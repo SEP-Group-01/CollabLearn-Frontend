@@ -1,121 +1,84 @@
-import { useState, useRef, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import React, { useState, useRef, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import SidebarComponent from "../components/SideBar";
+import { AttachFile, Send, Close } from "@mui/icons-material";
+import {Pin, Heart, MessageCircle, Reply } from "lucide-react";
 import {
-  ArrowLeft,
-  Send,
-  Pin,
-  Heart,
-  MessageCircle,
-  MoreVertical,
-  Reply,
-} from "lucide-react";
+  Box,
+  Button,
+  Card,
+  CardMedia,
+  CardContent,
+  TextField,
+  Avatar,
+  Typography,
+  Chip,
+  IconButton,
+  Paper,
+  Stack,
+  useMediaQuery,
+} from "@mui/material";
 
-// --- Local UI Components ---
+type Role = "admin" | "member";
 
-const Button = ({
-  children,
-  className = "",
-  ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-  <button
-    className={
-      "inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 " +
-      className
-    }
-    {...props}
-  >
-    {children}
-  </button>
-);
+interface Author {
+  id: number;
+  name: string;
+  avatar: string;
+  role: Role;
+}
 
-const Card = ({
-  children,
-  className = "",
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={
-      "rounded-xl border border-gray-300 bg-white text-black shadow " +
-      className
-    }
-    {...props}
-  >
-    {children}
-  </div>
-);
+interface ReplyType {
+  id: number;
+  content: string;
+  author: Author;
+  timestamp: string;
+  likes: number;
+  isLiked: boolean;
+}
 
-const CardContent = ({
-  children,
-  className = "",
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={"p-6 pt-0 " + className} {...props}>
-    {children}
-  </div>
-);
+interface MessageType {
+  id: number;
+  content: string;
+  author: Author;
+  timestamp: string;
+  isPinned: boolean;
+  likes: number;
+  replies: ReplyType[];
+  isLiked: boolean;
+  image?: string;
+}
 
-const Textarea = ({
-  className = "",
-  ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
-  <textarea
-    className={
-      "flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600 " +
-      className
-    }
-    {...props}
-  />
-);
-
-// --- Mock Data ---
-
-const mockMessages = [
+const mockMessages: MessageType[] = [
   {
     id: 1,
-    content:
-      "Welcome to the Machine Learning Fundamentals forum! 🎉 This is where we'll discuss concepts, share resources, and help each other learn. Feel free to ask questions and share your insights!",
+    content: "Welcome to the forum! Feel free to ask questions.",
     author: {
-      id: 1,
-      name: "Dr. Sarah Johnson",
-      avatar: "/placeholder.svg?height=40&width=40&text=SJ",
-      role: "admin",
+      id: 2,
+      name: "Alice Johnson",
+      avatar: "/placeholder.svg?height=40&width=40&text=AJ",
+      role: "member",
     },
-    timestamp: "2024-01-15T10:00:00Z",
-    isPinned: true,
-    likes: 15,
+    timestamp: "2025-08-08T09:00:00Z",
+    isPinned: false,
+    likes: 2,
     replies: [],
     isLiked: false,
   },
   {
     id: 2,
-    content:
-      "I'm having trouble understanding the concept of gradient descent. Can someone explain it in simple terms? I've read the textbook but it's still not clicking for me.",
+    content: "Hi Alice! Can you explain how to join a study group?",
     author: {
-      id: 3,
-      name: "Maria Rodriguez",
-      avatar: "/placeholder.svg?height=40&width=40&text=MR",
+      id: 999,
+      name: "You",
+      avatar: "/placeholder.svg?height=40&width=40&text=Y",
       role: "member",
     },
-    timestamp: "2024-01-20T14:30:00Z",
+    timestamp: "2025-08-08T09:05:00Z",
     isPinned: false,
-    likes: 8,
-    replies: [
-      {
-        id: 21,
-        content:
-          "Think of gradient descent like walking down a hill in the fog. You can't see the bottom, but you can feel the slope under your feet. You take steps in the direction that goes downhill the steepest until you reach the bottom. In ML, the 'hill' is your error function, and you're trying to find the minimum error.",
-        author: {
-          id: 2,
-          name: "Alex Chen",
-          avatar: "/placeholder.svg?height=32&width=32&text=AC",
-          role: "member",
-        },
-        timestamp: "2024-01-20T15:15:00Z",
-        likes: 12,
-        isLiked: true,
-      },
-    ],
-    isLiked: true,
+    likes: 1,
+    replies: [],
+    isLiked: false,
   },
 ];
 
@@ -124,68 +87,72 @@ const mockGroup = {
   name: "Machine Learning Fundamentals",
 };
 
-// --- Main Component ---
-
 export default function GroupForumPage() {
-  const params = useParams();
-  const groupId = params.id as string;
+  const params = useParams<{ id: string }>();
+  const groupId = params.id ?? ""; // fallback to empty string if undefined
+  const isMobile = useMediaQuery("(max-width:900px)");
 
-  const [messages, setMessages] = useState(mockMessages);
+  const [messages, setMessages] = useState<MessageType[]>(mockMessages);
   const [newMessage, setNewMessage] = useState("");
   const [shownReplies, setShownReplies] = useState<number[]>([]);
-
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyContent, setReplyContent] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const [collapsed, setCollapsed] = useState(isMobile);
+  const [image, setImage] = useState<File | null>(null);
 
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImage(e.target.files[0]);
+    }
+  };
 
-    const message = {
+  const handleSendMessage = () => {
+    if (!newMessage.trim() && !image) return;
+    let imageUrl = "";
+    if (image) {
+      imageUrl = URL.createObjectURL(image); // For demo, use local URL
+    }
+    const message: MessageType = {
       id: Date.now(),
       content: newMessage,
       author: {
         id: 999,
         name: "You",
         avatar: "/placeholder.svg?height=40&width=40&text=Y",
-        role: "member" as const,
+        role: "member",
       },
       timestamp: new Date().toISOString(),
       isPinned: false,
       likes: 0,
       replies: [],
       isLiked: false,
+      image: imageUrl, // Add image URL to message
     };
-
     setMessages([...messages, message]);
     setNewMessage("");
+    setImage(null);
   };
 
   const handleSendReply = (messageId: number) => {
     if (!replyContent.trim()) return;
-
-    const reply = {
+    const reply: ReplyType = {
       id: Date.now(),
       content: replyContent,
       author: {
         id: 999,
         name: "You",
         avatar: "/placeholder.svg?height=32&width=32&text=Y",
-        role: "member" as const,
+        role: "member",
       },
       timestamp: new Date().toISOString(),
       likes: 0,
       isLiked: false,
     };
-
     setMessages(
       messages.map((msg) =>
         msg.id === messageId
@@ -241,222 +208,374 @@ export default function GroupForumPage() {
     const diffInHours = Math.floor(
       (now.getTime() - date.getTime()) / (1000 * 60 * 60)
     );
-
     if (diffInHours < 1) return "Just now";
     if (diffInHours < 24) return `${diffInHours}h ago`;
     if (diffInHours < 48) return "Yesterday";
     return date.toLocaleDateString();
   };
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case "admin":
-        return "text-yellow-600";
-      default:
-        return "text-gray-600";
-    }
-  };
+  const getRoleColor = (role: Role) =>
+    role === "admin" ? "warning" : "default";
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto p-4">
-      {/* Header */}
-      <div className="flex  flex-col items-center text-center gap-4 mb-10">
-        <div>
-          <h1 className="text-3xl text-blue-600 font-bold ">{mockGroup.name} Forum</h1>
-          <p className="text-gray-500">
+    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+      {/* Sidebar */}
+      <Box
+        sx={{
+          width: { xs: "100%", md: collapsed ? 72 : 240 },
+          flexShrink: 0,
+          bgcolor: "background.paper",
+          borderRight: "1px solid #e0e0e0",
+        }}
+      >
+        <SidebarComponent collapsed={collapsed} setCollapsed={setCollapsed} />
+      </Box>
+
+      {/* Main Content */}
+      <Box
+        sx={{
+          flexGrow: 1,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            px: 2,
+            py: 2,
+            borderBottom: "1px solid #e0e0e0",
+            bgcolor: "background.default",
+          }}
+        >
+          <Typography variant="h5" fontWeight="bold">
+            {mockGroup.name} Forum
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
             Discuss topics and share knowledge with group members
-          </p>
-        </div>
-      </div>
+          </Typography>
+        </Box>
 
-      {/* Messages */}
-      <div className="space-y-4">
-        {messages.map((message) => (
-          <Card
-            key={message.id}
-            className={message.isPinned ? "border-blue-800 bg-yellow-50" : ""}
-          >
-            <CardContent>
-              {/* Message Header */}
-              <div className="flex items-start justify-between mb-2 mt-2">
-                <div className="flex items-center gap-3">
-                  <img
-                    src={message.author.avatar || "/placeholder.svg"}
-                    alt={message.author.name}
-                    className="h-10 w-10 rounded-full"
-                  />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-blue-600 ">
-                        {message.author.name}
-                      </span>
-                      <span
-                        className={`text-xs font-medium ${getRoleColor(
-                          message.author.role
-                        )} border rounded px-1`}
-                      >
-                        {message.author.role}
-                      </span>
-                      {message.isPinned && (
-                        <Pin className="h-4 w-4 text-yellow-600" />
-                      )}
-                    </div>
-                    <span className="text-sm text-gray-500">
-                      {formatTimestamp(message.timestamp)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Message Content */}
-              <p className="mb-4 whitespace-pre-wrap text-gray-900">
-                {message.content}
-              </p>
-
-              {/* Message Actions */}
-              <div className="flex items-center gap-4 mb-4">
-                <button
-                  onClick={() => toggleLike(message.id)}
-                  className={`inline-flex items-center gap-1 text-sm ${
-                    message.isLiked ? "text-red-600" : "text-gray-600"
-                  }`}
+        <Box sx={{ flexGrow: 1, overflowY: "auto", px: 2, py: 2 }}>
+          <Stack spacing={2}>
+            {messages.map((message) => {
+              const isOwnMessage = message.author.name === "You";
+              return (
+                <Box
+                  key={message.id}
+                  sx={{
+                    display: "flex",
+                    justifyContent: isOwnMessage ? "flex-end" : "flex-start",
+                  }}
                 >
-                  <Heart
-                    className={`h-4 w-4 ${
-                      message.isLiked ? "fill-current" : ""
-                    }`}
-                  />
-                  {message.likes}
-                </button>
-                <button
-                  onClick={() =>
-                    setReplyingTo(replyingTo === message.id ? null : message.id)
-                  }
-                  className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-                >
-                  <Reply className="h-4 w-4" />
-                  Reply
-                </button>
-                <button
-                  onClick={() => toggleReplies(message.id)}
-                  className="text-sm text-gray-500 hover:text-gray-900 inline-flex items-center gap-1"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  {message.replies.length} replies
-                </button>
-              </div>
-
-              {/* Replies */}
-              {shownReplies.includes(message.id) &&
-                message.replies.length > 0 && (
-                  <div className="ml-6 space-y-3 border-l border-gray-200 pl-4">
-                    {message.replies.map((reply) => (
-                      <div key={reply.id} className="p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <img
-                            src={reply.author.avatar || "/placeholder.svg"}
-                            alt={reply.author.name}
-                            className="h-6 w-6 rounded-full"
-                          />
-                          <span className="font-medium text-sm">
-                            {reply.author.name}
-                          </span>
-                          <span
-                            className={`text-xs font-medium ${getRoleColor(
-                              reply.author.role
-                            )} border rounded px-1`}
-                          >
-                            {reply.author.role}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {formatTimestamp(reply.timestamp)}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-900 mb-2">
-                          {reply.content}
-                        </p>
-                        <button
-                          onClick={() => toggleLike(message.id, true, reply.id)}
-                          className={`inline-flex items-center gap-1 text-xs ${
-                            reply.isLiked ? "text-red-600" : "text-gray-600"
-                          }`}
-                        >
-                          <Heart
-                            className={`h-3 w-3 ${
-                              reply.isLiked ? "fill-current" : ""
-                            }`}
-                          />
-                          {reply.likes}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-              {/* Reply Input */}
-              {replyingTo === message.id && (
-                <div className="mt-4 ml-6">
-                  <div className="flex gap-2">
-                    <Textarea
-                      placeholder="Write a reply..."
-                      value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
-                      className="min-h-[80px]"
-                    />
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        onClick={() => handleSendReply(message.id)}
-                        disabled={!replyContent.trim()}
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        className="bg-transparent text-gray-600 hover:bg-gray-100"
-                        onClick={() => {
-                          setReplyingTo(null);
-                          setReplyContent("");
+                  <Card
+                    sx={{
+                      maxWidth: "70%",
+                      backgroundColor: message.isPinned ? "#fff9c4" : "white",
+                      borderTopLeftRadius: 16,
+                      borderTopRightRadius: 16,
+                      borderBottomLeftRadius: isOwnMessage ? 16 : 4,
+                      borderBottomRightRadius: isOwnMessage ? 4 : 16,
+                    }}
+                  >
+                    <CardContent>
+                      <Stack
+                        direction="row"
+                        spacing={2}
+                        alignItems="flex-start"
+                        sx={{
+                          flexDirection: isOwnMessage ? "row-reverse" : "row",
                         }}
                       >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
+                        <Avatar src={message.author.avatar} />
+                        <Box>
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            sx={{
+                              justifyContent: isOwnMessage
+                                ? "flex-end"
+                                : "flex-start",
+                            }}
+                          >
+                            <Typography
+                              color="primary"
+                              fontWeight="bold"
+                              sx={{
+                                textAlign: isOwnMessage ? "right" : "left",
+                              }}
+                            >
+                              {message.author.name}
+                            </Typography>
+                            <Chip
+                              label={message.author.role}
+                              size="small"
+                              color={getRoleColor(message.author.role)}
+                            />
+                            {message.isPinned && <Pin size={16} />}
+                          </Stack>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ textAlign: isOwnMessage ? "right" : "left" }}
+                          >
+                            {formatTimestamp(message.timestamp)}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                      <Box mt={2}>
+                        <Typography sx={{ whiteSpace: "pre-wrap" }}>
+                          {message.content}
+                        </Typography>
+                        {message.image && (
+                          <Box mt={1}>
+                            <img
+                              src={message.image}
+                              alt="chat-img"
+                              style={{ maxWidth: "100%", borderRadius: 8 }}
+                            />
+                          </Box>
+                        )}
+                      </Box>
+                      <Stack
+                        direction="row"
+                        spacing={2}
+                        mt={2}
+                        sx={{
+                          justifyContent: isOwnMessage
+                            ? "flex-end"
+                            : "flex-start",
+                        }}
+                      >
+                        <IconButton
+                          onClick={() => toggleLike(message.id)}
+                          color={message.isLiked ? "error" : "default"}
+                          size="small"
+                        >
+                          <Heart size={16} />
+                          <Typography variant="body2" ml={0.5}>
+                            {message.likes}
+                          </Typography>
+                        </IconButton>
+                        <Button
+                          size="small"
+                          onClick={() =>
+                            setReplyingTo(
+                              replyingTo === message.id ? null : message.id
+                            )
+                          }
+                        >
+                          <Reply fontSize="small" /> Reply
+                        </Button>
+                        <Button
+                          size="small"
+                          onClick={() => toggleReplies(message.id)}
+                        >
+                          <MessageCircle fontSize="small" />{" "}
+                          {message.replies.length} replies
+                        </Button>
+                      </Stack>
 
-      {/* New Message Input */}
-      <Card className="sticky bottom-4">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-2">
-            <div className="flex-1 flex gap-2 mt-5">
-              <Textarea
-                placeholder="Share your thoughts with the group..."
+                      {shownReplies.includes(message.id) &&
+                        message.replies.length > 0 && (
+                          <Stack
+                            spacing={2}
+                            mt={2}
+                            pl={4}
+                            borderLeft={1}
+                            borderColor="divider"
+                          >
+                            {message.replies.map((reply) => (
+                              <Paper key={reply.id} sx={{ p: 2 }}>
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  alignItems="center"
+                                >
+                                  <Avatar
+                                    src={reply.author.avatar}
+                                    sx={{ width: 24, height: 24 }}
+                                  />
+                                  <Typography
+                                    variant="body2"
+                                    fontWeight="medium"
+                                  >
+                                    {reply.author.name}
+                                  </Typography>
+                                  <Chip
+                                    label={reply.author.role}
+                                    size="small"
+                                    color={getRoleColor(reply.author.role)}
+                                  />
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    {formatTimestamp(reply.timestamp)}
+                                  </Typography>
+                                </Stack>
+                                <Typography variant="body2" mt={1}>
+                                  {reply.content}
+                                </Typography>
+                                <IconButton
+                                  onClick={() =>
+                                    toggleLike(message.id, true, reply.id)
+                                  }
+                                  color={reply.isLiked ? "error" : "default"}
+                                  size="small"
+                                >
+                                  <Heart size={14} />
+                                  <Typography variant="caption" ml={0.5}>
+                                    {reply.likes}
+                                  </Typography>
+                                </IconButton>
+                              </Paper>
+                            ))}
+                          </Stack>
+                        )}
+
+                      {replyingTo === message.id && (
+                        <Stack spacing={1} mt={2}>
+                          <TextField
+                            fullWidth
+                            multiline
+                            minRows={2}
+                            placeholder="Write a reply..."
+                            value={replyContent}
+                            onChange={(e) => setReplyContent(e.target.value)}
+                          />
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              onClick={() => handleSendReply(message.id)}
+                              disabled={!replyContent.trim()}
+                              variant="contained"
+                              endIcon={<Send size={16} />}
+                            >
+                              Send
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setReplyingTo(null);
+                                setReplyContent("");
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </Stack>
+                        </Stack>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Box>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </Stack>
+        </Box>
+
+        {/* New Message Input */}
+        <Box
+          sx={{
+            borderTop: "1px solid #e0e0e0",
+            p: 2,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Stack direction="column" spacing={2}>
+            {/* Message Input and Actions */}
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              alignItems="flex-end"
+            >
+              <TextField
+                fullWidth
+                multiline
+                minRows={2}
+                placeholder="Write your message..."
+                variant="outlined"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                className="min-h-[40px] resize-none flex-1"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     handleSendMessage();
                   }
                 }}
+                sx={{ flex: 1 }}
               />
+
+              {/* Image Upload Button */}
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                id="image-upload"
+                onChange={handleImageChange}
+              />
+              <label htmlFor="image-upload">
+                <IconButton
+                  component="span"
+                  color="primary"
+                  sx={{ mb: { xs: 0, sm: "4px" } }}
+                >
+                  <AttachFile />
+                </IconButton>
+              </label>
+
+              {/* Send Button */}
               <Button
+                variant="contained"
+                endIcon={<Send />}
+                disabled={!newMessage.trim() && !image}
                 onClick={handleSendMessage}
-                disabled={!newMessage.trim()}
-                className="h-fit self-end"
+                sx={{ mb: { xs: 0, sm: "4px" }, whiteSpace: "nowrap" }}
               >
-                <Send className="mr-2 h-4 w-4" />
                 Send
               </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+            </Stack>
+
+            {/* Image Preview */}
+            {image && (
+              <Card
+                sx={{
+                  maxWidth: 220,
+                  borderRadius: 2,
+                  boxShadow: 3,
+                  position: "relative",
+                }}
+              >
+                <IconButton
+                  size="small"
+                  onClick={() => setImage(null)}
+                  sx={{
+                    position: "absolute",
+                    top: 4,
+                    right: 4,
+                    bgcolor: "rgba(0,0,0,0.4)",
+                    color: "white",
+                    "&:hover": { bgcolor: "rgba(0,0,0,0.6)" },
+                  }}
+                >
+                  <Close fontSize="small" />
+                </IconButton>
+                <CardMedia
+                  component="img"
+                  height="140"
+                  image={URL.createObjectURL(image)}
+                  alt="preview"
+                  sx={{ objectFit: "cover" }}
+                />
+                <CardContent sx={{ p: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Image ready to send
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+          </Stack>
+        </Box>
+      </Box>
+    </Box>
   );
 }

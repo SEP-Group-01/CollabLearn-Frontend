@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { assets } from "../assets/assets";
 import { useNavigate } from "react-router-dom";
+import { Box, InputBase, IconButton, Button, Paper } from "@mui/material";
+import { assets } from "../assets/assets";
 
 interface SearchBarProps {
   data?: string;
@@ -8,37 +9,59 @@ interface SearchBarProps {
 
 const SearchBar: React.FC<SearchBarProps> = ({ data }) => {
   const navigate = useNavigate();
-  const [input, setInput] = useState(data ? data : "");
+  const [input, setInput] = useState(data || "");
 
   const onSearchHandler = (e: React.FormEvent) => {
     e.preventDefault();
-    navigate("/group-list/" + input);
+    if (input.trim()) {
+      navigate("/group-list/" + input);
+    }
   };
 
   return (
-    <form
+    <Paper
+      component="form"
       onSubmit={onSearchHandler}
-      className="max-w-xl w-full md:h-14 h-12 flex items-center bg-white border border-gray-500/20 rounded"
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        maxWidth: 600,
+        width: "100%",
+        height: { xs: 48, md: 56 },
+        border: "1px solid",
+        borderColor: "grey.300",
+        borderRadius: 2,
+        boxShadow: "none",
+        px: 1,
+        backgroundColor: "#fff",
+      }}
     >
-      <img
-        src={assets.search_icon}
-        alt="Search Icon"
-        className=" md:w-auto w-10 px-3 "
-      />
-      <input
-        onChange={e => setInput(e.target.value)}
-        value={input}
-        type="text"
+      <IconButton sx={{ p: 1 }}>
+        <img src={assets.search_icon} alt="Search Icon" style={{ height: 24 }} />
+      </IconButton>
+
+      <InputBase
+        sx={{ ml: 1, flex: 1, color: "text.secondary" }}
         placeholder="Search for courses"
-        className="w-full outline-none text-gray-500/80"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
       />
-      <button
+
+      <Button
         type="submit"
-        className="bg-blue-600 rounded text-white md:px-10 px-7 md:py-3 py-2 mx-1"
+        variant="contained"
+        color="primary"
+        sx={{
+          textTransform: "none",
+          px: { xs: 3, md: 5 },
+          py: { xs: 1, md: 1.5 },
+          borderRadius: 1,
+          ml: 1,
+        }}
       >
         Search
-      </button>
-    </form>
+      </Button>
+    </Paper>
   );
 };
 
