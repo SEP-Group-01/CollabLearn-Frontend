@@ -7,6 +7,7 @@ import CollaborativeEditor from './pages/CollaborativeEditor'
 import Forum from './pages/Forum'
 import Group from './pages/Group'
 import Profile from './pages/Profile'
+import QuizesPage from './pages/QuizesPage'
 
 
 
@@ -22,6 +23,7 @@ const App = () => {
         <Route path="/forum" element={<Forum />} />
         <Route path='/group'element={<Group/>}/>
         <Route path='/profile'element={<Profile/>}/>
+        <Route path='/quizzes' element={<QuizesPage/>}/>
 
 
 
