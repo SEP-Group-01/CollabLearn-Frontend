@@ -1,9 +1,9 @@
-
 import React, { useMemo, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import SidebarComponent from "../components/SideBar";
 import {
   Box,
+  Grid,
   Card,
   CardHeader,
   Typography,
@@ -11,7 +11,6 @@ import {
   Button,
   Stack,
 } from "@mui/material";
-import Grid from "@mui/material/Grid";
 import {
   Forum,
   School,
@@ -21,11 +20,93 @@ import {
   CheckCircle,
 } from "@mui/icons-material";
 
+type SubModule = {
+  id: number;
+  title: string;
+  description: string;
+  resources: number;
+  sessions: number;
+  enrolled: boolean;
+};
 
+export default function GroupDetailPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const groupId = id || "1";
+  const [collapsed, setCollapsed] = useState(false);
 
-const Group = () => {
+  const initialGroup = useMemo(
+    () => ({
+      id: Number(groupId),
+      title: groupId === "1" ? "Machine Learning Fundamentals" : `Group #${groupId}`,
+      category: "Computer Science",
+      requiresApproval: Number(groupId) % 2 === 1,
+      isMember: false,
+      isPending: false,
+      members: 245 + Number(groupId),
+      studyHours: 24 + Number(groupId),
+      description:
+        "Learn the basics of ML algorithms and applications. Understand core concepts, implement algorithms from scratch, and collaborate on practical projects.",
+    }),
+    [groupId]
+  );
+
+  const initialModules: SubModule[] = useMemo(
+    () => [
+      {
+        id: 1,
+        title: "Linear Algebra Basics",
+        description: "Foundation concepts in linear algebra for ML (vectors, matrices, eigen stuff).",
+        resources: 12,
+        sessions: 4,
+        enrolled: false,
+      },
+      {
+        id: 2,
+        title: "Neural Networks",
+        description: "From perceptrons to deep networks: activations, loss functions, backprop.",
+        resources: 18,
+        sessions: 6,
+        enrolled: false,
+      },
+      {
+        id: 3,
+        title: "Optimization and Gradient Descent",
+        description: "Intuition + math for optimization: GD, momentum, Adam, LR schedules.",
+        resources: 9,
+        sessions: 3,
+        enrolled: false,
+      },
+      {
+        id: 4,
+        title: "Model Evaluation",
+        description: "Metrics, validation, overfitting, cross-validation and confusion matrix.",
+        resources: 11,
+        sessions: 3,
+        enrolled: false,
+      },
+    ],
+    []
+  );
+
+  const [group, setGroup] = useState(initialGroup);
+  const [modules, setModules] = useState<SubModule[]>(initialModules);
+
+  const handleJoinOrRequest = () => {
+    if (group.requiresApproval) {
+      setGroup((g) => ({ ...g, isPending: true }));
+    } else {
+      setGroup((g) => ({ ...g, isMember: true }));
+    }
+  };
+
+  const handleEnrollModule = (moduleId: number) => {
+    setModules((mods) =>
+      mods.map((m) => (m.id === moduleId ? { ...m, enrolled: !m.enrolled } : m))
+    );
+  };
+
   return (
-
     <Box display="flex">
       <SidebarComponent collapsed={collapsed} setCollapsed={setCollapsed} />
       <Box
@@ -129,9 +210,9 @@ const Group = () => {
           </Typography>
         </Box>
 
-        <Stack spacing={2}>
+        <Grid container spacing={2} direction="column">
           {modules.map((m) => (
-            <Box key={m.id}>
+            <Grid item xs={12} key={m.id}>
               <Card
                 variant="outlined"
                 sx={{
@@ -178,13 +259,10 @@ const Group = () => {
                   sx={{ pb: 0 }}
                 />
               </Card>
-            </Box>
+            </Grid>
           ))}
-        </Stack>
+        </Grid>
       </Box>
     </Box>
   );
-
 }
-
-export default Group
