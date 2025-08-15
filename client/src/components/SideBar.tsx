@@ -1,15 +1,17 @@
-import { useState, ReactNode } from "react";
-import {
-  Sidebar,
-  Menu,
-  MenuItem,
-  SubMenu,
-} from "react-pro-sidebar";
+
+import { useState } from "react";
+import type { ReactNode } from "react";
+import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
+import EditIcon from "@mui/icons-material/Edit";
+
+
 import { Box } from "@mui/material";
-import { Link, To } from "react-router-dom";
+import { Link } from "react-router-dom";
+import type { To } from "react-router-dom";
 
 // Icons
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
@@ -87,24 +89,47 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
         <Menu>
 
           {/* Toggle */}
-          <MenuItem
-            icon={<MenuOutlinedIcon sx={{ color: "white" }} />}
-            onClick={handleToggle}
-            style={{ color: "white", marginBottom: 20 }}
-          >
-            {!collapsed && (
+          {collapsed ? (
+            <Box
+              onClick={handleToggle}
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                padding: "12px",
+                marginBottom: "8px",
+                cursor: "pointer",
+                color: "white",
+                "&:hover": {
+                  backgroundColor: "rgba(255, 255, 255, 0.1)"
+                }
+              }}
+            >
+              <MenuOutlinedIcon sx={{ color: "white" }} />
+            </Box>
+          ) : (
+            <MenuItem
+              icon={null}
+              onClick={handleToggle}
+              style={{ 
+                color: "white", 
+                marginBottom: 12, 
+                padding: "12px 16px"
+              }}
+            >
               <Box
                 sx={{
                   display: "flex",
-                  justifyContent: "center",
+                  justifyContent: "space-between",
                   alignItems: "center",
-                  ml: 1,
+                  width: "100%"
                 }}
               >
                 <img src={assets.logo} alt="logo" width="120" />
+                <ChevronLeftIcon sx={{ color: "white" }} />
               </Box>
-            )}
-          </MenuItem>
+            </MenuItem>
+          )}
 
           {/* Profile */}
           <SidebarMenuItem

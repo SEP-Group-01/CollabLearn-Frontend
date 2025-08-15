@@ -12,6 +12,7 @@ import HomePage from "./pages/HomePage"
 import SignUpPage from "./pages/SignUpPage"
 import LoginPage from "./pages/LoginPage"
 import DashboardPage from "./pages/DashboardPage"
+import QuizesPage from './pages/QuizesPage'
 
 
 
@@ -26,13 +27,12 @@ const App = () => {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/editor" element={<CollaborativeEditor/>} />
 
-          <Route path="/forum" element={<Forum />} />
-          <Route path='/group' element={<Group/>}/>
-          <Route path='/profile' element={<Profile/>}/>
-        </Routes>
+        <Route path="/forum" element={<Forum />} />
+        <Route path='/group'element={<Group/>}/>
+        <Route path='/profile'element={<Profile/>}/>
+        <Route path='/quizzes' element={<QuizesPage/>}/>
+      </Routes>
       </div>
-
-      
 
    
   )

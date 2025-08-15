@@ -23,6 +23,7 @@ import {
   List,
   ListItem,
 } from "@mui/material"
+import SidebarComponent from '../components/SideBar'
 import {
   FormatBold,
   FormatItalic,
@@ -128,6 +129,7 @@ const highlightColors = [
 
 const CollaborativeEditor = () => {
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const [activeDocument, setActiveDocument] = useState("Team Meeting Notes")
   const [editorContent, setEditorContent] = useState(`
     <h1>Team Meeting Notes - January 2024</h1>
@@ -205,73 +207,86 @@ const CollaborativeEditor = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        {/* Top Navigation Bar */}
-        <AppBar position="static" color="default" elevation={1}>
-          <Toolbar>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1 }}>
-              <Description />
-              <Typography variant="h6" component="h1">
-                {activeDocument}
-              </Typography>
-            </Box>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {/* User Presence Area */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <People sx={{ fontSize: 16, color: 'text.secondary' }} />
-                <Box sx={{ display: 'flex', gap: -1 }}>
-                  {collaborators.map((user, index) => (
-                    <Tooltip key={user.id} title={`${user.name} ${user.isActive ? "(Active)" : "(Away)"}`}>
-                      <Badge
-                        overlap="circular"
-                        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                        badgeContent={
-                          user.isActive ? (
-                            <Box
-                              sx={{
-                                width: 12,
-                                height: 12,
-                                borderRadius: '50%',
-                                backgroundColor: 'success.main',
-                                border: '2px solid',
-                                borderColor: 'background.paper',
-                              }}
-                            />
-                          ) : null
-                        }
-                      >
-                        <Avatar
-                          sx={{
-                            width: 32,
-                            height: 32,
-                            fontSize: '12px',
-                            bgcolor: user.color.replace('bg-', '').replace('-500', '.main'),
-                            marginLeft: index > 0 ? -1 : 0,
-                            border: '2px solid',
-                            borderColor: 'background.paper',
-                          }}
-                        >
-                          {user.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </Avatar>
-                      </Badge>
-                    </Tooltip>
-                  ))}
-                </Box>
+      <Box sx={{ minHeight: '100vh', display: 'flex' }}>
+        {/* Sidebar */}
+        <SidebarComponent collapsed={collapsed} setCollapsed={setCollapsed} />
+        
+        {/* Main Content */}
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            flex: 1,
+            marginLeft: { xs: 0, md: collapsed ? '80px' : '250px' },
+            transition: 'margin-left 0.3s ease',
+          }}
+        >
+          {/* Top Navigation Bar */}
+          <AppBar position="static" color="default" elevation={1}>
+            <Toolbar>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1 }}>
+                <Description />
+                <Typography variant="h6" component="h1">
+                  {activeDocument}
+                </Typography>
               </Box>
 
-              {/* Theme Toggle */}
-              <Tooltip title="Toggle theme">
-                <IconButton onClick={toggleTheme} size="small">
-                  {isDarkMode ? <LightMode /> : <DarkMode />}
-                </IconButton>
-              </Tooltip>
-            </Box>
-          </Toolbar>
-        </AppBar>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                {/* User Presence Area */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <People sx={{ fontSize: 16, color: 'text.secondary' }} />
+                  <Box sx={{ display: 'flex', gap: -1 }}>
+                    {collaborators.map((user, index) => (
+                      <Tooltip key={user.id} title={`${user.name} ${user.isActive ? "(Active)" : "(Away)"}`}>
+                        <Badge
+                          overlap="circular"
+                          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                          badgeContent={
+                            user.isActive ? (
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  backgroundColor: 'success.main',
+                                  border: '2px solid',
+                                  borderColor: 'background.paper',
+                                }}
+                              />
+                            ) : null
+                          }
+                        >
+                          <Avatar
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              fontSize: '12px',
+                              bgcolor: user.color.replace('bg-', '').replace('-500', '.main'),
+                              marginLeft: index > 0 ? -1 : 0,
+                              border: '2px solid',
+                              borderColor: 'background.paper',
+                            }}
+                          >
+                            {user.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </Avatar>
+                        </Badge>
+                      </Tooltip>
+                    ))}
+                  </Box>
+                </Box>
+
+                {/* Theme Toggle */}
+                <Tooltip title="Toggle theme">
+                  <IconButton onClick={toggleTheme} size="small">
+                    {isDarkMode ? <LightMode /> : <DarkMode />}
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </Toolbar>
+          </AppBar>
 
         {/* Formatting Toolbar */}
         <Paper elevation={0} sx={{ borderBottom: 1, borderColor: 'divider', px: 3, py: 1 }}>
@@ -612,6 +627,7 @@ const CollaborativeEditor = () => {
               </List>
             </Box>
           </Paper>
+        </Box>
         </Box>
       </Box>
     </ThemeProvider>

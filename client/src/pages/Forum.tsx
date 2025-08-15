@@ -450,7 +450,7 @@ export default function GroupForumPage() {
                               onClick={() => handleSendReply(message.id)}
                               disabled={!replyContent.trim()}
                               variant="contained"
-                              endIcon={<Send size={16} />}
+                              endIcon={<Send fontSize="small" />}
                             >
                               Send
                             </Button>
