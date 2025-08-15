@@ -156,7 +156,7 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
             label={!collapsed ? "Groups" : ""}
             icon={<GroupsOutlinedIcon sx={{ color: "white" }} />}
             style={{ color: "white" }}
-            defaultOpen={!collapsed}
+            defaultOpen={collapsed}
           >
             <SidebarMenuItem
               title="Registered Groups"
@@ -172,6 +172,15 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
             title="Generate Study Plan"
             to="/study-plan"
             icon={<FormatListBulletedOutlinedIcon sx={{ color: "white" }} />}
+            selected={selected}
+            setSelected={setSelected}
+            collapsed={collapsed}
+          />
+
+          <SidebarMenuItem
+            title="Edit Document"
+            to="/editor"
+            icon={<EditIcon sx={{ color: "white" }} />}
             selected={selected}
             setSelected={setSelected}
             collapsed={collapsed}
