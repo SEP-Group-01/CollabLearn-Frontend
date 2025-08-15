@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
     Box,
     Card,
@@ -15,7 +15,12 @@ import {
     Paper,
     Breadcrumbs,
     Link,
-    Alert
+    Alert,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions
 } from '@mui/material';
 
 import {
@@ -24,7 +29,6 @@ import {
     Edit as EditIcon,
     Save as SaveIcon,
     Cancel as CancelIcon,
-    CloudUpload as CloudUploadIcon,
     NavigateNext as NavigateNextIcon,
     Home as HomeIcon,
     Quiz as QuizIcon,
@@ -34,165 +38,14 @@ import {
 
 import Footer from '../components/Footer';
 import SidebarComponent from '../components/SideBar';
+import {mockResources} from '../mocks/Quizzes';
+import type {Option, Question, QuizDetails} from '../types/QuizInterfaces'
+import DragDropImageUpload from '../components/DragDropImageUpload'
 
-// Mock data for resources
-const mockResources = [
-    { id: '1', title: 'React Fundamentals', type: 'Document' },
-    { id: '2', title: 'Advanced JavaScript', type: 'Video' },
-    { id: '3', title: 'State Management', type: 'Article' },
-    { id: '4', title: 'Component Design Patterns', type: 'Tutorial' },
-    { id: '5', title: 'Testing React Applications', type: 'Guide' }
-];
-
-interface Option {
-    id: string;
-    sequenceLetter: string;
-    text: string;
-    image: File | null;
-    isCorrect: boolean;
-}
-
-interface Question {
-    id: string;
-    questionText: string;
-    image: File | null;
-    options: Option[];
-    marks: number;
-    isEditing: boolean;
-}
-
-interface QuizDetails {
-    title: string;
-    description: string;
-    allocatedTime: number;
-    topics: string;
-    selectedResources: string[];
-}
-
-interface DragDropImageUploadProps {
-    onImageUpload: (file: File) => void;
-    currentImage: File | null;
-    label: string;
-    fullWidth?: boolean;
-    height?: string;
-    dragOverId: string;
-    isDragOver: boolean;
-    onDragOver: (e: React.DragEvent, dropId: string) => void;
-    onDragLeave: (e: React.DragEvent) => void;
-    onDrop: (e: React.DragEvent) => void;
-}
-
-const DragDropImageUpload: React.FC<DragDropImageUploadProps> = ({
-    onImageUpload,
-    currentImage,
-    label,
-    fullWidth = false,
-    height = '120px',
-    dragOverId,
-    isDragOver,
-    onDragOver,
-    onDragLeave,
-    onDrop
-}) => {
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const handleClick = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            onImageUpload(file);
-        }
-    };
-
-    return (
-        <Box
-            sx={{
-                border: '2px dashed',
-                borderColor: isDragOver ? 'primary.main' : 'divider',
-                borderRadius: 2,
-                p: 2,
-                textAlign: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease-in-out',
-                bgcolor: isDragOver ? 'rgba(25, 118, 210, 0.08)' : 'background.paper',
-                minHeight: height,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: 1,
-                width: fullWidth ? '100%' : 'auto',
-                '&:hover': {
-                    borderColor: 'primary.main',
-                    bgcolor: 'action.hover',
-                    transform: 'translateY(-1px)',
-                    boxShadow: 1
-                }
-            }}
-            onClick={handleClick}
-            onDragOver={(e) => onDragOver(e, dragOverId)}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
-        >
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={handleFileChange}
-            />
-            
-            {currentImage ? (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
-                    <Box sx={{ 
-                        position: 'relative',
-                        borderRadius: 1,
-                        overflow: 'hidden',
-                        boxShadow: 1
-                    }}>
-                        <img
-                            src={URL.createObjectURL(currentImage)}
-                            alt="Preview"
-                            style={{
-                                maxWidth: '120px',
-                                maxHeight: '80px',
-                                objectFit: 'cover',
-                                borderRadius: '4px'
-                            }}
-                        />
-                    </Box>
-                    <Typography variant="body2" color="primary.main" sx={{ fontWeight: 'medium', fontSize: '0.875rem' }}>
-                        Click or drag to change
-                    </Typography>
-                </Box>
-            ) : (
-                <>
-                    <CloudUploadIcon 
-                        sx={{ 
-                            fontSize: isDragOver ? 36 : 32, 
-                            color: isDragOver ? 'primary.main' : 'text.secondary',
-                            transition: 'all 0.2s ease-in-out'
-                        }} 
-                    />
-                    <Typography variant="body2" color="text.primary" sx={{ fontWeight: 'medium', fontSize: '0.875rem' }}>
-                        {label}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                        Click to browse or drag and drop
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                        JPEG, PNG, GIF, WebP (Max 5MB)
-                    </Typography>
-                </>
-            )}
-        </Box>
-    );
-};
 
 const CreateQuiz: React.FC = () => {
+    const [openSaveDialog, setOpenSaveDialog] = useState(false);
+    const [openCancelDialog, setOpenCancelDialog] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isAddingQuestion, setIsAddingQuestion] = useState(false);
@@ -465,17 +318,87 @@ const CreateQuiz: React.FC = () => {
         alert('Quiz created successfully!');
     };
 
+    const handleSaveAndExit = () => {
+        setOpenSaveDialog(true);
+    };
+
+    const handleCancelAndExit = () => {
+        setOpenCancelDialog(true);
+    };
+
+    const confirmSaveAndExit = () => {
+        setOpenSaveDialog(false);
+        handleCreateQuiz();
+        window.history.back();
+    };
+
+    const confirmCancelAndExit = () => {
+        setOpenCancelDialog(false);
+        window.history.back();
+    };
+
     return (
         <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
             <SidebarComponent collapsed={collapsed} setCollapsed={setCollapsed} />
-            
-            <Box sx={{ 
-                flexGrow: 1, 
+
+            <Box sx={{
+                flexGrow: 1,
                 ml: collapsed ? '80px' : '250px',
                 transition: 'margin-left 0.3s ease',
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                position: 'relative'
             }}>
+                {/* Save & Exit and Cancel & Exit Buttons */}
+                <Box sx={{ position: 'absolute', top: 24, right: 40, zIndex: 10, display: 'flex', gap: 2 }}>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<SaveIcon />}
+                        sx={{ fontWeight: 'bold', textTransform: 'none', borderRadius: 2, boxShadow: 2 }}
+                        onClick={handleSaveAndExit}
+                    >
+                        Save and Exit
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        color="secondary"
+                        startIcon={<CancelIcon />}
+                        sx={{ fontWeight: 'bold', textTransform: 'none', borderRadius: 2, boxShadow: 2 }}
+                        onClick={handleCancelAndExit}
+                    >
+                        Cancel and Exit
+                    </Button>
+                </Box>
+
+                {/* Save Confirmation Dialog */}
+                <Dialog open={openSaveDialog} onClose={() => setOpenSaveDialog(false)}>
+                    <DialogTitle>Save and Exit</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            Are you sure you want to save your changes and exit?
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenSaveDialog(false)} color="inherit">Cancel</Button>
+                        <Button onClick={confirmSaveAndExit} color="primary" variant="contained">Save and Exit</Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Cancel Confirmation Dialog */}
+                <Dialog open={openCancelDialog} onClose={() => setOpenCancelDialog(false)}>
+                    <DialogTitle>Cancel and Exit</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            Are you sure you want to discard your changes and exit? Unsaved changes will be lost.
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenCancelDialog(false)} color="inherit">Back</Button>
+                        <Button onClick={confirmCancelAndExit} color="secondary" variant="contained">Cancel and Exit</Button>
+                    </DialogActions>
+                </Dialog>
+
                 <Container maxWidth="lg" sx={{ py: 3, flexGrow: 1 }}>
                     {/* Breadcrumbs */}
                     <Box sx={{ mb: 3 }}>
@@ -1026,32 +949,6 @@ const CreateQuiz: React.FC = () => {
                             )}
                         </CardContent>
                     </Card>
-
-                    {/* Create Quiz Button */}
-                    <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
-                        <Button
-                            variant="contained"
-                            size="large"
-                            onClick={handleCreateQuiz}
-                            fullWidth
-                            sx={{ 
-                                maxWidth: '400px', 
-                                py: 1.5,
-                                borderRadius: 2,
-                                fontWeight: 'bold',
-                                textTransform: 'none',
-                                fontSize: '1.1rem',
-                                boxShadow: 3,
-                                '&:hover': {
-                                    boxShadow: 6,
-                                    transform: 'translateY(-1px)'
-                                },
-                                transition: 'all 0.2s ease-in-out'
-                            }}
-                        >
-                            Add Question
-                        </Button>
-                    </Box>
                 </Container>
                 
                 <Footer />
