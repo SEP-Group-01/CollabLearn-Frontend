@@ -8,6 +8,7 @@ import Forum from './pages/Forum'
 import Group from './pages/Group'
 import Profile from './pages/Profile'
 import QuizesPage from './pages/QuizesPage'
+import CreateQuiz from './pages/CreateQuiz'
 
 
 
@@ -24,6 +25,7 @@ const App = () => {
         <Route path='/group'element={<Group/>}/>
         <Route path='/profile'element={<Profile/>}/>
         <Route path='/quizzes' element={<QuizesPage/>}/>
+        <Route path='/create-quiz' element={<CreateQuiz/>}/>
 
 
 

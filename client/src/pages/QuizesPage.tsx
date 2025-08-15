@@ -9,11 +9,11 @@ import { useInView } from 'react-intersection-observer'
   Chip,
   Container,
   Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
+  // Dialog,
+  // DialogTitle,
+  // DialogContent,
+  // DialogActions,
+  // TextField,
   Breadcrumbs,
   Stack,
   Avatar,
@@ -66,14 +66,14 @@ interface Quiz {
   }[]
 }
 
-interface CreateQuizData {
-  title: string
-  description: string
-  timeAllocated: number
-  totalMarks: number
-  tags: string[]
-  resourceTags: string[]
-}
+// interface CreateQuizData {
+//   title: string
+//   description: string
+//   timeAllocated: number
+//   totalMarks: number
+//   tags: string[]
+//   resourceTags: string[]
+// }
 
 // Lazy Quiz Card Component
 interface LazyQuizCardProps {
@@ -579,16 +579,16 @@ const LazyQuizCard = ({
 }
 
 const QuizesPage = () => {
-  const [openCreateDialog, setOpenCreateDialog] = useState(false)
+  // const [openCreateDialog, setOpenCreateDialog] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
-  const [createQuizData, setCreateQuizData] = useState<CreateQuizData>({
-    title: '',
-    description: '',
-    timeAllocated: 60,
-    totalMarks: 100,
-    tags: [],
-    resourceTags: []
-  })
+  // const [createQuizData, setCreateQuizData] = useState<CreateQuizData>({
+  //   title: '',
+  //   description: '',
+  //   timeAllocated: 60,
+  //   totalMarks: 100,
+  //   tags: [],
+  //   resourceTags: []
+  // })
 
   // Mock data - this would come from an API
   const userRole = 'moderator' // 'student', 'moderator', 'admin'
@@ -747,16 +747,17 @@ const QuizesPage = () => {
 
   const handleCreateQuiz = () => {
     // Handle quiz creation
-    console.log('Creating quiz:', createQuizData)
-    setOpenCreateDialog(false)
-    setCreateQuizData({
-      title: '',
-      description: '',
-      timeAllocated: 60,
-      totalMarks: 100,
-      tags: [],
-      resourceTags: []
-    })
+    // console.log('Creating quiz:', createQuizData)
+    // setOpenCreateDialog(false)
+    // setCreateQuizData({
+    //   title: '',
+    //   description: '',
+    //   timeAllocated: 60,
+    //   totalMarks: 100,
+    //   tags: [],
+    //   resourceTags: []
+    // })
+    
   }
 
   const handleAttemptQuiz = (quizId: string) => {
@@ -830,7 +831,7 @@ const QuizesPage = () => {
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() => setOpenCreateDialog(true)}
+                onClick={() => handleCreateQuiz()}
                 size="large"
               >
                 Create Quiz
@@ -856,7 +857,7 @@ const QuizesPage = () => {
           </Stack>
 
           {/* Create Quiz Dialog */}
-          <Dialog open={openCreateDialog} onClose={() => setOpenCreateDialog(false)} maxWidth="md" fullWidth>
+          {/* <Dialog open={openCreateDialog} onClose={() => setOpenCreateDialog(false)} maxWidth="md" fullWidth>
             <DialogTitle>Create New Quiz</DialogTitle>
             <DialogContent>
               <Box sx={{ pt: 1 }}>
@@ -923,7 +924,7 @@ const QuizesPage = () => {
               <Button onClick={() => setOpenCreateDialog(false)}>Cancel</Button>
               <Button onClick={handleCreateQuiz} variant="contained">Create Quiz</Button>
             </DialogActions>
-          </Dialog>
+          </Dialog> */}
         </Container>
         
         <Footer />
