@@ -34,6 +34,7 @@ const QuizesPage = () => {
   const handleAttemptQuiz = (quizId: string) => {
     console.log('Attempting quiz:', quizId)
     // Navigate to quiz attempt page
+    navigate('/attempt-quiz')
   }
 
   const handleReviewAttempt = (quizId: string, attemptNumber: number) => {
