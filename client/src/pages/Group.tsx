@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import SidebarComponent from "../components/SideBar";
 import {
   Box,
+  Grid,
   Card,
   CardHeader,
   Typography,
@@ -10,7 +11,6 @@ import {
   Button,
   Stack,
 } from "@mui/material";
-import Grid from "@mui/material/Grid";
 import {
   Forum,
   School,
@@ -210,9 +210,9 @@ export default function GroupDetailPage() {
           </Typography>
         </Box>
 
-        <Stack spacing={2}>
+        <Grid container spacing={2} direction="column">
           {modules.map((m) => (
-            <Box key={m.id}>
+            <Grid item xs={12} key={m.id}>
               <Card
                 variant="outlined"
                 sx={{
@@ -259,9 +259,9 @@ export default function GroupDetailPage() {
                   sx={{ pb: 0 }}
                 />
               </Card>
-            </Box>
+            </Grid>
           ))}
-        </Stack>
+        </Grid>
       </Box>
     </Box>
   );

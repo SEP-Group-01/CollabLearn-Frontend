@@ -1,38 +1,210 @@
-import React from 'react'
-import { assets } from '../assets/assets'
+// import type React from "react"
 
-const Footer = () => {
+// const Footer: React.FC = () => {
+//   const footerLinks = {
+//     Links: ["Resource", "Help center", "Carrier", "Support Service", "Legal Notice"],
+//     Contacts: ["192. New york", "+1125156363"],
+//   }
+
+//   return (
+//     <footer className="bg-blue-600 text-white py-12">
+//       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+//         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+//           {/* Logo and Description */}
+//           <div className="md:col-span-2">
+//             <div className="flex items-center mb-4">
+//               <span className="text-2xl font-bold">Learn.</span>
+//             </div>
+//             <p className="text-blue-100 mb-4">
+//               Empowering learners through collaborative education and innovative learning solutions.
+//             </p>
+//           </div>
+
+//           {/* Links */}
+//           <div>
+//             <h3 className="text-lg font-semibold mb-4">Links</h3>
+//             <ul className="space-y-2">
+//               {footerLinks.Links.map((link, index) => (
+//                 <li key={index}>
+//                   <a href="#" className="text-blue-100 hover:text-white transition-colors">
+//                     {link}
+//                   </a>
+//                 </li>
+//               ))}
+//             </ul>
+//           </div>
+
+//           {/* Contacts */}
+//           <div>
+//             <h3 className="text-lg font-semibold mb-4">Contacts</h3>
+//             <ul className="space-y-2">
+//               {footerLinks.Contacts.map((contact, index) => (
+//                 <li key={index} className="text-blue-100">
+//                   {contact}
+//                 </li>
+//               ))}
+//             </ul>
+//           </div>
+//         </div>
+
+//         {/* Copyright */}
+//         <div className="border-t border-blue-500 mt-8 pt-8 text-center">
+//           <p className="text-blue-100">Copyright 2020@ all right reserved.</p>
+//         </div>
+//       </div>
+//     </footer>
+//   )
+// }
+
+// export default Footer
+
+import React from "react";
+import { Box, Grid, Typography, Button, TextField, Paper } from "@mui/material";
+import { assets } from "../assets/assets";
+
+function Footer() {
   return (
-    <footer className='bg-gray-900 md:px-36 text-left w-full mt-10'>
-        <div className='flex flex-col md:flex-row items-start px-8 md:px-0 justify-center gap-10 md:gap-32 py-10 border-b border-white/30'>
-            <div className='flex flex-col md:items-start items-center w-full'>
-                <img src={assets.logo_dark} alt='logo'/>
-                <p className='mt-6 text-center md:text-left text-sm text-white/80'>Empowering students with smart tools to manage learning, track progress, and achieve academic goals.</p>
+    <Box
+      component="footer"
+      sx={{
+        bgcolor: "#1e293b", // dark blue-gray
+        color: "#fff",
+        width: "100%",
+        mt: 8,
+        pt: 6,
+      }}
+    >
+      <Box
+        sx={{
+          maxWidth: 1200,
+          mx: "auto",
+          px: { xs: 2, md: 6 },
+          pb: 4,
+          borderBottom: "1px solid rgba(255,255,255,0.18)",
+        }}
+      >
+        <Grid
+          container
+          spacing={6}
+          alignItems="flex-start"
+          justifyContent="center"
+        >
+          {/* Logo and Description */}
+          <Grid item xs={12} md={4}>
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: { xs: "center", md: "flex-start" } }}>
+              <img src={assets.logo_dark} alt="logo" style={{ maxWidth: 140 }} />
+              <Typography
+                variant="body2"
+                sx={{
+                  mt: 3,
+                  color: "rgba(255,255,255,0.8)",
+                  textAlign: { xs: "center", md: "left" },
+                  maxWidth: 300,
+                }}
+              >
+                Empowering students with smart tools to manage learning, track progress, and achieve academic goals.
+              </Typography>
+            </Box>
+          </Grid>
 
-            </div>
-            <div className='flex flex-col md:items-start items-center w-full'>
-                <h2 className='font-semibold text-white mb-5'>Company</h2>
-                <ul className='flex md:flex-col w-full justify-between text-sm text-white/80 md:space-y-2'>
-                    <li><a href="#">Home</a></li>
-                    <li><a href="#">About us</a></li>
-                    <li><a href="#">Contact Us</a></li>
-                    <li><a href="#">Privacy policy</a></li>
-                </ul>
-            </div>
-            <div className='hidden md:flex flex-col items-start w-full'>
-                <h2 className='font-semibold text-white mb-5'>Subscribe to our newsletter</h2>
-                <p className='text-sm text-white/80'>The latest news,articles,and resources,sent to your inbox weekly</p>
-                <div className='flex items-center gap-2 mt-4'>
-                    <input type='email' placeholder='Enter your email' className='borde rborder-gray-500/30 bg-gray-800 text-gray-500 placeholder-gray-500 outline-none w-64 h-9 rounded px-2 text-sm' />
-                    <button className='bg-blue-600 text-white w-24 h-9 rounded'>Subscribe</button>
-                </div>
+          {/* Company Links */}
+          <Grid item xs={12} md={4}>
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: { xs: "center", md: "flex-start" } }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: "#fff" }}>
+                Company
+              </Typography>
+              <Box
+                component="ul"
+                sx={{
+                  listStyle: "none",
+                  p: 0,
+                  m: 0,
+                  display: "flex",
+                  flexDirection: { xs: "row", md: "column" },
+                  gap: { xs: 2, md: 1 },
+                  width: "100%",
+                  justifyContent: { xs: "space-between", md: "flex-start" },
+                  color: "rgba(255,255,255,0.8)",
+                  fontSize: 15,
+                }}
+              >
+                <li>
+                  <a href="#" style={{ color: "inherit", textDecoration: "none" }}>Home</a>
+                </li>
+                <li>
+                  <a href="#" style={{ color: "inherit", textDecoration: "none" }}>About us</a>
+                </li>
+                <li>
+                  <a href="#" style={{ color: "inherit", textDecoration: "none" }}>Contact Us</a>
+                </li>
+                <li>
+                  <a href="#" style={{ color: "inherit", textDecoration: "none" }}>Privacy policy</a>
+                </li>
+              </Box>
+            </Box>
+          </Grid>
 
-            </div>
-
-        </div>
-        <p className='py-4 text-center text-xs md:text-sm text-white/60'>Copyright 2025 @ GreateStack.All Right Reserved</p>
-    </footer>
-  )
+          {/* Newsletter */}
+          <Grid item xs={12} md={4} sx={{ display: { xs: "none", md: "flex" } }}>
+            <Box sx={{ flexDirection: "column" }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: "#fff" }}>
+                Subscribe to our newsletter
+              </Typography>
+              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.8)", mb: 2 }}>
+                The latest news, articles, and resources, sent to your inbox weekly
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+                <TextField
+                  type="email"
+                  placeholder="Enter your email"
+                  size="small"
+                  sx={{
+                    bgcolor: "#334155",
+                    input: { color: "#fff" },
+                    "& .MuiOutlinedInput-root": {
+                      "& fieldset": { borderColor: "rgba(255,255,255,0.18)" },
+                      "&:hover fieldset": { borderColor: "#2563eb" },
+                    },
+                    width: 200,
+                  }}
+                  InputProps={{
+                    sx: { borderRadius: 2, fontSize: 14 },
+                  }}
+                />
+                <Button
+                  variant="contained"
+                  sx={{
+                    bgcolor: "#2563eb",
+                    color: "#fff",
+                    height: 40,
+                    width: 100,
+                    borderRadius: 2,
+                    fontWeight: 500,
+                    fontSize: 15,
+                    boxShadow: "none",
+                    "&:hover": { bgcolor: "#1e40af" },
+                  }}
+                >
+                  Subscribe
+                </Button>
+              </Box>
+            </Box>
+          </Grid>
+        </Grid>
+      </Box>
+      <Typography
+        variant="body2"
+        sx={{
+          py: 2,
+          textAlign: "center",
+          color: "rgba(255,255,255,0.6)",
+          fontSize: { xs: 12, md: 14 },
+        }}
+      >
+        Copyright 2025 @ GreateStack. All Right Reserved
+      </Typography>
+    </Box>
+  );
 }
 
-export default Footer
+export default Footer;

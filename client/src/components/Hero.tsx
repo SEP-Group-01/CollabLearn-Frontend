@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Typography, useTheme } from "@mui/material";
+import { Box, Typography, useTheme,Button } from "@mui/material";
 import SearchBar from "./SearchBar";
 import { assets } from "../assets/assets";
 
@@ -54,6 +54,47 @@ const Hero = () => {
       <Box mt={3}  display="flex" justifyContent="center">
         <SearchBar />
       </Box>
+
+      <Box display="flex" gap={2} mt={3} justifyContent="center">
+      <Button
+              variant="contained"
+              sx={{
+                bgcolor: "primary",
+                color: "#fff",
+                px: 4,
+                py: 1.5,
+                borderRadius: "999px",
+                fontSize: "1.125rem",
+                fontWeight: 500,
+                textTransform: "none",
+                boxShadow: "none",
+                "&:hover": { bgcolor: "primary" },
+              }}
+            >
+              Create a Group
+            </Button>
+            <Button
+              variant="outlined"
+              sx={{
+                borderColor: "primary",
+                color: "primary",
+                px: 4,
+                py: 1.5,
+                borderRadius: "999px",
+                fontSize: "1.125rem",
+                fontWeight: 500,
+                textTransform: "none",
+                bgcolor: "transparent",
+                "&:hover": {
+                  bgcolor: "#e0e7ff",
+                  borderColor: "primary",
+                  color: "primary",
+                },
+              }}
+            >
+              Join for a Group
+            </Button>
+            </Box>
     </Box>
   );
 };

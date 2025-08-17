@@ -1,7 +1,9 @@
+
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
 import EditIcon from "@mui/icons-material/Edit";
+
 
 import { Box } from "@mui/material";
 import { Link } from "react-router-dom";
@@ -16,7 +18,7 @@ import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBullet
 import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
+import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 
 // Optional: Your logo asset
 import { assets } from "../assets/assets";
@@ -33,7 +35,8 @@ interface SidebarMenuItemProps {
 interface SidebarComponentProps {
   collapsed: boolean;
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
-  position?: "fixed" | "static";
+    position?: "fixed" | "static";
+
 }
 
 const SidebarMenuItem = ({
@@ -60,10 +63,7 @@ const SidebarMenuItem = ({
   );
 };
 
-const SidebarComponent = ({
-  collapsed,
-  setCollapsed,
-}: SidebarComponentProps) => {
+const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) => {
   const [selected, setSelected] = useState<string>("Home");
 
   const handleToggle = () => setCollapsed((prev) => !prev);
@@ -71,13 +71,13 @@ const SidebarComponent = ({
   const sidebarWidth = collapsed ? 80 : 250;
 
   const sidebarStyles: React.CSSProperties = {
-    position: window.innerWidth < 900 ? "static" : "fixed",
+    position:window.innerWidth < 900 ? "static" : "fixed",
     top: 0,
     left: 0,
-    height: window.innerWidth < 900 ? "auto" : "100vh",
+    height: "100vh",
     width: sidebarWidth,
- backgroundColor: "#1565c0",  // Light blue background
-  color: "#white",  
+    backgroundColor: "#1a237e",
+    color: "white",
     overflowY: "auto",
     transition: "width 0.3s ease",
     zIndex: 1300,
@@ -87,6 +87,7 @@ const SidebarComponent = ({
     <Box sx={{ display: "flex" }}>
       <Sidebar collapsed={collapsed} style={sidebarStyles}>
         <Menu>
+
           {/* Toggle */}
           {collapsed ? (
             <Box
@@ -177,18 +178,18 @@ const SidebarComponent = ({
           />
 
           <SidebarMenuItem
-            title="Forum"
-            to="/forum"
-            icon={<ForumOutlinedIcon sx={{ color: "white" }} />}
+            title="Edit Document"
+            to="/editor"
+            icon={<EditIcon sx={{ color: "white" }} />}
             selected={selected}
             setSelected={setSelected}
             collapsed={collapsed}
           />
 
           <SidebarMenuItem
-            title="Edit Documents"
-            to="/dashboard/groups/edit-documents" // Change the path as needed
-            icon={<EditIcon sx={{ color: "white" }} />}
+            title="Forum"
+            to="/forum"
+            icon={<ForumOutlinedIcon sx={{ color: "white" }} />}
             selected={selected}
             setSelected={setSelected}
             collapsed={collapsed}
