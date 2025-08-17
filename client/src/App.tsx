@@ -13,8 +13,13 @@ import SignUpPage from "./pages/SignUpPage"
 import LoginPage from "./pages/LoginPage"
 import DashboardPage from "./pages/DashboardPage"
 import QuizesPage from './pages/QuizesPage'
+
+import CreateQuiz from './pages/CreateQuiz'
+import AttemptQuiz from './pages/AttemptQuiz'
+
 import ModulePage from './pages/ModulePage'
 import ModuleDocumentsPage from './pages/ModuleDocument'
+
 
 
 
@@ -33,9 +38,15 @@ const App = () => {
         <Route path='/group'element={<Group/>}/>
         <Route path='/profile'element={<Profile/>}/>
         <Route path='/quizzes' element={<QuizesPage/>}/>
+
+        <Route path='/create-quiz' element={<CreateQuiz/>}/>
+        <Route path='/attempt-quiz' element={<AttemptQuiz/>}/>
+
+
+
+
         <Route path='/subgroup' element={<ModulePage/>}/>
         <Route path='/doc' element={<ModuleDocumentsPage/>}/>
-        
       </Routes>
       </div>
 
