@@ -386,6 +386,7 @@ import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
 import { useSignUp } from "@clerk/clerk-react"
 import ClerkWrapper from "../components/ClerkWrapper"
+import {signup} from "../api/authApi" // Import signup API function
 
 import signUpImage from "../assets/sign-up.jpeg"
 
@@ -442,36 +443,12 @@ function SignUpPageContent() {
     setError("")
 
     try {
-      // Simulate API call for demo
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Mock success for demo
-      setSuccess(true)
-      setTimeout(() => {
-        alert("Sign up successful! (Demo mode - no backend connected)")
-      }, 1000)
-
-      /*
-      // BACKEND IMPLEMENTATION:
-      const signUpData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        password: formData.password,
-      };
-
-      const response = await authService.signUp(signUpData);
-
-      if (response.success && response.token) {
-        authService.setToken(response.token);
-        if (response.refreshToken) {
-          authService.setRefreshToken(response.refreshToken);
-        }
-        navigate('/dashboard');
+      const response = await signup(formData.email, formData.password, formData.firstName, formData.lastName);
+      if (response.user.id) {
+        setSuccess(true);
       } else {
-        setError(response.message || 'Sign up failed');
+        setError(response.message || "Sign up failed");
       }
-      */
     } catch (err: any) {
       setError(err.message || "An error occurred during signup")
     } finally {

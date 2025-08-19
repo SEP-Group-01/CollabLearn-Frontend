@@ -361,6 +361,7 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff"
 import { useSignIn } from "@clerk/clerk-react"
 import ClerkWrapper from "../components/ClerkWrapper"
 import loginImage from "../assets/login.jpeg"
+import {login, forgotPassword, resetPassword} from "../api/authApi" // Import auth API functions if needed
 
 function LoginPageContent() {
   const [formData, setFormData] = useState({ email: "", password: "" })
@@ -389,34 +390,24 @@ function LoginPageContent() {
     setLoading(true)
     setError("")
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Call the login API
+      const response = await login(
+        formData.email,
+        formData.password
+      );
 
-      // Mock success for demo
-      setSuccess(true)
-      setTimeout(() => {
-        // TODO: Navigate to dashboard when authentication is implemented
-        // navigate('/dashboard')
-        alert("Login successful! (Demo mode - no backend connected)")
-      }, 1000)
+      console.log("Login response:", response.access_token);
 
-      /*
-      // BACKEND IMPLEMENTATION NEEDED:
-      const response = await authService.login({
-        email: formData.email,
-        password: formData.password,
-        rememberMe: rememberMe
-      });
-      if (response.success) {
-        localStorage.setItem('authToken', response.token);
-        if (rememberMe) {
-          localStorage.setItem('refreshToken', response.refreshToken);
+
+      if (response.access_token) {
+        localStorage.setItem('authToken', response.access_token);
+        if (rememberMe && response.refresh_token) {
+          localStorage.setItem('refreshToken', response.refresh_token);
         }
+        setSuccess(true);
         navigate('/dashboard');
-      } else {
-        setError(response.message);
       }
-      */
+
     } catch (err: any) {
       setError(err.message || "An error occurred during login")
     } finally {
@@ -448,21 +439,12 @@ function LoginPageContent() {
       return
     }
     // TODO: Implement password reset when backend is ready
-    alert(`Password reset email would be sent to: ${formData.email} (Demo mode - no backend connected)`)
-
-    /*
-    // BACKEND IMPLEMENTATION NEEDED:
     try {
-      const response = await authService.forgotPassword(formData.email);
-      if (response.success) {
-        alert('Password reset email sent! Check your inbox.');
-      } else {
-        setError(response.message);
-      }
+      await forgotPassword(formData.email)
+      alert(`Password reset email sent to: ${formData.email}`)
     } catch (err: any) {
-      setError(err.message || 'An error occurred sending reset email');
+      setError(err.message || "An error occurred sending reset email")
     }
-    */
   }
 
   return (
