@@ -19,6 +19,8 @@ import AttemptQuiz from './pages/AttemptQuiz'
 
 import ModulePage from './pages/ModulePage'
 import ModuleDocumentsPage from './pages/ModuleDocument'
+import VerifyEmailPage from './pages/VerifyEmailPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 
 
 
@@ -31,6 +33,8 @@ const App = () => {
           <Route path="/" element={<HomePage />} />
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/editor" element={<CollaborativeEditor/>} />
 

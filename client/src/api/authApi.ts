@@ -28,13 +28,29 @@ export const signup = async (email: string, password: string, first_name: string
 };
 
 export const verifyEmail = async (token: string) => {
-  return axios.get(`${API_URL}/auth/verify_email`, { params: { token } });
+  try {
+    const response = await axios.get(`${API_URL}/auth/verify-email?token=${token}`);
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
+    throw new Error(error.message || "Email verification failed");
+  }
 };
 
 export const forgotPassword = async (email: string) => {
-  return axios.post(`${API_URL}/auth/forgot_password`, { email });
+  return axios.post(`${API_URL}/auth/forgot-password`, { email });
 };
 
 export const resetPassword = async (token: string, newPassword: string) => {
-  return axios.post(`${API_URL}/auth/reset_password`, { token, newPassword });
+  try {
+    const response = await axios.post(`${API_URL}/auth/reset-password?token=${token}`, { newPassword });
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
+    throw new Error(error.message || "Password reset failed");
+  }
 };
