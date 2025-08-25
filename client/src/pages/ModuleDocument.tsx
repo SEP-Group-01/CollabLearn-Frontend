@@ -314,7 +314,7 @@ export default function ModuleDocumentsPage() {
       {/* Search and Filter */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Grid container spacing={2} alignItems="center">
+          
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
@@ -325,31 +325,7 @@ export default function ModuleDocumentsPage() {
                   startAdornment: <Search sx={{ mr: 1, color: "text.secondary" }} />,
                 }}
               />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Filter by tags</InputLabel>
-                <Select
-                  multiple
-                  value={selectedTags}
-                  onChange={(e) => setSelectedTags(e.target.value as string[])}
-                  input={<OutlinedInput label="Filter by tags" />}
-                  renderValue={(selected) => (
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                      {selected.map((value) => (
-                        <Chip key={value} label={value} size="small" />
-                      ))}
-                    </Box>
-                  )}
-                >
-                  {allTags.map((tag) => (
-                    <MenuItem key={tag} value={tag}>
-                      {tag}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
+            
           </Grid>
         </CardContent>
       </Card>
@@ -386,7 +362,7 @@ export default function ModuleDocumentsPage() {
               }}
               onClick={() => handleDocumentClick(doc.id)}
             >
-              <CardContent sx={{ flexGrow: 1 }}>
+              <CardContent sx={{ flexGrow: 2}}>
                 {/* Document Header */}
                 <Box display="flex" alignItems="flex-start" gap={2} mb={2}>
                   <Box display="flex" alignItems="center" justifyContent="center" p={1}>

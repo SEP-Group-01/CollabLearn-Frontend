@@ -6,8 +6,6 @@ import CollaborativeEditor from './pages/CollaborativeEditor'
 import Forum from './pages/Forum'
 import Group from './pages/Group'
 import Profile from './pages/Profile'
-import type React from "react"
-import { BrowserRouter as Router} from "react-router-dom"
 import HomePage from "./pages/HomePage"
 import SignUpPage from "./pages/SignUpPage"
 import LoginPage from "./pages/LoginPage"
@@ -21,6 +19,7 @@ import ModulePage from './pages/ModulePage'
 import ModuleDocumentsPage from './pages/ModuleDocument'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import DocumentQuery from './pages/DocumentQuery'
 
 
 
@@ -51,6 +50,9 @@ const App = () => {
 
         <Route path='/subgroup' element={<ModulePage/>}/>
         <Route path='/doc' element={<ModuleDocumentsPage/>}/>
+        <Route path='/query' element={<DocumentQuery/>}/>
+
+
       </Routes>
       </div>
 
