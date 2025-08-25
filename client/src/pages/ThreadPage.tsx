@@ -3,7 +3,6 @@ import SidebarComponent from "../components/SideBar"
 import { useParams, useNavigate } from "react-router-dom"
 import {
   Box,
-  Grid,
   Card,
   CardContent,
   CardHeader,
@@ -14,8 +13,8 @@ import {
   IconButton,
   useTheme,
   useMediaQuery
-  
 } from "@mui/material"
+import { Grid } from "@mui/material"
 import {
   ArrowBack,
   PictureAsPdf,

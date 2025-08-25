@@ -1,9 +1,26 @@
 import { Box, Typography, Button } from "@mui/material";
 import { motion } from "framer-motion";
+import { useState } from "react";
 import SearchBar from "./SearchBar";
+import CreateWorkspaceModal from "./CreateWorkspaceModal";
 import { assets } from "../assets/assets";
 
+interface WorkspaceFormData {
+  title: string;
+  description: string;
+  tags: string[];
+  image: File | null;
+  joinPolicy: 'anyone' | 'requests' | 'invites';
+}
+
 const Hero = () => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleCreateWorkspace = (workspaceData: WorkspaceFormData) => {
+    console.log('Creating workspace:', workspaceData);
+    // Here you would typically send the data to your backend
+    // For now, we'll just log it
+  };
   
 
   // Animation variants
@@ -131,7 +148,7 @@ const Hero = () => {
               WebkitTextFillColor: "transparent",
             }}
           >
-            Welcome Back Student!
+            Welcome to CollabLearn!
           </Typography>
         </motion.div>
 
@@ -185,6 +202,7 @@ const Hero = () => {
           <motion.div variants={buttonVariants}>
             <Button
               variant="contained"
+              onClick={() => setIsModalOpen(true)}
               sx={{
                 bgcolor: "primary.main",
                 color: "#fff",
@@ -204,7 +222,7 @@ const Hero = () => {
               whileHover="hover"
               whileTap="tap"
             >
-              Create a Group
+              Create new Workspace
             </Button>
           </motion.div>
           
@@ -233,11 +251,18 @@ const Hero = () => {
               whileHover="hover"
               whileTap="tap"
             >
-              Join a Group
+              Join a Workspace
             </Button>
           </motion.div>
         </motion.div>
       </motion.div>
+
+      {/* Create Workspace Modal */}
+      <CreateWorkspaceModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleCreateWorkspace}
+      />
     </Box>
   );
 };
