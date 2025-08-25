@@ -593,7 +593,7 @@ export default function ModulePage() {
   }
 
   const navigateToDocuments = () => {
-    navigate(`/dashboard/groups/${groupId}/modules/${moduleId}/documents`)
+    navigate(`/doc`)
   }
 
   const navigateToLinks = () => {

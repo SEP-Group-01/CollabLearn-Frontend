@@ -9,7 +9,7 @@ import Profile from './pages/Profile'
 import HomePage from "./pages/HomePage"
 import SignUpPage from "./pages/SignUpPage"
 import LoginPage from "./pages/LoginPage"
-import DashboardPage from "./pages/DashboardPage"
+// import DashboardPage from "./pages/DashboardPage"
 import QuizesPage from './pages/QuizesPage'
 
 import CreateQuiz from './pages/CreateQuiz'
@@ -34,7 +34,7 @@ const App = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
+          {/* <Route path="/dashboard" element={<DashboardPage />} /> */}
           <Route path="/editor" element={<CollaborativeEditor/>} />
 
         <Route path="/forum" element={<Forum />} />

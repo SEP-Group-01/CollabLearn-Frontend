@@ -1,4 +1,3 @@
-import React from "react";
 import Header from "../components/Header";
 import BenefitsSection from "../components/BenefitsSection";
 import GroupsSection from "../components/GroupsSection";
@@ -13,9 +12,15 @@ function HomePage() {
       <Header />
       <main>
         <Hero />
-        <BenefitsSection />
-        <GroupsSection />
-        <AboutSection />
+        <Box sx={{ py: { xs: 2, md: 4 } }}>
+          <BenefitsSection />
+        </Box>
+        <Box sx={{ py: { xs: 2, md: 4 } }}>
+          <GroupsSection />
+        </Box>
+        <Box sx={{ py: { xs: 2, md: 4 } }}>
+          <AboutSection />
+        </Box>
       </main>
       <Footer />
     </Box>

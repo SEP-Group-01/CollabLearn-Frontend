@@ -406,7 +406,7 @@ function LoginPageContent() {
           localStorage.setItem('refreshToken', response.refresh_token);
         }
         setSuccess(true);
-        navigate('/dashboard');
+        navigate('/');
       }
 
     } catch (err: any) {

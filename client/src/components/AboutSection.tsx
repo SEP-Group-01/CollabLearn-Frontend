@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Box, Typography, Button, Grid, Card, Container, alpha } from "@mui/material"
+import { Box, Typography, Button, Card, Container } from "@mui/material"
 import { Users, BookOpen, Target, Zap, ChevronLeft, ChevronRight, ArrowRight, Sparkles } from "lucide-react"
 
 const AboutSection: React.FC = () => {
@@ -183,9 +183,17 @@ const AboutSection: React.FC = () => {
         </Box>
 
         {/* Main Content */}
-        <Grid container spacing={6} alignItems="center" sx={{ mb: 10 }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", lg: "row" },
+            gap: 6,
+            alignItems: "center",
+            mb: 10,
+          }}
+        >
           {/* Left Content */}
-          <Grid item xs={12} lg={5}>
+          <Box sx={{ flex: { xs: "1 1 100%", lg: "0 0 41.667%" } }}>
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -206,9 +214,16 @@ const AboutSection: React.FC = () => {
               </Typography>
 
               {/* Feature highlights */}
-              <Grid container spacing={3} sx={{ mb: 4 }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                  gap: 3,
+                  mb: 4,
+                }}
+              >
                 {features.map((feature, index) => (
-                  <Grid item xs={12} sm={6} key={index}>
+                  <Box key={index}>
                     <motion.div
                       whileHover={{ y: -5 }}
                       transition={{ duration: 0.2 }}
@@ -262,21 +277,43 @@ const AboutSection: React.FC = () => {
                         </Box>
                       </Box>
                     </motion.div>
-                  </Grid>
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
 
               <motion.div
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-               
+                <Button
+                  variant="contained"
+                  endIcon={<ArrowRight size={20} />}
+                  sx={{
+                    bgcolor: "#0369a1",
+                    color: "#ffffff",
+                    px: 4,
+                    py: 1.5,
+                    borderRadius: 3,
+                    fontSize: "1rem",
+                    fontWeight: 600,
+                    textTransform: "none",
+                    boxShadow: "0 4px 14px rgba(3, 105, 161, 0.3)",
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                    "&:hover": {
+                      bgcolor: "#0284c7",
+                      boxShadow: "0 6px 20px rgba(3, 105, 161, 0.4)",
+                      transform: "translateY(-2px)",
+                    },
+                  }}
+                >
+                  Learn More About Us
+                </Button>
               </motion.div>
             </motion.div>
-          </Grid>
+          </Box>
 
           {/* Right Side - Carousel and Stats Section */}
-          <Grid item xs={12} lg={7}>
+          <Box sx={{ flex: { xs: "1 1 100%", lg: "0 0 58.333%" } }}>
             <Box
               sx={{
                 position: "relative",
@@ -467,9 +504,16 @@ const AboutSection: React.FC = () => {
                     Join a thriving community of learners achieving their academic goals together
                   </Typography>
 
-                  <Grid container spacing={4} justifyContent="center">
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+                      gap: 4,
+                      justifyContent: "center",
+                    }}
+                  >
                     {stats.map((stat, index) => (
-                      <Grid item xs={12} sm={4} key={index}>
+                      <Box key={index}>
                         <motion.div
                           whileHover={{ scale: 1.05 }}
                           transition={{ type: "spring", stiffness: 200 }}
@@ -507,14 +551,14 @@ const AboutSection: React.FC = () => {
                             </Typography>
                           </Box>
                         </motion.div>
-                      </Grid>
+                      </Box>
                     ))}
-                  </Grid>
+                  </Box>
                 </Box>
               </motion.div>
             </Box>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
       </Container>
     </Box>
   )

@@ -1,5 +1,6 @@
 import type React from "react"
-import { Box, Grid, Typography, Button, Card, CardMedia, CardContent } from "@mui/material"
+import { useNavigate } from "react-router-dom"
+import { Box, Typography, Button, Card, CardMedia, CardContent, Container } from "@mui/material"
 import course_2 from "../assets/course_2.png"
 import course_1 from "../assets/course_1.png"
 import course_3 from "../assets/course_3.png"
@@ -37,6 +38,8 @@ const GroupsSection: React.FC = () => {
     },
   ]
 
+  const navigate = useNavigate()
+
   return (
     <Box
       component="section"
@@ -61,7 +64,7 @@ const GroupsSection: React.FC = () => {
         }}
       />
 
-      <Box sx={{ maxWidth: "1200px", mx: "auto", px: { xs: 2, sm: 3, lg: 4 }, position: "relative", zIndex: 1 }}>
+      <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
         {/* Section Header */}
         <Box textAlign="center" mb={5}>
           <Typography
@@ -91,10 +94,17 @@ const GroupsSection: React.FC = () => {
         </Box>
 
         {/* Groups Grid */}
-        <Grid container spacing={3} mb={6}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
+            gap: 3,
+            mb: 6,
+          }}
+        >
           {groups.map((group, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
-              <Card
+            <Box key={index}>
+              <Card onClick={() => navigate(`/group`)}  //methana thawa hadann onee
                 sx={{
                   height: "100%",
                   display: "flex",
@@ -227,9 +237,9 @@ const GroupsSection: React.FC = () => {
                   </Button>
                 </CardContent>
               </Card>
-            </Grid>
+            </Box>
           ))}
-        </Grid>
+        </Box>
 
         {/* See More Button */}
         <Box textAlign="center">
@@ -257,7 +267,7 @@ const GroupsSection: React.FC = () => {
             View All Groups
           </Button>
         </Box>
-      </Box>
+      </Container>
     </Box>
   )
 }

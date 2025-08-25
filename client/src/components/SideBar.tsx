@@ -160,7 +160,7 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
           >
             <SidebarMenuItem
               title="Registered Groups"
-              to="/groups"
+              to="/group"
               icon={null}
               selected={selected}
               setSelected={setSelected}

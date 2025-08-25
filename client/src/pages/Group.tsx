@@ -106,6 +106,11 @@ export default function GroupDetailPage() {
     );
   };
 
+  const handleModuleClick = (moduleId: number) => {
+    // Navigate to the module details page
+    navigate('/subgroup');
+  };
+
   return (
     <Box display="flex">
       <SidebarComponent collapsed={collapsed} setCollapsed={setCollapsed} />
@@ -203,10 +208,10 @@ export default function GroupDetailPage() {
         {/* Submodules */}
         <Box mb={2}>
           <Typography variant="h6" fontWeight="bold" mb={1}>
-            Modules
+            Threads
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Enroll in modules to track progress and access resources
+            Subscribe threads to track progress and access resources
           </Typography>
         </Box>
 
@@ -230,6 +235,7 @@ export default function GroupDetailPage() {
                 }}
               >
                 <CardHeader
+                  onClick={() => handleModuleClick()}
                   title={
                     <Box display="flex" alignItems="center" gap={2} flexWrap="wrap" justifyContent="space-between">
                       <Box display="flex" alignItems="center" gap={1} flex="1 1 auto" minWidth={0}>

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Grid, Box, Typography } from "@mui/material"
+import { Box, Typography, Container } from "@mui/material"
 import DescriptionIcon from "@mui/icons-material/Description"
 import GroupIcon from "@mui/icons-material/Group"
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer"
@@ -64,7 +64,7 @@ function BenefitsSection() {
         }}
       />
 
-      <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 2, sm: 3, lg: 4 }, position: "relative", zIndex: 1 }}>
+      <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
         {/* Section Header */}
         <Box textAlign="center" mb={5}>
           <Typography
@@ -98,9 +98,16 @@ function BenefitsSection() {
         </Box>
 
         {/* Benefits Grid - All cards with fixed size */}
-        <Grid container spacing={3} justifyContent="center">
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
+            gap: 3,
+            justifyContent: "center",
+          }}
+        >
           {benefits.map((benefit, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index} sx={{ display: "flex" }}>
+            <Box key={index} sx={{ display: "flex" }}>
               <Box
                 onMouseEnter={() => setHovered(index)}
                 onMouseLeave={() => setHovered(null)}
@@ -168,10 +175,10 @@ function BenefitsSection() {
                   {benefit.description}
                 </Typography>
               </Box>
-            </Grid>
+            </Box>
           ))}
-        </Grid>
-      </Box>
+        </Box>
+      </Container>
     </Box>
   )
 }

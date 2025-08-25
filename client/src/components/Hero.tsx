@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Typography, Button } from "@mui/material";
 import { motion } from "framer-motion";
 import SearchBar from "./SearchBar";
@@ -136,7 +135,7 @@ const Hero = () => {
           </Typography>
         </motion.div>
 
-        <div variants={sketchVariants}>
+        <motion.div variants={sketchVariants}>
           <Box
             component="img"
             src={assets.sketch}
@@ -148,7 +147,7 @@ const Hero = () => {
               mx: "auto",
             }}
           />
-        </div>
+        </motion.div>
 
         <motion.div variants={itemVariants}>
           <Typography

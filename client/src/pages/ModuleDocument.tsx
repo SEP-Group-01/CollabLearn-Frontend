@@ -11,9 +11,7 @@ import {
   Card,
   CardContent,
   Button,
-  Grid,
   Chip,
-  Avatar,
   Stack,
   Alert,
   AlertTitle,
@@ -30,7 +28,6 @@ import {
   Select,
   OutlinedInput,
   Rating,
-  Divider,
   Fab,
   useTheme,
   useMediaQuery,
@@ -45,8 +42,6 @@ import {
   Edit,
   MoreVert,
   Warning,
-  Visibility,
-  Schedule,
   Add,
   Upload,
   Search,
@@ -196,10 +191,10 @@ export default function ModuleDocumentsPage() {
    const theme = useTheme()
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'))
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
-  const [selectedDoc, setSelectedDoc] = useState<number | null>(null)
   const [addDocumentOpen, setAddDocumentOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [selectedTags] = useState<string[]>([])
+  // Note: setSelectedTags would be used for tag filtering functionality (not implemented yet)
   const [newDocument, setNewDocument] = useState({
     title: "",
     description: "",
@@ -218,15 +213,13 @@ export default function ModuleDocumentsPage() {
 
   const allTags = Array.from(new Set(mockDocuments.flatMap((doc) => doc.tags)))
 
-  const handleMenuClick = (event: React.MouseEvent<HTMLElement>, docId: number) => {
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation()
     setAnchorEl(event.currentTarget)
-    setSelectedDoc(docId)
   }
 
   const handleMenuClose = () => {
     setAnchorEl(null)
-    setSelectedDoc(null)
   }
 
   const getFileIcon = (type: string) => {
@@ -246,8 +239,8 @@ export default function ModuleDocumentsPage() {
     navigate(`/dashboard/groups/${groupId}/modules/${moduleId}/documents/${docId}`)
   }
 
-  const handleDocumentQuery = (docId: number) => {
-    navigate(`/dashboard/groups/${groupId}/modules/${moduleId}/documents/${docId}/query`)
+  const handleDocumentQuery = () => {
+    navigate(`/query`)
   }
 
   const handleAddDocument = () => {
@@ -298,35 +291,113 @@ export default function ModuleDocumentsPage() {
             Back to Module
           </Button>
         </Box>
-        <Button variant="contained" startIcon={<Add />} onClick={() => setAddDocumentOpen(true)}>
-          Add Document
-        </Button>
+        <Box display="flex" alignItems="center" gap={2}>
+          <Button 
+            variant="contained"
+            startIcon={<Search />} 
+            onClick={() => handleDocumentQuery()}
+            sx={{
+              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+              border: 0,
+              borderRadius: 3,
+              boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+              color: 'white',
+              height: 48,
+              padding: '0 30px',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              textTransform: 'none',
+              position: 'relative',
+              overflow: 'hidden',
+              '&:hover': {
+                background: 'linear-gradient(45deg, #1976D2 30%, #1BA8D4 90%)',
+                boxShadow: '0 4px 8px 3px rgba(33, 203, 243, .4)',
+                transform: 'translateY(-1px)',
+              },
+              '&:active': {
+                transform: 'translateY(0px)',
+              },
+              '&:before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: '-100%',
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+                transition: 'left 0.6s',
+              },
+              '&:hover:before': {
+                left: '100%',
+              },
+              transition: 'all 0.2s ease-in-out',
+              animation: 'pulse 2s infinite',
+              '@keyframes pulse': {
+                '0%': {
+                  boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+                },
+                '50%': {
+                  boxShadow: '0 3px 15px 4px rgba(33, 203, 243, .5)',
+                },
+                '100%': {
+                  boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+                },
+              },
+            }}
+          >
+            Query Documents
+          </Button>
+          <Button 
+            variant="contained" 
+            startIcon={<Add />} 
+            onClick={() => setAddDocumentOpen(true)}
+            sx={{
+              background: 'linear-gradient(45deg, #4CAF50 30%, #81C784 90%)',
+              border: 0,
+              borderRadius: 3,
+              boxShadow: '0 3px 5px 2px rgba(76, 175, 80, .3)',
+              color: 'white',
+              height: 48,
+              padding: '0 25px',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              textTransform: 'none',
+              '&:hover': {
+                background: 'linear-gradient(45deg, #388E3C 30%, #66BB6A 90%)',
+                boxShadow: '0 4px 8px 3px rgba(76, 175, 80, .4)',
+                transform: 'translateY(-1px)',
+              },
+              '&:active': {
+                transform: 'translateY(0px)',
+              },
+              transition: 'all 0.2s ease-in-out',
+            }}
+          >
+            Add Document
+          </Button>
+        </Box>
       </Box>
 
       {/* Page Title */}
       <Typography variant="h4" fontWeight="bold" gutterBottom>
-        Module Documents
+        Thread Documents
       </Typography>
       <Typography color="text.secondary" paragraph>
-        Access all documents, notes, and resources for this module. Rate, comment, and collaborate with your peers.
+        Access all documents, notes, and resources for this thread. Rate, comment, and collaborate with your peers.
       </Typography>
 
       {/* Search and Filter */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                placeholder="Search documents..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: <Search sx={{ mr: 1, color: "text.secondary" }} />,
-                }}
-              />
-            
-          </Grid>
+          <TextField
+            fullWidth
+            placeholder="Search documents..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: <Search sx={{ mr: 1, color: "text.secondary" }} />,
+            }}
+          />
         </CardContent>
       </Card>
 
@@ -346,50 +417,66 @@ export default function ModuleDocumentsPage() {
       )}
 
       {/* Documents Grid */}
-      <Grid container spacing={3}>
+      <Stack spacing={3}>
         {filteredDocuments.map((doc) => (
-          <Grid item xs={12} md={6} lg={4} key={doc.id}>
             <Card
+              key={doc.id}
               sx={{
                 cursor: "pointer",
                 transition: "all 0.2s",
                 "&:hover": { transform: "translateY(-2px)", boxShadow: 3 },
                 border: doc.isEditing ? "2px solid" : "1px solid",
                 borderColor: doc.isEditing ? "warning.main" : "divider",
-                height: "100%",
+                width: "100%",
                 display: "flex",
-                flexDirection: "column",
+                flexDirection: { xs: "column", md: "row" },
+                alignItems: { xs: "stretch", md: "center" },
               }}
               onClick={() => handleDocumentClick(doc.id)}
             >
-              <CardContent sx={{ flexGrow: 2}}>
-                {/* Document Header */}
-                <Box display="flex" alignItems="flex-start" gap={2} mb={2}>
+              <CardContent sx={{ flexGrow: 1, display: "flex", flexDirection: { xs: "column", md: "row" }, alignItems: { xs: "stretch", md: "center" }, gap: 2 }}>
+                {/* Document Icon and Basic Info */}
+                <Box display="flex" alignItems="center" gap={2} sx={{ minWidth: { xs: "auto", md: "300px" } }}>
                   <Box display="flex" alignItems="center" justifyContent="center" p={1}>
                     {getFileIcon(doc.type)}
                   </Box>
                   <Box flexGrow={1} minWidth={0}>
-                    <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-                      <Typography variant="h6" fontWeight="bold" noWrap>
-                        {doc.title}
-                      </Typography>
-                      <IconButton size="small" onClick={(e) => handleMenuClick(e, doc.id)}>
-                        <MoreVert fontSize="small" />
-                      </IconButton>
-                    </Box>
-                    
+                    <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
+                      {doc.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.875rem" }}>
+                      {doc.size} • {doc.uploadedBy} • {doc.uploadedAt}
+                    </Typography>
                   </Box>
                 </Box>
 
-
                 {/* Description */}
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  {doc.description}
-                </Typography>
-
+                <Box flexGrow={1} sx={{ minWidth: { xs: "auto", md: "200px" } }}>
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary" 
+                    sx={{ 
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      lineHeight: 1.4
+                    }}
+                  >
+                    {doc.description}
+                  </Typography>
+                </Box>
 
                 {/* Rating and Stats */}
-                <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                <Box 
+                  display="flex" 
+                  flexDirection={{ xs: "row", md: "column" }} 
+                  alignItems={{ xs: "space-between", md: "flex-end" }} 
+                  justifyContent="space-between"
+                  gap={1}
+                  sx={{ minWidth: { xs: "auto", md: "150px" } }}
+                >
                   <Box display="flex" alignItems="center" gap={1}>
                     <Rating value={doc.rating} precision={0.1} size="small" readOnly />
                     <Typography variant="body2" color="text.secondary">
@@ -407,39 +494,43 @@ export default function ModuleDocumentsPage() {
                     </Box>
                   </Box>
                 </Box>
+
+                {/* Menu Button */}
+                <Box>
+                  <IconButton size="small" onClick={(e) => handleMenuClick(e)}>
+                    <MoreVert fontSize="small" />
+                  </IconButton>
+                </Box>
               </CardContent>
 
               {/* Action Buttons */}
-              <Box p={2} pt={0}>
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDocumentClick(doc.id)
-                    }}
-                  >
-                    View
-                  </Button>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    fullWidth
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDocumentQuery(doc.id)
-                    }}
-                  >
-                    Query
-                  </Button>
-                </Stack>
+              <Box 
+                p={2} 
+                sx={{ 
+                  display: "flex", 
+                  flexDirection: "row",
+                  gap: 1,
+                  minWidth: { xs: "auto", md: "120px" },
+                  borderLeft: { xs: "none", md: "1px solid" },
+                  borderTop: { xs: "1px solid", md: "none" },
+                  borderColor: "divider"
+                }}
+              >
+                <Button
+                  variant="contained"
+                  size="small"
+                  fullWidth
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDocumentClick(doc.id)
+                  }}
+                >
+                  View
+                </Button>
               </Box>
             </Card>
-          </Grid>
         ))}
-      </Grid>
+      </Stack>
 
       {/* No Results */}
       {filteredDocuments.length === 0 && (
@@ -466,15 +557,6 @@ export default function ModuleDocumentsPage() {
         <MenuItem onClick={handleMenuClose}>
           <Edit sx={{ mr: 1 }} />
           Edit
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            handleMenuClose()
-            if (selectedDoc) handleDocumentQuery(selectedDoc)
-          }}
-        >
-          <Search sx={{ mr: 1 }} />
-          Query Document
         </MenuItem>
       </Menu>
 
