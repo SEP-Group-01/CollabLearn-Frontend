@@ -106,7 +106,7 @@ export default function GroupDetailPage() {
     );
   };
 
-  const handleModuleClick = (moduleId: number) => {
+  const handleModuleClick = () => {
     // Navigate to the module details page
     navigate('/subgroup');
   };
@@ -256,7 +256,7 @@ export default function GroupDetailPage() {
                         size="small"
                         sx={{ flexShrink: 0 }}
                       >
-                        {m.enrolled ? "Enrolled" : "Enroll"}
+                        {m.enrolled ? "Subscribed" : "Subscribe"}
                       </Button>
                     </Box>
                   }

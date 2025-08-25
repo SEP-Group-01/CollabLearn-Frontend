@@ -878,7 +878,7 @@ export default function ModulePage() {
             <Button
               variant="outlined"
               size="small"
-              color={card.color}
+              color={card.color as "primary" | "secondary" | "info" | "inherit" | "success" | "error" | "warning"}
               endIcon={<ArrowForward />}
               sx={{
                 mt: 2,
@@ -906,11 +906,27 @@ export default function ModulePage() {
       <Card sx={{ mb: 3 }}>
         <CardHeader
           title={
-            <Box display="flex" alignItems="center" gap={1}>
+            <Box display="flex" alignItems="center" gap={2}>
               <EditIcon color="primary" />
               <Typography variant="h6" fontWeight="bold">
                 Quizzes ({moduleData.quizzes.length})
               </Typography>
+              <Button
+                variant="contained"
+                size="small"
+                endIcon={<ArrowForward />}
+                onClick={() => navigate('/quizzes')}
+                sx={{ 
+                  minWidth: 'auto',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2
+                }}
+              >
+                View All
+              </Button>
             </Box>
           }
         />
