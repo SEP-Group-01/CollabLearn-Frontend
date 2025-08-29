@@ -179,7 +179,7 @@ const Hero = () => {
             }}
           >
             Your personalized dashboard helps you track your progress, access course
-            materials, join discussions, and manage your study plans—all in one place.
+            materials, join discussions, and manage your study plans, all in one place.
           </Typography>
         </motion.div>
 
