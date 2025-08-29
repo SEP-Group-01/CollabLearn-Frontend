@@ -104,7 +104,7 @@ const GroupsSection: React.FC = () => {
         >
           {groups.map((group, index) => (
             <Box key={index}>
-              <Card onClick={() => navigate(`/group`)}  //methana thawa hadann onee
+              <Card onClick={() => navigate(`/workspace`)}  //methana thawa hadann onee
                 sx={{
                   height: "100%",
                   display: "flex",

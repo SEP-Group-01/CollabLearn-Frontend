@@ -1,5 +1,5 @@
 import { Box, Typography, Button } from "@mui/material";
-import { motion } from "framer-motion";
+import { motion, easeOut } from "framer-motion";
 import { useState } from "react";
 import SearchBar from "./SearchBar";
 import CreateWorkspaceModal from "./CreateWorkspaceModal";
@@ -42,7 +42,7 @@ const Hero = () => {
       opacity: 1,
       transition: {
         duration: 0.5,
-        ease: "easeOut"
+        ease: easeOut
       }
     }
   };
@@ -53,7 +53,7 @@ const Hero = () => {
       scale: 1,
       rotate: 0,
       transition: {
-        type: "spring",
+        type: "spring" as "spring",
         stiffness: 100,
         delay: 0.5
       }
@@ -65,7 +65,7 @@ const Hero = () => {
     visible: {
       scale: 1,
       transition: {
-        type: "spring",
+        type: "spring" as const,
         stiffness: 100
       }
     },

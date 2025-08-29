@@ -4,7 +4,7 @@ import { Route, Routes } from 'react-router-dom'
 import CollaborativeEditor from './pages/CollaborativeEditor'
 
 import Forum from './pages/Forum'
-import Group from './pages/Group'
+import Workspace from './pages/Workspace'
 import Profile from './pages/Profile'
 import HomePage from "./pages/HomePage"
 import SignUpPage from "./pages/SignUpPage"
@@ -15,8 +15,8 @@ import QuizesPage from './pages/QuizesPage'
 import CreateQuiz from './pages/CreateQuiz'
 import AttemptQuiz from './pages/AttemptQuiz'
 
-import ModulePage from './pages/ThreadPage'
-import ModuleDocumentsPage from './pages/ThreadDocument'
+import ThreadPage from './pages/ThreadPage'
+import ThreadDocumentsPage from './pages/ThreadDocument'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import DocumentQuery from './pages/DocumentQuery'
@@ -38,18 +38,15 @@ const App = () => {
           <Route path="/editor" element={<CollaborativeEditor/>} />
 
         <Route path="/forum" element={<Forum />} />
-        <Route path='/group'element={<Group/>}/>
+        <Route path='/workspace'element={<Workspace/>}/>
         <Route path='/profile'element={<Profile/>}/>
         <Route path='/quizzes' element={<QuizesPage/>}/>
 
         <Route path='/create-quiz' element={<CreateQuiz/>}/>
         <Route path='/attempt-quiz' element={<AttemptQuiz/>}/>
 
-
-
-
-        <Route path='/subgroup' element={<ModulePage/>}/>
-        <Route path='/doc' element={<ModuleDocumentsPage/>}/>
+        <Route path='/thread' element={<ThreadPage/>}/>
+        <Route path='/doc' element={<ThreadDocumentsPage/>}/>
         <Route path='/query' element={<DocumentQuery/>}/>
 
 

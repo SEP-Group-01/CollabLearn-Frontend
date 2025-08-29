@@ -49,125 +49,12 @@ import {
   Visibility,
 } from "@mui/icons-material"
 
-interface Document {
-  id: number
-  title: string
-  description: string
-  fileName: string
-  fileType: "pdf"
-  fileSize: string
-  uploadedBy: string
-  uploadedAt: string
-  pages?: number
-  tags: string[]
-  views: number
-  isSelected: boolean
-}
+import { mockDocuments } from "../mocks/Documents"
+import type { Document, ChatMessage } from "../types/QueryInterfaces"
 
-interface ChatMessage {
-  id: number
-  type: "user" | "ai"
-  content: string
-  timestamp: Date
-  selectedDocuments?: number[]
-  references?: Array<{
-    documentId: number
-    documentTitle: string
-    page?: number
-    section: string
-    text: string
-  }>
-  isLoading?: boolean
-}
-
-const mockDocuments: Document[] = [
-  {
-    id: 1,
-    title: "Linear Algebra Fundamentals",
-    description: "Comprehensive guide covering vector spaces, linear transformations, eigenvalues, and eigenvectors.",
-    fileName: "linear_algebra_fundamentals.pdf",
-    fileType: "pdf",
-    fileSize: "2.4 MB",
-    uploadedBy: "Dr. Johnson",
-    uploadedAt: "2024-01-15",
-    pages: 156,
-    tags: ["fundamentals", "vectors", "eigenvalues"],
-    views: 567,
-    isSelected: false,
-  },
-  {
-    id: 2,
-    title: "Matrix Operations Guide",
-    description: "Step-by-step tutorial on matrix operations including multiplication, inversion, and determinants.",
-    fileName: "matrix_operations.docx",
-    fileType: "pdf",
-    fileSize: "1.8 MB",
-    uploadedBy: "Alex Chen",
-    uploadedAt: "2024-01-18",
-    pages: 89,
-    tags: ["matrices", "operations", "tutorial"],
-    views: 423,
-    isSelected: false,
-  },
-  {
-    id: 3,
-    title: "Eigenvalue Problem Solutions",
-    description: "Collection of solved eigenvalue problems with different methods and approaches.",
-    fileName: "eigenvalue_solutions.pdf",
-    fileType: "pdf",
-    fileSize: "3.1 MB",
-    uploadedBy: "Maria Rodriguez",
-    uploadedAt: "2024-01-20",
-    pages: 134,
-    tags: ["eigenvalues", "solutions", "methods"],
-    views: 298,
-    isSelected: false,
-  },
-  {
-    id: 4,
-    title: "Vector Space Theory Notes",
-    description: "Detailed lecture notes on vector space theory including subspaces and linear independence.",
-    fileName: "vector_space_theory.txt",
-    fileType: "pdf",
-    fileSize: "456 KB",
-    uploadedBy: "Sarah Kim",
-    uploadedAt: "2024-01-22",
-    tags: ["theory", "vector-spaces", "subspaces"],
-    views: 187,
-    isSelected: false,
-  },
-  {
-    id: 5,
-    title: "Linear Transformations Handbook",
-    description: "Comprehensive handbook covering linear transformations and their matrix representations.",
-    fileName: "linear_transformations.pdf",
-    fileType: "pdf",
-    fileSize: "2.9 MB",
-    uploadedBy: "Mike Chen",
-    uploadedAt: "2024-01-25",
-    pages: 201,
-    tags: ["transformations", "matrices", "geometry"],
-    views: 312,
-    isSelected: false,
-  },
-  {
-    id: 6,
-    title: "Practice Problems Collection",
-    description: "Curated collection of linear algebra practice problems with detailed solutions.",
-    fileName: "practice_problems.docx",
-    fileType: "pdf",
-    fileSize: "1.2 MB",
-    uploadedBy: "Dr. Johnson",
-    uploadedAt: "2024-01-28",
-    pages: 67,
-    tags: ["practice", "problems", "solutions"],
-    views: 445,
-    isSelected: false,
-  },
-]
 
 export default function DocumentQuery() {
-  const { groupId, moduleId } = useParams()
+  // const { groupId, moduleId } = useParams()
   const navigate = useNavigate()
   const [documents, setDocuments] = useState<Document[]>(mockDocuments)
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -314,7 +201,7 @@ export default function DocumentQuery() {
           <Box display="flex" alignItems="center" gap={2}>
             <Button
               startIcon={<ArrowBack />}
-              onClick={() => navigate(`/dashboard/groups/${groupId}/modules/${moduleId}`)}
+              onClick={() => navigate(`/dashboard/thread`)}
             >
               Back to Module
             </Button>

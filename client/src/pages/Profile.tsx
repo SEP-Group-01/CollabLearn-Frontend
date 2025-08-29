@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import SidebarComponent from "../components/SideBar";
 import {
   Box,
   Typography,
-  Grid,
   Card,
   CardContent,
   Avatar,
@@ -180,9 +179,20 @@ export default function ProfilePage() {
         {/* Info + Groups */}
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Grid container spacing={4}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 4,
+              }}
+            >
               {/* Personal Info */}
-              <Grid item xs={12} md={6}>
+              <Box
+                sx={{
+                  flexBasis: { xs: '100%', md: '50%' },
+                  minWidth: 0,
+                }}
+              >
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
                   Personal Information
                 </Typography>
@@ -260,10 +270,15 @@ export default function ProfilePage() {
                     />
                   </ListItem>
                 </List>
-              </Grid>
+              </Box>
 
               {/* Enrolled Groups */}
-              <Grid item xs={12} md={6}>
+              <Box
+                sx={{
+                  flexBasis: { xs: '100%', md: '50%' },
+                  minWidth: 0,
+                }}
+              >
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
                   Enrolled Groups
                 </Typography>
@@ -274,9 +289,22 @@ export default function ProfilePage() {
                     </ListItem>
                   ))}
                 </List>
-              </Grid>
+              </Box>
 
-            <Grid item xs={6} md={3}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 2,
+                mt: 4,
+              }}
+            >
+            <Box
+              sx={{
+                flexBasis: { xs: '50%', md: '25%' },
+                minWidth: 0,
+              }}
+            >
             <Card>
               <CardContent sx={{ textAlign: "center" }}>
                 <Groups color="primary" sx={{ fontSize: 40, mb: 1 }} />
@@ -286,8 +314,13 @@ export default function ProfilePage() {
                 <Typography color="text.secondary">Study Groups</Typography>
               </CardContent>
             </Card>
-          </Grid>
-          <Grid item xs={6} md={3}>
+          </Box>
+          <Box
+            sx={{
+              flexBasis: { xs: '50%', md: '25%' },
+              minWidth: 0,
+            }}
+          >
             <Card>
               <CardContent sx={{ textAlign: "center" }}>
                 <School color="success" sx={{ fontSize: 40, mb: 1 }} />
@@ -297,8 +330,13 @@ export default function ProfilePage() {
                 <Typography color="text.secondary">Study Hours</Typography>
               </CardContent>
             </Card>
-          </Grid>
-          <Grid item xs={6} md={3}>
+          </Box>
+          <Box
+            sx={{
+              flexBasis: { xs: '50%', md: '25%' },
+              minWidth: 0,
+            }}
+          >
             <Card>
               <CardContent sx={{ textAlign: "center" }}>
                 <BookmarkBorder color="info" sx={{ fontSize: 40, mb: 1 }} />
@@ -308,8 +346,13 @@ export default function ProfilePage() {
                 <Typography color="text.secondary">Completed</Typography>
               </CardContent>
             </Card>
-          </Grid>
-          <Grid item xs={6} md={3}>
+          </Box>
+          <Box
+            sx={{
+              flexBasis: { xs: '50%', md: '25%' },
+              minWidth: 0,
+            }}
+          >
             <Card>
               <CardContent sx={{ textAlign: "center" }}>
                 <EmojiEvents color="warning" sx={{ fontSize: 40, mb: 1 }} />
@@ -319,8 +362,9 @@ export default function ProfilePage() {
                 <Typography color="text.secondary">Achievements</Typography>
               </CardContent>
             </Card>
-          </Grid>
-          </Grid>
+          </Box>
+          </Box>
+            </Box>
           </CardContent>
         </Card>
 

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Box, Grid, Typography, Button, TextField, IconButton, Divider } from "@mui/material"
+import { Box, Typography, Button, TextField, IconButton, Divider } from "@mui/material"
 import { useNavigate } from "react-router-dom"
 import { Mail, Phone, Facebook, Twitter, Instagram, Linkedin, ArrowUp } from "lucide-react"
 
@@ -114,9 +114,20 @@ function Footer() {
           zIndex: 1,
         }}
       >
-        <Grid container spacing={{ xs: 4, md: 6 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: { xs: 4, md: 6 },
+          }}
+        >
           {/* Logo and Description */}
-          <Grid item xs={12} md={4}>
+          <Box
+            sx={{
+              flexBasis: { xs: '100%', md: '33.333%' },
+              minWidth: 0,
+            }}
+          >
             <Box>
               <Typography
                 variant="h5"
@@ -185,10 +196,15 @@ function Footer() {
                 </Box>
               </Box>
             </Box>
-          </Grid>
+          </Box>
 
           {/* Company Links */}
-          <Grid item xs={12} sm={6} md={2}>
+          <Box
+            sx={{
+              flexBasis: { xs: '100%', sm: '50%', md: '16.666%' },
+              minWidth: 0,
+            }}
+          >
             <Typography
               variant="h6"
               fontWeight="bold"
@@ -221,10 +237,15 @@ function Footer() {
                 </Typography>
               ))}
             </Box>
-          </Grid>
+          </Box>
 
           {/* Support Links */}
-          <Grid item xs={12} sm={6} md={2}>
+          <Box
+            sx={{
+              flexBasis: { xs: '100%', sm: '50%', md: '16.666%' },
+              minWidth: 0,
+            }}
+          >
             <Typography
               variant="h6"
               fontWeight="bold"
@@ -257,10 +278,15 @@ function Footer() {
                 </Typography>
               ))}
             </Box>
-          </Grid>
+          </Box>
 
           {/* Newsletter */}
-          <Grid item xs={12} md={4}>
+          <Box
+            sx={{
+              flexBasis: { xs: '100%', md: '33.333%' },
+              minWidth: 0,
+            }}
+          >
             <Typography
               variant="h6"
               fontWeight="bold"
@@ -392,8 +418,8 @@ function Footer() {
                 ))}
               </Box>
             </Box>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
 
         {/* Divider */}
         <Divider sx={{ my: 4, borderColor: "#334155" }} />

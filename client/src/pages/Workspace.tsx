@@ -108,7 +108,7 @@ export default function GroupDetailPage() {
 
   const handleModuleClick = () => {
     // Navigate to the module details page
-    navigate('/subgroup');
+    navigate('/thread');
   };
 
   return (
@@ -215,9 +215,9 @@ export default function GroupDetailPage() {
           </Typography>
         </Box>
 
-        <Grid container spacing={2} direction="column">
+        <Stack spacing={2}>
           {modules.map((m) => (
-            <Grid item xs={12} key={m.id}>
+            <Box key={m.id}>
               <Card
                 variant="outlined"
                 sx={{
@@ -265,9 +265,9 @@ export default function GroupDetailPage() {
                   sx={{ pb: 0 }}
                 />
               </Card>
-            </Grid>
+            </Box>
           ))}
-        </Grid>
+        </Stack>
       </Box>
     </Box>
   );

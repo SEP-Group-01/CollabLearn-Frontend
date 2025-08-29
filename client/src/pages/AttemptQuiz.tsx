@@ -22,54 +22,8 @@ import {
 	AccessTime as AccessTimeIcon
 } from '@mui/icons-material';
 import SidebarComponent from '../components/SideBar';
-// import Footer from '../components/Footer';
-import type { Question } from '../types/QuizInterfaces';
 
-// Mock quiz name and questions for demo (replace with real data fetch)
-const quizName = 'Sample Quiz Title';
-const mockQuestions: Question[] = [
-	{
-		id: 'q1',
-		questionText: 'Which of the following are React hooks?',
-		image: null,
-		options: [
-			{ id: '1', sequenceLetter: 'A', text: 'useState', image: null, isCorrect: true },
-			{ id: '2', sequenceLetter: 'B', text: 'useFetch', image: null, isCorrect: false },
-			{ id: '3', sequenceLetter: 'C', text: 'useEffect', image: null, isCorrect: true },
-			{ id: '4', sequenceLetter: 'D', text: 'useClass', image: null, isCorrect: false }
-		],
-		marks: 2,
-		isEditing: false
-	},
-	{
-		id: 'q2',
-		questionText: 'What is the output of 2 + 2 in JavaScript?',
-		image: null,
-		options: [
-			{ id: '1', sequenceLetter: 'A', text: '22', image: null, isCorrect: false },
-			{ id: '2', sequenceLetter: 'B', text: '4', image: null, isCorrect: true },
-			{ id: '3', sequenceLetter: 'C', text: 'undefined', image: null, isCorrect: false },
-			{ id: '4', sequenceLetter: 'D', text: 'NaN', image: null, isCorrect: false }
-		],
-		marks: 1,
-		isEditing: false
-	},
-	{
-		id: 'q3',
-		questionText: 'Select all valid CSS units.',
-		image: null,
-		options: [
-			{ id: '1', sequenceLetter: 'A', text: 'px', image: null, isCorrect: true },
-			{ id: '2', sequenceLetter: 'B', text: 'em', image: null, isCorrect: true },
-			{ id: '3', sequenceLetter: 'C', text: 'pt', image: null, isCorrect: true },
-			{ id: '4', sequenceLetter: 'D', text: 'xyz', image: null, isCorrect: false }
-		],
-		marks: 2,
-		isEditing: false
-	}
-];
-
-const totalTime = 5 * 60; // 5 minutes for demo
+import { quizName, mockQuestions, totalTime } from '../mocks/Quizzes';
 
 const AttemptQuiz: React.FC = () => {
 	const [collapsed, setCollapsed] = useState(false);
