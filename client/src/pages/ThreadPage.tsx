@@ -26,16 +26,16 @@ import {
   ArrowForward,
 } from "@mui/icons-material"
 
-import { useModuleData } from "../mocks/Threads"
-import type { ModuleData } from "../types/ThreadInterfaces"
+import { useThreadData } from "../mocks/Threads"
+import type { ThreadData } from "../types/ThreadInterfaces"
 
-export default function ModulePage() {
-  const { groupId, moduleId } = useParams<{ groupId: string; moduleId: string }>()
+export default function ThreadPage() {
+  const { workspaceId, threadId } = useParams<{ workspaceId: string; threadId: string }>()
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false);
-   const theme = useTheme()
+  const theme = useTheme()
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'))
-  const moduleData: ModuleData = useModuleData(moduleId!, groupId!)
+  const threadData: ThreadData = useThreadData(threadId!, workspaceId!)
 
   const getFileIcon = (type: string) => {
     switch (type) {
@@ -65,19 +65,19 @@ export default function ModulePage() {
 
 
   const openDocument = (documentId: number) => {
-    navigate(`/dashboard/groups/${groupId}/modules/${moduleId}/documents/${documentId}`)
+    navigate(`/workspace/${workspaceId}/threads/${threadId}/documents/${documentId}`)
   }
 
   const navigateToDocuments = () => {
-    navigate(`/doc`)
+    navigate(`/workspace/${workspaceId}/threads/${threadId}/documents`)
   }
 
   const navigateToLinks = () => {
-    navigate(`/dashboard/groups/${groupId}/modules/${moduleId}/links`)
+    navigate(`/workspace/${workspaceId}/threads/${threadId}/links`)
   }
 
   const navigateToVideos = () => {
-    navigate(`/dashboard/groups/${groupId}/modules/${moduleId}/videos`)
+    navigate(`/workspace/${workspaceId}/threads/${threadId}/videos`)
   }
 
   return (
@@ -125,7 +125,7 @@ export default function ModulePage() {
         }}
       >
         <IconButton 
-          onClick={() => navigate(`/workspace`)} 
+          onClick={() => navigate(`/workspace/:workspaceId`)} 
           sx={{ 
             bgcolor: "action.hover",
             '&:hover': {
@@ -137,17 +137,17 @@ export default function ModulePage() {
         </IconButton>
         <Box flex={1}>
           <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
-            {moduleData.title}
+            {threadData.title}
           </Typography>
           <Typography color="text.secondary" variant="body1">
-            {moduleData.description}
+            {threadData.description}
           </Typography>
         </Box>
       </Box>
     
 
       {/* Performance Analytics */}
-      {moduleData.enrolled && (
+      {threadData.enrolled && (
         <Card>
           <CardHeader
             title={
@@ -164,121 +164,136 @@ export default function ModulePage() {
                 gap: 3,
               }}
             >
-              {/* Performance Stats Container */}
+              {/* Performance Stats - Single Row */}
               <Box
                 sx={{
-                  flex: 1,
-                  minWidth: { xs: '100%', md: '300px' },
+                  width: '100%',
+                  display: 'flex',
+                  flexDirection: 'row',
+                  gap: 2,
+                  justifyContent: 'space-between',
+                  alignItems: 'stretch',
+                  flexWrap: { xs: 'wrap', md: 'nowrap' },
                 }}
               >
+                {/* Last Score */}
                 <Box
                   sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
-                    gap: 2,
+                    minWidth: 140,
+                    minHeight: '100px',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
                   }}
                 >
-                  <Box
-                    sx={{
-                      minHeight: '100px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Box textAlign="center" p={2} bgcolor="primary.50" borderRadius={2}>
-                      <Typography variant="h4" fontWeight="bold" color="primary">
-                        {moduleData.performance.lastScore || 0}%
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Last Score
-                      </Typography>
-                    </Box>
+                  <Box textAlign="center" p={2} bgcolor="primary.50" borderRadius={2}>
+                    <Typography variant="h4" fontWeight="bold" color="primary">
+                      {threadData.performance.lastScore || 0}%
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Last Score
+                    </Typography>
                   </Box>
-                  <Box
-                    sx={{
-                      minHeight: '100px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                      <Typography variant="h4" fontWeight="bold" color="primary">
-                        {moduleData.performance.averageScore}%
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Average Score
-                      </Typography>
-                    </Box>
+                </Box>
+                {/* Average Score */}
+                <Box
+                  sx={{
+                    minWidth: 140,
+                    minHeight: '100px',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
+                    <Typography variant="h4" fontWeight="bold" color="primary">
+                      {threadData.performance.averageScore}%
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Average Score
+                    </Typography>
                   </Box>
-                  <Box
-                    sx={{
-                      minHeight: '100px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                      <Typography variant="h4" fontWeight="bold" color="primary">
-                            {moduleData.performance.completedQuizzes}/{moduleData.performance.totalQuizzes}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Quizzes Completed
-                      </Typography>
-                    </Box>
+                </Box>
+                {/* Quizzes Completed */}
+                <Box
+                  sx={{
+                    minWidth: 140,
+                    minHeight: '100px',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
+                    <Typography variant="h4" fontWeight="bold" color="primary">
+                      {threadData.performance.completedQuizzes}/{threadData.performance.totalQuizzes}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Quizzes Completed
+                    </Typography>
                   </Box>
-                  <Box
-                    sx={{
-                      minHeight: '100px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                      <Typography variant="h4" fontWeight="bold" color="primary">
-                        {moduleData.performance.studyTime}h
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Study Time
-                      </Typography>
-                    </Box>
+                </Box>
+                {/* Study Time */}
+                <Box
+                  sx={{
+                    minWidth: 140,
+                    minHeight: '100px',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
+                    <Typography variant="h4" fontWeight="bold" color="primary">
+                      {threadData.performance.studyTime}h
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Study Time
+                    </Typography>
                   </Box>
-                  <Box
-                    sx={{
-                      minHeight: '100px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                      <Typography variant="h4" fontWeight="bold" color="primary">
-                        5
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Resource added
-                      </Typography>
-                    </Box>
+                </Box>
+                {/* Resource Added */}
+                <Box
+                  sx={{
+                    minWidth: 140,
+                    minHeight: '100px',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
+                    <Typography variant="h4" fontWeight="bold" color="primary">
+                      5
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Resource added
+                    </Typography>
                   </Box>
-                   <Box
-                    sx={{
-                      minHeight: '100px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                    }}
-                   >
-                    <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                      <Typography variant="h4" fontWeight="bold" color="primary">
-                        5
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Documents to Edit
-                      </Typography>
-                    </Box>
+                </Box>
+                {/* Documents to Edit */}
+                <Box
+                  sx={{
+                    minWidth: 140,
+                    minHeight: '100px',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
+                    <Typography variant="h4" fontWeight="bold" color="primary">
+                      5
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Documents to Edit
+                    </Typography>
                   </Box>
                 </Box>
               </Box>
@@ -327,7 +342,7 @@ export default function ModulePage() {
       {
         title: "Documents",
         icon: <Description fontSize="large" />,
-        count: moduleData.resources.documents.length,
+        count: threadData.resources.documents.length,
         onClick: navigateToDocuments,
         color: "primary",
         description: "PDFs, Word docs, and text files"
@@ -335,7 +350,7 @@ export default function ModulePage() {
       {
         title: "External Links",
         icon: <LinkIcon fontSize="large" />,
-        count: moduleData.resources.links.length,
+        count: threadData.resources.links.length,
         onClick: navigateToLinks,
         color: "secondary",
         description: "Courses, tutorials, and references"
@@ -343,7 +358,7 @@ export default function ModulePage() {
       {
         title: "Video Content",
         icon: <PlayCircle fontSize="large" />,
-        count: moduleData.resources.videos.length,
+        count: threadData.resources.videos.length,
         onClick: navigateToVideos,
         color: "info",
         description: "Lectures and demonstrations"
@@ -479,7 +494,7 @@ export default function ModulePage() {
             <Box display="flex" alignItems="center" gap={2}>
               <EditIcon color="primary" />
               <Typography variant="h6" fontWeight="bold">
-                Quizzes ({moduleData.quizzes.length})
+                Quizzes ({threadData.quizzes.length})
               </Typography>
               <Button
                 variant="contained"
@@ -509,7 +524,7 @@ export default function ModulePage() {
               alignItems: 'stretch',
             }}
           >
-            {moduleData.quizzes.map((quiz) => (
+            {threadData.quizzes.map((quiz) => (
               <Box
                 key={quiz.id}
                 sx={{
@@ -573,9 +588,9 @@ export default function ModulePage() {
   <CardHeader
     title={
       <Box display="flex" alignItems="center" gap={1}>
-        <EditIcon color={moduleData.currentlyEditing.length > 0 ? "primary" : "disabled"} />
+        <EditIcon color={threadData.currentlyEditing.length > 0 ? "primary" : "disabled"} />
         <Typography variant="h6" fontWeight="bold" color="text.primary">
-          {moduleData.currentlyEditing.length > 0 ? "Currently Being Edited" : "No Documents Being Edited"}
+          {threadData.currentlyEditing.length > 0 ? "Currently Being Edited" : "No Documents Being Edited"}
         </Typography>
       </Box>
     }
@@ -586,9 +601,9 @@ export default function ModulePage() {
     }}
   />
   <CardContent sx={{ p: 0 }}>
-    {moduleData.currentlyEditing.length > 0 ? (
+    {threadData.currentlyEditing.length > 0 ? (
       <Stack spacing={2} sx={{ p: 2 }}>
-        {moduleData.currentlyEditing.map((doc) => (
+        {threadData.currentlyEditing.map((doc) => (
           <Card
             key={doc.id}
             variant="outlined"

@@ -1,4 +1,3 @@
-import Header from "../components/Header";
 import BenefitsSection from "../components/BenefitsSection";
 import GroupsSection from "../components/GroupsSection";
 import AboutSection from "../components/AboutSection";
@@ -9,7 +8,7 @@ import Hero from "../components/Hero";
 function HomePage() {
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#fff" }}>
-      <Header />
+      {/* Remove <Header /> here */}
       <main>
         <Hero />
         <Box sx={{ py: { xs: 2, md: 4 } }}>

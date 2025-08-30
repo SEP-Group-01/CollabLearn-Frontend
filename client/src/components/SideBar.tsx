@@ -125,7 +125,7 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
                   width: "100%"
                 }}
               >
-                <img src={assets.logo} alt="logo" width="120" />
+                <img src={assets.logo_dark} alt="logo" width="120" />
                 <ChevronLeftIcon sx={{ color: "white" }} />
               </Box>
             </MenuItem>

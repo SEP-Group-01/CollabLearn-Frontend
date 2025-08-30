@@ -1,40 +1,39 @@
+import { useMemo } from "react";
+import type { ThreadData } from "../types/ThreadInterfaces";
 
-import { useMemo } from "react"
-import type { ModuleData, } from "../types/ThreadInterfaces"
-
-export const useModuleData = (moduleId: string, groupId: string): ModuleData => {
+export const useThreadData = (threadId: string, workspaceId: string): ThreadData => {
   return useMemo(
     () => ({
-      id: Number(moduleId),
+      id: Number(threadId),
       title:
-        moduleId === "1"
+        threadId === "1"
           ? "Linear Algebra Basics"
-          : moduleId === "2"
+          : threadId === "2"
             ? "Neural Networks"
             : "Optimization and Gradient Descent",
       description:
-        moduleId === "1"
-          ? "Foundation concepts in linear algebra for machine learning including vectors, matrices, eigenvalues, and eigenvectors. This module covers essential mathematical concepts that form the backbone of most ML algorithms."
-          : moduleId === "2"
+        threadId === "1"
+          ? "Foundation concepts in linear algebra for machine learning including vectors, matrices, eigenvalues, and eigenvectors. This thread covers essential mathematical concepts that form the backbone of most ML algorithms."
+          : threadId === "2"
             ? "From perceptrons to deep networks: understanding activation functions, loss functions, and backpropagation. Learn how neural networks learn and make predictions through hands-on examples."
             : "Mathematical intuition and practical implementation of optimization algorithms including gradient descent, momentum, Adam optimizer, and learning rate schedules.",
-      groupId: Number(groupId),
-      groupTitle: "Machine Learning Fundamentals",
+      workspaceId: Number(workspaceId),
+      workspaceTitle: "Machine Learning Fundamentals",
       enrolled: true,
       performance: {
-        progress: moduleId === "1" ? 75 : moduleId === "2" ? 45 : 0,
-        lastScore: moduleId === "1" ? 88 : moduleId === "2" ? 76 : null,
-        completedQuizzes: moduleId === "1" ? 3 : moduleId === "2" ? 2 : 0,
-        totalQuizzes: moduleId === "1" ? 4 : moduleId === "2" ? 5 : 3,
-        studyTime: moduleId === "1" ? 12.5 : moduleId === "2" ? 8.2 : 0,
-        averageScore: moduleId === "1" ? 85 : moduleId === "2" ? 78 : 0,
-        rank: moduleId === "1" ? 12 : moduleId === "2" ? 18 : 0,
+        progress: threadId === "1" ? 75 : threadId === "2" ? 45 : 0,
+        lastScore: threadId === "1" ? 88 : threadId === "2" ? 76 : null,
+        completedQuizzes: threadId === "1" ? 3 : threadId === "2" ? 2 : 0,
+        totalQuizzes: threadId === "1" ? 4 : threadId === "2" ? 5 : 3,
+        studyTime: threadId === "1" ? 12.5 : threadId === "2" ? 8.2 : 0,
+        averageScore: threadId === "1" ? 85 : threadId === "2" ? 78 : 0,
+        rank: threadId === "1" ? 12 : threadId === "2" ? 18 : 0,
         totalStudents: 45,
-        completionRate: moduleId === "1" ? 68 : moduleId === "2" ? 42 : 0,
+        completionRate: threadId === "1" ? 68 : threadId === "2" ? 42 : 0,
       },
       resources: {
         documents:
-          moduleId === "1"
+          threadId === "1"
             ? [
                 {
                   id: 1,
@@ -72,7 +71,7 @@ export const useModuleData = (moduleId: string, groupId: string): ModuleData => 
                   uploadedAt: "2024-01-22",
                 },
               ]
-            : moduleId === "2"
+            : threadId === "2"
               ? [
                   {
                     id: 5,
@@ -113,7 +112,7 @@ export const useModuleData = (moduleId: string, groupId: string): ModuleData => 
                   },
                 ],
         links:
-          moduleId === "1"
+          threadId === "1"
             ? [
                 {
                   id: 1,
@@ -140,7 +139,7 @@ export const useModuleData = (moduleId: string, groupId: string): ModuleData => 
                   description: "Complete MIT course on linear algebra",
                 },
               ]
-            : moduleId === "2"
+            : threadId === "2"
               ? [
                   {
                     id: 4,
@@ -170,7 +169,7 @@ export const useModuleData = (moduleId: string, groupId: string): ModuleData => 
                   },
                 ],
         videos:
-          moduleId === "1"
+          threadId === "1"
             ? [
                 {
                   id: 1,
@@ -200,7 +199,7 @@ export const useModuleData = (moduleId: string, groupId: string): ModuleData => 
                   views: 156,
                 },
               ]
-            : moduleId === "2"
+            : threadId === "2"
               ? [
                   {
                     id: 4,
@@ -234,7 +233,7 @@ export const useModuleData = (moduleId: string, groupId: string): ModuleData => 
                 ],
       },
       quizzes:
-        moduleId === "1"
+        threadId === "1"
           ? [
               {
                 id: 1,
@@ -290,7 +289,7 @@ export const useModuleData = (moduleId: string, groupId: string): ModuleData => 
                 createdAt: "2024-01-18",
               },
             ]
-          : moduleId === "2"
+          : threadId === "2"
             ? [
                 {
                   id: 5,
@@ -400,7 +399,7 @@ export const useModuleData = (moduleId: string, groupId: string): ModuleData => 
                 },
               ],
       currentlyEditing:
-        moduleId === "1"
+        threadId === "1"
           ? [
               {
                 id: 2,
@@ -414,7 +413,7 @@ export const useModuleData = (moduleId: string, groupId: string): ModuleData => 
                 lastEditTime: "2 minutes ago",
               },
             ]
-          : moduleId === "2"
+          : threadId === "2"
             ? [
                 {
                   id: 6,
@@ -453,6 +452,6 @@ export const useModuleData = (moduleId: string, groupId: string): ModuleData => 
           },
             ],
     }),
-    [moduleId, groupId],
-  )
+    [threadId, workspaceId],
+  );
 }

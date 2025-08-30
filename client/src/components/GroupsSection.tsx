@@ -1,49 +1,18 @@
 import type React from "react"
 import { useNavigate } from "react-router-dom"
 import { Box, Typography, Button, Card, CardMedia, CardContent, Container } from "@mui/material"
-import course_2 from "../assets/course_2.png"
-import course_1 from "../assets/course_1.png"
-import course_3 from "../assets/course_3.png"
-import course_4 from "../assets/course_4.png"
+import { mockWorkspaces } from "../mocks/Workspace"
 
 const GroupsSection: React.FC = () => {
-  const groups = [
-    {
-      title: "Web Design",
-      level: "Basic to advance",
-      image: course_1,
-      lightColor: "#E0F2FE",
-      darkColor: "#0369A1",
-    },
-    {
-      title: "Web Development",
-      level: "Basic to advance",
-      image: course_2,
-      lightColor: "#F0F9FF",
-      darkColor: "#0284C7",
-    },
-    {
-      title: "Digital Marketing",
-      level: "Basic to advance",
-      image: course_3,
-      lightColor: "#EFF6FF",
-      darkColor: "#1D4ED8",
-    },
-    {
-      title: "App Design",
-      level: "Basic to advance",
-      image: course_4,
-      lightColor: "#DBEAFE",
-      darkColor: "#1E40AF",
-    },
-  ]
-
   const navigate = useNavigate()
+
+  // Use mockWorkspaces instead of hardcoded groups
+  const workspaces = mockWorkspaces
 
   return (
     <Box
       component="section"
-      id="groups"
+      id="workspaces"
       sx={{
         py: { xs: 6, md: 8 },
         bgcolor: "#ffffff",
@@ -77,7 +46,7 @@ const GroupsSection: React.FC = () => {
               mb: 1,
             }}
           >
-            Study Groups
+            Study Workspaces
           </Typography>
           <Typography
             variant="subtitle1"
@@ -89,11 +58,11 @@ const GroupsSection: React.FC = () => {
               lineHeight: 1.5,
             }}
           >
-            Join collaborative learning groups to enhance your skills
+            Join collaborative learning workspaces to enhance your skills
           </Typography>
         </Box>
 
-        {/* Groups Grid */}
+        {/* Workspaces Grid */}
         <Box
           sx={{
             display: "grid",
@@ -102,9 +71,9 @@ const GroupsSection: React.FC = () => {
             mb: 6,
           }}
         >
-          {groups.map((group, index) => (
-            <Box key={index}>
-              <Card onClick={() => navigate(`/workspace`)}  //methana thawa hadann onee
+          {workspaces.map((workspace) => (
+            <Box key={workspace.id}>
+              <Card onClick={() => navigate(`/workspace/${workspace.id}`)}
                 sx={{
                   height: "100%",
                   display: "flex",
@@ -137,8 +106,8 @@ const GroupsSection: React.FC = () => {
                 >
                   <CardMedia
                     component="img"
-                    image={group.image}
-                    alt={group.title}
+                    image={workspace.image}
+                    alt={workspace.title}
                     className="card-image"
                     sx={{
                       width: "100%",
@@ -148,7 +117,7 @@ const GroupsSection: React.FC = () => {
                     }}
                   />
 
-                  {/* Level Badge */}
+                  {/* Category Badge */}
                   <Box
                     sx={{
                       position: "absolute",
@@ -159,18 +128,18 @@ const GroupsSection: React.FC = () => {
                       px: 1.5,
                       py: 0.5,
                       borderRadius: 1.5,
-                      border: `1px solid ${group.lightColor}`,
+                      border: `1px solid ${workspace.lightColor}`,
                     }}
                   >
                     <Typography
                       variant="caption"
                       sx={{
-                        color: group.darkColor,
+                        color: workspace.darkColor,
                         fontWeight: 600,
                         fontSize: "0.7rem",
                       }}
                     >
-                      {group.level}
+                      {workspace.category}
                     </Typography>
                   </Box>
                 </Box>
@@ -196,7 +165,7 @@ const GroupsSection: React.FC = () => {
                       mb: 1.5,
                     }}
                   >
-                    {group.title}
+                    {workspace.title}
                   </Typography>
 
                   <Typography
@@ -209,7 +178,7 @@ const GroupsSection: React.FC = () => {
                       fontSize: "0.875rem",
                     }}
                   >
-                    Learn from basics to advanced concepts
+                    {workspace.description}
                   </Typography>
 
                   {/* Join Button */}
@@ -217,21 +186,22 @@ const GroupsSection: React.FC = () => {
                     variant="contained"
                     fullWidth
                     sx={{
-                      bgcolor: group.lightColor,
-                      color: group.darkColor,
+                      bgcolor: workspace.lightColor,
+                      color: workspace.darkColor,
                       borderRadius: 2,
                       fontWeight: 600,
                       textTransform: "none",
                       py: 0.75,
                       fontSize: "0.9rem",
-                      border: `1px solid ${group.lightColor}`,
+                      border: `1px solid ${workspace.lightColor}`,
                       transition: "all 0.2s ease",
                       "&:hover": {
-                        bgcolor: group.darkColor,
+                        bgcolor: workspace.darkColor,
                         color: "#ffffff",
-                        borderColor: group.darkColor,
+                        borderColor: workspace.darkColor,
                       },
                     }}
+                    onClick={() => navigate(`/workspace/${workspace.id}`)}
                   >
                     Join
                   </Button>
@@ -263,8 +233,9 @@ const GroupsSection: React.FC = () => {
                 color: "#ffffff",
               },
             }}
+            onClick={() => navigate("/workspaces-list")}
           >
-            View All Groups
+            View All Workspaces
           </Button>
         </Box>
       </Container>

@@ -1,6 +1,7 @@
 import { Box, Typography, Button } from "@mui/material";
 import { motion, easeOut } from "framer-motion";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import SearchBar from "./SearchBar";
 import CreateWorkspaceModal from "./CreateWorkspaceModal";
 import { assets } from "../assets/assets";
@@ -15,6 +16,7 @@ interface WorkspaceFormData {
 
 const Hero = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleCreateWorkspace = (workspaceData: WorkspaceFormData) => {
     console.log('Creating workspace:', workspaceData);
@@ -250,6 +252,7 @@ const Hero = () => {
               component={motion.button}
               whileHover="hover"
               whileTap="tap"
+              onClick={() => navigate("/workspaces-list/")}
             >
               Join a Workspace
             </Button>

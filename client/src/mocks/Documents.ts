@@ -1,87 +1,157 @@
-import type { Document } from "../types/QueryInterfaces"
+import type { Document } from "../types/DocumentInterfaces"
+
+export type Document = {
+  id: number;
+  title: string;
+  description: string;
+  type: "pdf" | "doc" | "txt";
+  size: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  views: number;
+  downloads: number;
+  rating: number;
+  totalRatings: number;
+  comments: number;
+  tags: string[];
+  isEditing: boolean;
+  editor?: string;
+  editingSince?: string;
+  likes: number;
+  mockComments?: string[]; // Add this field for mock comments
+};
 
 export const mockDocuments: Document[] = [
   {
     id: 1,
     title: "Linear Algebra Fundamentals",
-    description: "Comprehensive guide covering vector spaces, linear transformations, eigenvalues, and eigenvectors.",
-    fileName: "linear_algebra_fundamentals.pdf",
-    fileType: "pdf",
-    fileSize: "2.4 MB",
+    description:
+      "Comprehensive guide covering vectors, matrices, eigenvalues, and linear transformations with practical examples and exercises.",
+    type: "pdf",
+    size: "2.4 MB",
     uploadedBy: "Dr. Johnson",
     uploadedAt: "2024-01-15",
-    pages: 156,
-    tags: ["fundamentals", "vectors", "eigenvalues"],
-    views: 567,
-    isSelected: false,
+    views: 156,
+    downloads: 89,
+    rating: 4.5,
+    totalRatings: 23,
+    comments: 12,
+    tags: ["fundamentals", "vectors", "matrices", "eigenvalues"],
+    isEditing: true,
+    editor: "Alex Chen",
+    editingSince: "2 minutes ago",
+    likes: 34,
+    mockComments: [
+      "Great summary of the basics!",
+      "Very helpful for my exam prep.",
+      "Could use more examples on eigenvalues.",
+    ],
   },
   {
     id: 2,
-    title: "Matrix Operations Guide",
-    description: "Step-by-step tutorial on matrix operations including multiplication, inversion, and determinants.",
-    fileName: "matrix_operations.docx",
-    fileType: "pdf",
-    fileSize: "1.8 MB",
+    title: "Matrix Operations Step-by-Step",
+    description:
+      "Detailed walkthrough of matrix operations including addition, multiplication, inverse, and determinant calculations with solved examples.",
+    type: "doc",
+    size: "1.8 MB",
     uploadedBy: "Alex Chen",
     uploadedAt: "2024-01-18",
-    pages: 89,
-    tags: ["matrices", "operations", "tutorial"],
-    views: 423,
-    isSelected: false,
+    views: 98,
+    downloads: 45,
+    rating: 4.2,
+    totalRatings: 18,
+    comments: 8,
+    tags: ["operations", "multiplication", "inverse", "examples"],
+    isEditing: true,
+    editor: "Maria Rodriguez",
+    editingSince: "15 minutes ago",
+    likes: 28,
+    mockComments: [
+      "Step-by-step explanations are clear.",
+      "Loved the solved examples.",
+      "Can you add more on determinants?",
+    ],
   },
   {
     id: 3,
-    title: "Eigenvalue Problem Solutions",
-    description: "Collection of solved eigenvalue problems with different methods and approaches.",
-    fileName: "eigenvalue_solutions.pdf",
-    fileType: "pdf",
-    fileSize: "3.1 MB",
+    title: "Practice Problems Collection",
+    description:
+      "Curated collection of linear algebra practice problems with detailed solutions and explanations for self-study.",
+    type: "txt",
+    size: "156 KB",
     uploadedBy: "Maria Rodriguez",
     uploadedAt: "2024-01-20",
-    pages: 134,
-    tags: ["eigenvalues", "solutions", "methods"],
-    views: 298,
-    isSelected: false,
+    views: 67,
+    downloads: 34,
+    rating: 4.0,
+    totalRatings: 15,
+    comments: 5,
+    tags: ["practice", "problems", "solutions", "self-study"],
+    isEditing: false,
+    likes: 19,
+    mockComments: [
+      "Perfect for self-study.",
+      "Solutions are well explained.",
+      "Would like more advanced problems.",
+    ],
   },
   {
     id: 4,
-    title: "Vector Space Theory Notes",
-    description: "Detailed lecture notes on vector space theory including subspaces and linear independence.",
-    fileName: "vector_space_theory.txt",
-    fileType: "pdf",
-    fileSize: "456 KB",
-    uploadedBy: "Sarah Kim",
+    title: "Eigenvalues and Eigenvectors Tutorial",
+    description:
+      "In-depth tutorial explaining eigenvalues and eigenvectors with geometric interpretations and real-world applications.",
+    type: "pdf",
+    size: "3.2 MB",
+    uploadedBy: "Dr. Johnson",
     uploadedAt: "2024-01-22",
-    tags: ["theory", "vector-spaces", "subspaces"],
-    views: 187,
-    isSelected: false,
+    views: 134,
+    downloads: 78,
+    rating: 4.7,
+    totalRatings: 31,
+    comments: 16,
+    tags: ["eigenvalues", "eigenvectors", "tutorial", "applications"],
+    isEditing: false,
+    likes: 42,
+     mockComments: [
+    "Great summary of the basics!",
+    "Very helpful for my exam prep.",
+    "Could use more examples on eigenvalues."
+  ]
   },
   {
     id: 5,
-    title: "Linear Transformations Handbook",
-    description: "Comprehensive handbook covering linear transformations and their matrix representations.",
-    fileName: "linear_transformations.pdf",
-    fileType: "pdf",
-    fileSize: "2.9 MB",
-    uploadedBy: "Mike Chen",
+    title: "Vector Spaces and Linear Independence",
+    description:
+      "Comprehensive notes on vector spaces, subspaces, linear independence, and basis with proofs and examples.",
+    type: "doc",
+    size: "2.1 MB",
+    uploadedBy: "Sarah Kim",
     uploadedAt: "2024-01-25",
-    pages: 201,
-    tags: ["transformations", "matrices", "geometry"],
-    views: 312,
-    isSelected: false,
+    views: 89,
+    downloads: 56,
+    rating: 4.3,
+    totalRatings: 20,
+    comments: 9,
+    tags: ["vector-spaces", "independence", "basis", "proofs"],
+    isEditing: false,
+    likes: 25,
   },
   {
     id: 6,
-    title: "Practice Problems Collection",
-    description: "Curated collection of linear algebra practice problems with detailed solutions.",
-    fileName: "practice_problems.docx",
-    fileType: "pdf",
-    fileSize: "1.2 MB",
-    uploadedBy: "Dr. Johnson",
+    title: "Linear Transformations Visualized",
+    description:
+      "Visual guide to understanding linear transformations with interactive examples and geometric interpretations.",
+    type: "pdf",
+    size: "4.1 MB",
+    uploadedBy: "Mike Chen",
     uploadedAt: "2024-01-28",
-    pages: 67,
-    tags: ["practice", "problems", "solutions"],
-    views: 445,
-    isSelected: false,
+    views: 112,
+    downloads: 67,
+    rating: 4.6,
+    totalRatings: 25,
+    comments: 14,
+    tags: ["transformations", "visual", "geometry", "interactive"],
+    isEditing: false,
+    likes: 38,
   },
 ]

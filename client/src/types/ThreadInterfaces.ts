@@ -43,12 +43,12 @@ export type QuizType = {
   createdAt: string
 }
 
-export type ModuleData = {
+export type ThreadData = {
   id: number
   title: string
   description: string
-  groupId: number
-  groupTitle: string
+  workspaceId: number
+  workspaceTitle: string
   enrolled: boolean
   performance: {
     progress: number
