@@ -1,5 +1,8 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+"use client"
+
+import type React from "react"
+import { useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
 import {
   Box,
   Typography,
@@ -11,113 +14,98 @@ import {
   InputAdornment,
   IconButton,
   Divider,
-} from "@mui/material";
-import Visibility from "@mui/icons-material/Visibility";
-import VisibilityOff from "@mui/icons-material/VisibilityOff";
+} from "@mui/material"
+import Visibility from "@mui/icons-material/Visibility"
+import VisibilityOff from "@mui/icons-material/VisibilityOff"
+import { useSignIn } from "@clerk/clerk-react"
+import ClerkWrapper from "../components/ClerkWrapper"
+import loginImage from "../assets/login.jpeg"
+import {login, forgotPassword, resetPassword} from "../api/authApi" // Import auth API functions if needed
 
-function LoginPage() {
-  const [formData, setFormData] = useState({ email: "", password: "" });
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+function LoginPageContent() {
+  const [formData, setFormData] = useState({ email: "", password: "" })
+  const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState(false)
 
-  const navigate = useNavigate();
+  const { signIn } = useSignIn()
+  const navigate = useNavigate()
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
-    });
-  };
+    })
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     if (!formData.email || !formData.password) {
-      setError("Please fill in all fields");
-      return;
+      setError("Please fill in all fields")
+      return
     }
-    setLoading(true);
-    setError("");
+    setLoading(true)
+    setError("")
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Call the login API
+      const response = await login(
+        formData.email,
+        formData.password
+      );
 
-      // Mock success for demo
-      setSuccess(true);
-      setTimeout(() => {
-        // TODO: Navigate to dashboard when authentication is implemented
-        // navigate('/dashboard')
-        alert("Login successful! (Demo mode - no backend connected)");
-      }, 1000);
+      console.log("Login response:", response.access_token);
 
-      /*
-      // BACKEND IMPLEMENTATION NEEDED:
-      const response = await authService.login({
-        email: formData.email,
-        password: formData.password,
-        rememberMe: rememberMe
-      });
-      if (response.success) {
-        localStorage.setItem('authToken', response.token);
-        if (rememberMe) {
-          localStorage.setItem('refreshToken', response.refreshToken);
+
+      if (response.access_token) {
+        localStorage.setItem('authToken', response.access_token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        if (rememberMe && response.refresh_token) {
+          localStorage.setItem('refreshToken', response.refresh_token);
         }
-        navigate('/dashboard');
-      } else {
-        setError(response.message);
+        setSuccess(true);
+        navigate('/');
       }
-      */
+
     } catch (err: any) {
-      setError(err.message || "An error occurred during login");
+      setError(err.message || "An error occurred during login")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
+  // ONLY CLERK IMPLEMENTATION - Google OAuth
   const handleGoogleLogin = async () => {
-    // TODO: Implement Google OAuth when backend is ready
-    alert("Google Login - Backend implementation needed");
-
-    /*
-    // BACKEND IMPLEMENTATION NEEDED:
-    try {
-      window.location.href = `${process.env.REACT_APP_API_URL}/auth/google`;
-      // Or use Google OAuth library
-      const response = await authService.googleLogin();
-      if (response.success) {
-        localStorage.setItem('authToken', response.token);
-        navigate('/dashboard');
-      }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred with Google login');
+    if (!signIn) {
+      setError("Google sign in not available")
+      return
     }
-    */
-  };
+
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: "/dashboard",
+        redirectUrlComplete: "/dashboard",
+      })
+    } catch (err: any) {
+      setError(err.errors?.[0]?.message || "An error occurred with Google login")
+    }
+  }
 
   const handleForgotPassword = async () => {
     if (!formData.email) {
-      setError("Please enter your email address first");
-      return;
+      setError("Please enter your email address first")
+      return
     }
     // TODO: Implement password reset when backend is ready
-    alert(`Password reset email would be sent to: ${formData.email} (Demo mode - no backend connected)`);
-
-    /*
-    // BACKEND IMPLEMENTATION NEEDED:
     try {
-      const response = await authService.forgotPassword(formData.email);
-      if (response.success) {
-        alert('Password reset email sent! Check your inbox.');
-      } else {
-        setError(response.message);
-      }
+      await forgotPassword(formData.email)
+      alert(`Password reset email sent to: ${formData.email}`)
     } catch (err: any) {
-      setError(err.message || 'An error occurred sending reset email');
+      setError(err.message || "An error occurred sending reset email")
     }
-    */
-  };
+  }
 
   return (
     <Box sx={{ minHeight: "100vh", display: "flex" }}>
@@ -126,7 +114,7 @@ function LoginPage() {
         sx={{
           display: { xs: "none", lg: "flex" },
           width: "50%",
-          bgcolor: "linear-gradient(135deg, #bbf7d0 0%, #eff6ff 100%)",
+          background: "linear-gradient(135deg, #bbf7d0 0%, #eff6ff 100%)",
           alignItems: "center",
           justifyContent: "center",
           p: 6,
@@ -134,9 +122,15 @@ function LoginPage() {
       >
         <Box sx={{ maxWidth: 400 }}>
           <img
-            src="https://via.placeholder.com/400x300/10B981/FFFFFF?text=Login+Illustration"
+            src={loginImage || "/placeholder.svg"}
             alt="Login illustration"
-            style={{ width: "100%", borderRadius: 12, boxShadow: "0 4px 24px rgba(16,185,129,0.08)" }}
+            width={400 * 2} // scale width by 6
+            height={300 * 2} // scale height proportionally
+            style={{
+              width: "100%",
+              borderRadius: 12,
+              boxShadow: "0 4px 24px rgba(16,185,129,0.08)",
+            }}
           />
         </Box>
       </Box>
@@ -222,13 +216,13 @@ function LoginPage() {
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: 1 }}>
               <FormControlLabel
                 control={
-                  <Checkbox
-                    checked={rememberMe}
-                    onChange={e => setRememberMe(e.target.checked)}
-                    color="primary"
-                  />
+                  <Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} color="primary" />
                 }
-                label={<Typography fontSize={14} color="#64748b">Remember me</Typography>}
+                label={
+                  <Typography fontSize={14} color="#64748b">
+                    Remember me
+                  </Typography>
+                }
               />
               <Button
                 variant="text"
@@ -241,7 +235,17 @@ function LoginPage() {
 
             {/* Error Message */}
             {error && (
-              <Box sx={{ color: "#dc2626", bgcolor: "#fef2f2", textAlign: "center", borderRadius: 2, p: 1.5, mt: 2, mb: 1 }}>
+              <Box
+                sx={{
+                  color: "#dc2626",
+                  bgcolor: "#fef2f2",
+                  textAlign: "center",
+                  borderRadius: 2,
+                  p: 1.5,
+                  mt: 2,
+                  mb: 1,
+                }}
+              >
                 {error}
               </Box>
             )}
@@ -282,7 +286,7 @@ function LoginPage() {
             {/* Divider */}
             <Divider sx={{ my: 3 }}>or</Divider>
 
-            {/* Google Login */}
+            {/* Google Login - ONLY CLERK IMPLEMENTATION */}
             <Button
               type="button"
               onClick={handleGoogleLogin}
@@ -329,6 +333,15 @@ function LoginPage() {
         </Paper>
       </Box>
     </Box>
-  );}
+  )
+}
 
-  export default LoginPage;
+function LoginPage() {
+  return (
+    <ClerkWrapper>
+      <LoginPageContent />
+    </ClerkWrapper>
+  )
+}
+
+export default LoginPage
