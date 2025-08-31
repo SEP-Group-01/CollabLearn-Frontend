@@ -3,7 +3,7 @@ import course_1 from "../assets/course_1.png";
 import course_2 from "../assets/course_2.png";
 import course_3 from "../assets/course_3.png";
 import course_4 from "../assets/course_4.png";
-import { mockThreads } from "../mocks/Workspace";
+// import { mockThreads } from "../mocks/Workspace";
 
 export const mockWorkspaces: Workspace[] = [
   {
