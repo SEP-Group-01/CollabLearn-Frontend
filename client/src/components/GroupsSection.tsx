@@ -1,177 +1,246 @@
-import React from "react";
-import { assets } from "../assets/assets";
-import {
-  Box,
-  Grid,
-  Typography,
-  Button,
-  Card,
-  CardMedia,
-  CardContent,
-} from "@mui/material";
+import type React from "react"
+import { useNavigate } from "react-router-dom"
+import { Box, Typography, Button, Card, CardMedia, CardContent, Container } from "@mui/material"
+import { mockWorkspaces } from "../mocks/Workspace"
 
-function GroupsSection() {
-  const groups = [
-    {
-      title: "Web Design",
-      level: "Basic to advance",
-      image: assets.course_1_thumbnail,
-    },
-    {
-      title: "Web development",
-      level: "Basic to advance",
-      image: assets.course_2_thumbnail,
-    },
-    {
-      title: "Digital marketing",
-      level: "Basic to advance",
-      image: assets.course_3_thumbnail,
-    },
-    {
-      title: "App Design",
-      level: "Basic to advance",
-      image: assets.course_4_thumbnail,
-    },
-    {
-      title: "Mobile design",
-      level: "Basic to advance",
-      image: assets.course_5_thumbnail,
-    },
-    {
-      title: "Graphics Design",
-      level: "Basic to advance",
-      image: assets.course_6_thumbnail,
-    },
-  ];
+const GroupsSection: React.FC = () => {
+  const navigate = useNavigate()
+
+  // Use mockWorkspaces instead of hardcoded groups
+  const workspaces = mockWorkspaces
 
   return (
     <Box
       component="section"
-      id="groups"
+      id="workspaces"
       sx={{
-        py: { xs: 8, md: 12 },
-        bgcolor: "#f8fafc",
+        py: { xs: 6, md: 8 },
+        bgcolor: "#ffffff",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      <Box sx={{ maxWidth: "1200px", mx: "auto", px: 2 }}>
+      {/* Background decoration */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(148, 163, 184, 0.03) 100%)",
+          zIndex: 0,
+        }}
+      />
+
+      <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
         {/* Section Header */}
-        <Box textAlign="center" mb={8}>
-          <Typography variant="h4" fontWeight="bold" color="#1e293b" gutterBottom>
-            Groups
+        <Box textAlign="center" mb={5}>
+          <Typography
+            variant="h5"
+            fontWeight="bold"
+            color="#0f172a"
+            gutterBottom
+            sx={{
+              fontSize: { xs: "1.75rem", md: "2rem" },
+              mb: 1,
+            }}
+          >
+            Study Workspaces
           </Typography>
           <Typography
             variant="subtitle1"
-            color="#64748b"
-            maxWidth={600}
-            mx="auto"
+            color="#475569"
+            sx={{
+              maxWidth: 500,
+              mx: "auto",
+              fontSize: "1rem",
+              lineHeight: 1.5,
+            }}
           >
-            Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been th
+            Join collaborative learning workspaces to enhance your skills
           </Typography>
         </Box>
 
-        {/* Groups Grid */}
-        <Grid container spacing={4} mb={8}>
-          {groups.map((group, index) => (
-            <Grid item xs={12} sm={6} md={4} key={index} sx={{ display: "flex" }}>
-              <Card
+        {/* Workspaces Grid */}
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
+            gap: 3,
+            mb: 6,
+          }}
+        >
+          {workspaces.map((workspace) => (
+            <Box key={workspace.id}>
+              <Card onClick={() => navigate(`/workspace/${workspace.id}`)}
                 sx={{
-                  width: "40%", // Consistent width
-                  display: "raw",
-                  flexDirection: "flex",
-                  justifyContent: "space-between",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
                   borderRadius: 3,
                   overflow: "hidden",
-                  boxShadow: 2,
-                  transition: "box-shadow 0.2s, transform 0.2s",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  cursor: "pointer",
+                  bgcolor: "#ffffff",
+                  border: "1px solid #f1f5f9",
                   "&:hover": {
-                    boxShadow: 6,
-                    transform: "translateY(-4px) scale(1.02)",
+                    transform: "translateY(-4px)",
+                    boxShadow: "0 12px 20px -5px rgba(0, 0, 0, 0.1)",
+                    borderColor: "#e2e8f0",
+                    "& .card-image": {
+                      transform: "scale(1.05)",
+                    },
                   },
                 }}
               >
+                {/* Image Container */}
                 <Box
                   sx={{
+                    position: "relative",
                     width: "100%",
-                    aspectRatio: "16/9",
+                    height: 160,
                     overflow: "hidden",
                   }}
                 >
                   <CardMedia
                     component="img"
-                    image={group.image}
-                    alt={group.title}
+                    image={workspace.image}
+                    alt={workspace.title}
+                    className="card-image"
                     sx={{
                       width: "100%",
                       height: "100%",
                       objectFit: "cover",
-                      transition: "transform 0.3s",
-                      "&:hover": {
-                        transform: "scale(1.05)",
-                      },
+                      transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                     }}
                   />
-                </Box>
 
-                <CardContent sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
-                  <Typography variant="h6" fontWeight="bold" color="#1e293b" gutterBottom>
-                    {group.title}
-                  </Typography>
-                  <Typography variant="body2" color="#64748b" mb={2}>
-                    {group.level}
-                  </Typography>
-                  <Box mt="auto">
-                    <Button
-                      variant="contained"
-                      fullWidth
+                  {/* Category Badge */}
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      top: 8,
+                      right: 8,
+                      bgcolor: "rgba(255, 255, 255, 0.95)",
+                      backdropFilter: "blur(10px)",
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: 1.5,
+                      border: `1px solid ${workspace.lightColor}`,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
                       sx={{
-                        bgcolor: "#2563eb",
-                        color: "#fff",
-                        borderRadius: "999px",
-                        fontWeight: 500,
-                        textTransform: "none",
-                        "&:hover": { bgcolor: "#1e40af" },
+                        color: workspace.darkColor,
+                        fontWeight: 600,
+                        fontSize: "0.7rem",
                       }}
                     >
-                      Join
-                    </Button>
+                      {workspace.category}
+                    </Typography>
                   </Box>
+                </Box>
+
+                {/* Content */}
+                <CardContent
+                  sx={{
+                    flexGrow: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    p: 2.5,
+                    "&:last-child": { pb: 2.5 },
+                  }}
+                >
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight="bold"
+                    color="#0f172a"
+                    gutterBottom
+                    sx={{
+                      fontSize: "1.1rem",
+                      lineHeight: 1.3,
+                      mb: 1.5,
+                    }}
+                  >
+                    {workspace.title}
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color="#64748b"
+                    sx={{
+                      mb: 3,
+                      lineHeight: 1.4,
+                      flexGrow: 1,
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    {workspace.description}
+                  </Typography>
+
+                  {/* Join Button */}
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    sx={{
+                      bgcolor: workspace.lightColor,
+                      color: workspace.darkColor,
+                      borderRadius: 2,
+                      fontWeight: 600,
+                      textTransform: "none",
+                      py: 0.75,
+                      fontSize: "0.9rem",
+                      border: `1px solid ${workspace.lightColor}`,
+                      transition: "all 0.2s ease",
+                      "&:hover": {
+                        bgcolor: workspace.darkColor,
+                        color: "#ffffff",
+                        borderColor: workspace.darkColor,
+                      },
+                    }}
+                    onClick={() => navigate(`/workspace/${workspace.id}`)}
+                  >
+                    Join
+                  </Button>
                 </CardContent>
               </Card>
-            </Grid>
+            </Box>
           ))}
-        </Grid>
+        </Box>
 
         {/* See More Button */}
         <Box textAlign="center">
           <Button
             variant="outlined"
             sx={{
-              borderColor: "#2563eb",
-              color: "#2563eb",
+              borderColor: "#e2e8f0",
+              color: "#475569",
+              bgcolor: "#f8fafc",
               px: 4,
               py: 1.5,
-              borderRadius: "999px",
-              fontSize: "1.125rem",
-              fontWeight: 500,
+              borderRadius: 2,
+              fontSize: "1rem",
+              fontWeight: 600,
               textTransform: "none",
-              bgcolor: "transparent",
+              borderWidth: 1.5,
+              transition: "all 0.2s ease",
               "&:hover": {
-                bgcolor: "#e0e7ff",
-                borderColor: "#1e40af",
-                color: "#1e40af",
+                bgcolor: "#0f172a",
+                borderColor: "#0f172a",
+                color: "#ffffff",
               },
             }}
+            onClick={() => navigate("/workspaces-list")}
           >
-            See More
+            View All Workspaces
           </Button>
         </Box>
-      </Box>
+      </Container>
     </Box>
-  );
+  )
 }
 
-export default GroupsSection;
-
-
-
-
+export default GroupsSection

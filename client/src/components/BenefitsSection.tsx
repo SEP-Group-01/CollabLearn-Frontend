@@ -1,105 +1,186 @@
-import React from "react";
-import { Grid, Paper, Typography, Box } from "@mui/material";
-import DescriptionIcon from "@mui/icons-material/Description";
-import GroupIcon from "@mui/icons-material/Group";
-import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
-import SettingsIcon from "@mui/icons-material/Settings";
+import { useState } from "react"
+import { Box, Typography, Container } from "@mui/material"
+import DescriptionIcon from "@mui/icons-material/Description"
+import GroupIcon from "@mui/icons-material/Group"
+import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer"
+import SettingsIcon from "@mui/icons-material/Settings"
 
 function BenefitsSection() {
   const benefits = [
     {
-      icon: <DescriptionIcon sx={{ fontSize: 40, color: "#fff" }} />,
+      icon: <DescriptionIcon sx={{ fontSize: 32, color: "#0369A1" }} />,
       title: "Study Plan Generator",
-      description: "Lorem Ipsum is simply dummy text of the printing and typesetting",
-      color: "#1976d2",
+      description:
+        "Create study schedules based on your goals",
+      lightColor: "#E0F2FE",
+      darkColor: "#0369A1",
     },
     {
-      icon: <GroupIcon sx={{ fontSize: 40, color: "#fff" }} />,
-      title: "Collaborative Document Editing",
-      description: "Lorem Ipsum is simply dummy text of the printing and typesetting",
-      color: "#388e3c",
+      icon: <GroupIcon sx={{ fontSize: 32, color: "#0284C7" }} />,
+      title: "Collaborative Editing",
+      description: "Work on notes with peers in real-time.",
+      lightColor: "#F0F9FF",
+      darkColor: "#0284C7",
     },
     {
-      icon: <QuestionAnswerIcon sx={{ fontSize: 40, color: "#fff" }} />,
+      icon: <QuestionAnswerIcon sx={{ fontSize: 32, color: "#1D4ED8" }} />,
       title: "Document Querying",
-      description: "Lorem Ipsum is simply dummy text of the printing and typesetting",
-      color: "#fbc02d",
+      description: "Ask questions get AI-powered answers.",
+      lightColor: "#EFF6FF",
+      darkColor: "#1D4ED8",
     },
     {
-      icon: <SettingsIcon sx={{ fontSize: 40, color: "#fff" }} />,
-      title: "Manage Study Groups",
-      description: "Lorem Ipsum is simply dummy text of the printing and typesetting",
-      color: "#d32f2f",
+      icon: <SettingsIcon sx={{ fontSize: 32, color: "#1E40AF" }} />,
+      title: "Study Groups",
+      description: "Create and manage study groups with ease.",
+      lightColor: "#DBEAFE",
+      darkColor: "#1E40AF",
     },
-  ];
+  ]
+
+  const [hovered, setHovered] = useState<number | null>(null)
 
   return (
-    <Box component="section" id="features" sx={{ py: { xs: 6, md: 10 }, bgcolor: "#fafafa" }}>
-      <Box sx={{ maxWidth: 900, mx: "auto", px: 2 }}>
+    <Box
+      component="section"
+      id="features"
+      sx={{
+        py: { xs: 6, md: 8 },
+        bgcolor: "#ffffff",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* Background decoration */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(148, 163, 184, 0.03) 100%)",
+          zIndex: 0,
+        }}
+      />
+
+      <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
         {/* Section Header */}
-        <Box textAlign="center" mb={6}>
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Benefits from us
+        <Box textAlign="center" mb={5}>
+          <Typography
+            variant="h5"
+            fontWeight="bold"
+            color="#0f172a"
+            gutterBottom
+            sx={{
+              fontSize: { xs: "1.75rem", md: "2rem" },
+              mb: 1,
+              background: "linear-gradient(135deg, #0f172a 0%, #2563eb 100%)",
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            Key Features
           </Typography>
-          <Typography variant="subtitle1" color="text.secondary" maxWidth={600} mx="auto">
-            It is a long established fact that a reader will be distracted by the readable content of a page when looking
+          <Typography
+            variant="body1"
+            color="#64748b"
+            sx={{
+              maxWidth: 600,
+              mx: "auto",
+              fontSize: "1rem",
+              lineHeight: 1.5,
+            }}
+          >
+            Everything you need for effective collaborative learning
           </Typography>
         </Box>
 
-        {/* Benefits Grid */}
-        <Grid container spacing={4}>
+        {/* Benefits Grid - All cards with fixed size */}
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
+            gap: 3,
+            justifyContent: "center",
+          }}
+        >
           {benefits.map((benefit, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
-              <Paper
-                elevation={3}
+            <Box key={index} sx={{ display: "flex" }}>
+              <Box
+                onMouseEnter={() => setHovered(index)}
+                onMouseLeave={() => setHovered(null)}
                 sx={{
-                  p: 3,
-                  textAlign: "center",
+                  bgcolor: "#ffffff",
                   borderRadius: 3,
-                  transition: "transform 0.2s, box-shadow 0.2s",
+                  p: 3,
+                  width: "100%", // Ensure all cards take full width of grid cell
+                  height: 240, // Fixed height for all cards
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
+                  border: "1px solid #f1f5f9",
+                  transition: "all 0.3s ease",
+                  transform: hovered === index ? "translateY(-6px)" : "translateY(0)",
                   "&:hover": {
-                    transform: "translateY(-4px) scale(1.03)",
-                    boxShadow: 6,
+                    boxShadow: "0 12px 24px rgba(0, 0, 0, 0.12)",
+                    borderColor: "#e2e8f0",
                   },
                 }}
               >
                 <Box
                   sx={{
+                    bgcolor: benefit.lightColor,
+                    borderRadius: "50%",
+                    width: 70,
+                    height: 70,
                     display: "flex",
-                    justifyContent: "center",
                     alignItems: "center",
-                    mb: 2,
+                    justifyContent: "center",
+                    mb: 2.5,
+                    border: `2px solid ${benefit.darkColor}20`,
+                    transition: "all 0.3s ease",
+                    transform: hovered === index ? "scale(1.1) rotate(5deg)" : "scale(1)",
                   }}
                 >
-                  <Box
-                    sx={{
-                      bgcolor: benefit.color,
-                      borderRadius: "50%",
-                      width: 56,
-                      height: 56,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      mb: 1,
-                    }}
-                  >
-                    {benefit.icon}
-                  </Box>
+                  {benefit.icon}
                 </Box>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
+                <Typography
+                  variant="h6"
+                  fontWeight="bold"
+                  color="#0f172a"
+                  sx={{
+                    fontSize: "1.1rem",
+                    lineHeight: 1.3,
+                    mb: 1.5,
+                    minHeight: 56, // Fixed height for title to ensure alignment
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   {benefit.title}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography
+                  variant="body2"
+                  color="#64748b"
+                  sx={{
+                    fontSize: "0.9rem",
+                    lineHeight: 1.5,
+                  }}
+                >
                   {benefit.description}
                 </Typography>
-              </Paper>
-            </Grid>
+              </Box>
+            </Box>
           ))}
-        </Grid>
-      </Box>
+        </Box>
+      </Container>
     </Box>
-  );
+  )
 }
 
-export default BenefitsSection;
-
+export default BenefitsSection

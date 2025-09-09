@@ -1,5 +1,8 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+"use client"
+
+import type React from "react"
+import { useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
 import {
   Box,
   Typography,
@@ -11,114 +14,98 @@ import {
   InputAdornment,
   IconButton,
   Divider,
-} from "@mui/material";
-import Visibility from "@mui/icons-material/Visibility";
-import VisibilityOff from "@mui/icons-material/VisibilityOff";
+} from "@mui/material"
+import Visibility from "@mui/icons-material/Visibility"
+import VisibilityOff from "@mui/icons-material/VisibilityOff"
+import { useSignUp } from "@clerk/clerk-react"
+import ClerkWrapper from "../components/ClerkWrapper"
+import {signup} from "../api/authApi" // Import signup API function
 
-// TODO: Uncomment when backend is ready
-// import { authService } from '../services/authService'
+import signUpImage from "../assets/sign-up.jpeg"
 
 interface FormData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
+  firstName: string
+  lastName: string
+  email: string
+  password: string
 }
 
-function SignUpPage() {
+function SignUpPageContent() {
   const [formData, setFormData] = useState<FormData>({
     firstName: "",
     lastName: "",
     email: "",
     password: "",
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [agreeToTerms, setAgreeToTerms] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [agreeToTerms, setAgreeToTerms] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState(false)
 
-  const navigate = useNavigate();
+  const { signUp } = useSignUp()
+  const navigate = useNavigate()
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name, value } = e.target
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-    }));
-  };
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+    e.preventDefault()
 
     if (!agreeToTerms) {
-      setError("Please agree to the terms and privacy policy");
-      return;
+      setError("Please agree to the terms and privacy policy")
+      return
     }
 
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
-      setError("Please fill in all fields");
-      return;
+      setError("Please fill in all fields")
+      return
     }
 
     if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters long");
-      return;
+      setError("Password must be at least 6 characters long")
+      return
     }
 
-    setLoading(true);
-    setError("");
+    setLoading(true)
+    setError("")
 
     try {
-      // Simulate API call for demo
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Mock success for demo
-      setSuccess(true);
-      setTimeout(() => {
-        alert("Sign up successful! (Demo mode - no backend connected)");
-      }, 1000);
-
-      /*
-      // BACKEND IMPLEMENTATION:
-      const signUpData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        password: formData.password,
-      };
-
-      const response = await authService.signUp(signUpData);
-
-      if (response.success && response.token) {
-        authService.setToken(response.token);
-        if (response.refreshToken) {
-          authService.setRefreshToken(response.refreshToken);
-        }
-        navigate('/dashboard');
+      const response = await signup(formData.email, formData.password, formData.firstName, formData.lastName);
+      if (response.user.id) {
+        setSuccess(true);
       } else {
-        setError(response.message || 'Sign up failed');
+        setError(response.message || "Sign up failed");
       }
-      */
     } catch (err: any) {
-      setError(err.message || "An error occurred during signup");
+      setError(err.message || "An error occurred during signup")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
+  // ONLY CLERK IMPLEMENTATION - Google OAuth
   const handleGoogleSignUp = async () => {
-    alert("Google Sign Up - Backend implementation needed");
-
-    /*
-    // BACKEND IMPLEMENTATION:
-    try {
-      await authService.googleAuth();
-    } catch (err: any) {
-      setError(err.message || 'An error occurred with Google signup');
+    if (!signUp) {
+      setError("Google sign up not available")
+      return
     }
-    */
-  };
+
+    try {
+      await signUp.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: "/dashboard",
+        redirectUrlComplete: "/dashboard",
+      })
+    } catch (err: any) {
+      setError(err.errors?.[0]?.message || "An error occurred with Google signup")
+    }
+  }
 
   return (
     <Box sx={{ minHeight: "100vh", display: "flex" }}>
@@ -127,7 +114,7 @@ function SignUpPage() {
         sx={{
           display: { xs: "none", lg: "flex" },
           width: "50%",
-          bgcolor: "linear-gradient(135deg, #ede9fe 0%, #f3e8ff 100%)",
+          background: "linear-gradient(135deg, #ede9fe 0%, #f3e8ff 100%)",
           alignItems: "center",
           justifyContent: "center",
           p: 6,
@@ -135,8 +122,10 @@ function SignUpPage() {
       >
         <Box sx={{ maxWidth: 400 }}>
           <img
-            src="https://via.placeholder.com/400x300/8B5CF6/FFFFFF?text=Sign+Up+Illustration"
+            src={signUpImage || "/placeholder.svg"}
             alt="Sign up illustration"
+            width={400 * 2} // scale width by 6
+            height={300 * 2} // scale height proportionally
             style={{ width: "100%", borderRadius: 12, boxShadow: "0 4px 24px rgba(139,92,246,0.08)" }}
           />
         </Box>
@@ -246,11 +235,7 @@ function SignUpPage() {
             {/* Terms Agreement */}
             <FormControlLabel
               control={
-                <Checkbox
-                  checked={agreeToTerms}
-                  onChange={e => setAgreeToTerms(e.target.checked)}
-                  color="primary"
-                />
+                <Checkbox checked={agreeToTerms} onChange={(e) => setAgreeToTerms(e.target.checked)} color="primary" />
               }
               label={
                 <Typography fontSize={14} color="#64748b">
@@ -269,7 +254,17 @@ function SignUpPage() {
 
             {/* Error Message */}
             {error && (
-              <Box sx={{ color: "#dc2626", bgcolor: "#fef2f2", textAlign: "center", borderRadius: 2, p: 1.5, mt: 2, mb: 1 }}>
+              <Box
+                sx={{
+                  color: "#dc2626",
+                  bgcolor: "#fef2f2",
+                  textAlign: "center",
+                  borderRadius: 2,
+                  p: 1.5,
+                  mt: 2,
+                  mb: 1,
+                }}
+              >
                 {error}
               </Box>
             )}
@@ -310,7 +305,7 @@ function SignUpPage() {
             {/* Divider */}
             <Divider sx={{ my: 3 }}>or</Divider>
 
-            {/* Google Sign Up */}
+            {/* Google Sign Up - ONLY CLERK IMPLEMENTATION */}
             <Button
               type="button"
               onClick={handleGoogleSignUp}
@@ -357,7 +352,15 @@ function SignUpPage() {
         </Paper>
       </Box>
     </Box>
-  );
+  )
 }
 
-export default SignUpPage;
+function SignUpPage() {
+  return (
+    <ClerkWrapper>
+      <SignUpPageContent />
+    </ClerkWrapper>
+  )
+}
+
+export default SignUpPage
