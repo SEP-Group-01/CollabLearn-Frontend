@@ -1,12 +1,27 @@
-import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AppBar, Toolbar, IconButton, Typography, Box, Button, Drawer, List, ListItem, ListItemButton, ListItemText, Avatar } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
+import LogoutIcon from "@mui/icons-material/Logout";
+import {assets} from "../assets/assets";
+import {getUserData, isAuthenticated, logout} from "../api/authApi"
 
-function Header({ user }) {
+type HeaderProps = {};
+
+function Header({}: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // Get authentication status and user data
+  const authenticated = isAuthenticated();
+  const userData = getUserData();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
 
   const isHome = location.pathname === "/";
 
@@ -19,8 +34,7 @@ function Header({ user }) {
           { name: "features", href: "#features" },
           { name: "About", href: "#about" },
         ]
-      : []),
-    ...(!user ? [{ name: "login", href: "/login" }] : []),
+      : [])
   ];
 
   return (
@@ -39,27 +53,44 @@ function Header({ user }) {
           maxWidth: 1200,
           mx: "auto",
           width: "100%",
-          px: { xs: 2, md: 4 },
+          pl: { xs: 0, md: 0 },
+          pr: { xs: 2, md: 4 },
           display: "flex",
           alignItems: "center",
           minHeight: 72,
         }}
       >
         {/* Left: Logo */}
-        <Box sx={{ flex: "0 0 auto" }}>
-          <Typography
+        <Box sx={{ flex: "0 0 auto", ml: { xs: 1, md: 2 } }}>
+          <Box
             component={Link}
             to="/"
-            variant="h5"
             sx={{
-              fontWeight: "bold",
-              color: "#2563eb",
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
               textDecoration: "none",
-              letterSpacing: 1,
             }}
           >
-            Learn.
-          </Typography>
+            <img
+              src={assets.favicon}
+              alt="Collab-Learn"
+              style={{
+                width: 32,
+                height: 32,
+              }}
+            />
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: "bold",
+                color: "#2563eb",
+                letterSpacing: 1,
+              }}
+            >
+              Collab-Learn
+            </Typography>
+          </Box>
         </Box>
 
         {/* Center: Nav */}
@@ -91,33 +122,63 @@ function Header({ user }) {
 
         {/* Right: Profile or Join button */}
         <Box sx={{ flex: "0 0 auto", display: { xs: "none", md: "block" } }}>
-          {user ? (
-            <IconButton component={Link} to="/profile">
-              <Avatar
-                alt={user.name}
-                src={user.avatarUrl}
-                sx={{ width: 40, height: 40 }}
-              />
-            </IconButton>
+          {authenticated && userData ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Typography variant="body1" sx={{ color: "#1e293b", fontWeight: 500 }}>
+                {`${userData.first_name} ${userData.last_name}`}
+              </Typography>
+              <IconButton component={Link} to="/profile">
+                <Avatar
+                  alt={`${userData.first_name} ${userData.last_name}`}
+                  sx={{ width: 40, height: 40, bgcolor: "#2563eb" }}
+                >
+                  {`${userData.first_name[0]}${userData.last_name[0]}`}
+                </Avatar>
+              </IconButton>
+              <IconButton 
+                onClick={handleLogout}
+                sx={{ 
+                  color: "#6b7280",
+                  "&:hover": { bgcolor: "rgba(107, 114, 128, 0.04)" },
+                }}
+                title="Logout"
+              >
+                <LogoutIcon />
+              </IconButton>
+            </Box>
           ) : (
-            <Button
-              component={Link}
-              to="/signup"
-              variant="contained"
-              sx={{
-                bgcolor: "#2563eb",
-                color: "#fff",
-                px: 3,
-                py: 1,
-                borderRadius: "999px",
-                fontWeight: 500,
-                textTransform: "none",
-                boxShadow: "none",
-                "&:hover": { bgcolor: "#1e40af" },
-              }}
-            >
-              Join
-            </Button>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Button
+                component={Link}
+                to="/login"
+                sx={{
+                  color: "#2563eb",
+                  fontWeight: 500,
+                  textTransform: "none",
+                  "&:hover": { bgcolor: "rgba(37, 99, 235, 0.04)" },
+                }}
+              >
+                Login
+              </Button>
+              <Button
+                component={Link}
+                to="/signup"
+                variant="contained"
+                sx={{
+                  bgcolor: "#2563eb",
+                  color: "#fff",
+                  px: 3,
+                  py: 1,
+                  borderRadius: "999px",
+                  fontWeight: 500,
+                  textTransform: "none",
+                  boxShadow: "none",
+                  "&:hover": { bgcolor: "#1e40af" },
+                }}
+              >
+                Sign Up
+              </Button>
+            </Box>
           )}
         </Box>
 
@@ -167,27 +228,84 @@ function Header({ user }) {
               </ListItemButton>
             </ListItem>
           ))}
-          {!user && (
-            <ListItem>
-              <Button
-                component={Link}
-                to="/signup"
-                variant="contained"
-                fullWidth
-                sx={{
-                  bgcolor: "#2563eb",
-                  color: "#fff",
-                  borderRadius: "999px",
-                  fontWeight: 500,
-                  textTransform: "none",
-                  mt: 1,
-                  "&:hover": { bgcolor: "#1e40af" },
-                }}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Join
-              </Button>
-            </ListItem>
+          {!authenticated && (
+            <>
+              <ListItem>
+                <Button
+                  component={Link}
+                  to="/login"
+                  variant="outlined"
+                  fullWidth
+                  sx={{
+                    borderColor: "#2563eb",
+                    color: "#2563eb",
+                    borderRadius: "999px",
+                    fontWeight: 500,
+                    textTransform: "none",
+                    "&:hover": { bgcolor: "rgba(37, 99, 235, 0.04)" },
+                  }}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Login
+                </Button>
+              </ListItem>
+              <ListItem>
+                <Button
+                  component={Link}
+                  to="/signup"
+                  variant="contained"
+                  fullWidth
+                  sx={{
+                    bgcolor: "#2563eb",
+                    color: "#fff",
+                    borderRadius: "999px",
+                    fontWeight: 500,
+                    textTransform: "none",
+                    "&:hover": { bgcolor: "#1e40af" },
+                  }}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Sign Up
+                </Button>
+              </ListItem>
+            </>
+          )}
+          {authenticated && userData && (
+            <>
+              <ListItem>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: "100%", px: 2 }}>
+                  <Avatar
+                    alt={`${userData.first_name} ${userData.last_name}`}
+                    sx={{ width: 40, height: 40, bgcolor: "#2563eb" }}
+                  >
+                    {`${userData.first_name[0]}${userData.last_name[0]}`}
+                  </Avatar>
+                  <Typography variant="body1" sx={{ color: "#1e293b", fontWeight: 500 }}>
+                    {`${userData.first_name} ${userData.last_name}`}
+                  </Typography>
+                </Box>
+              </ListItem>
+              <ListItem>
+                <Button
+                  onClick={() => {
+                    handleLogout();
+                    setIsMenuOpen(false);
+                  }}
+                  variant="outlined"
+                  fullWidth
+                  sx={{
+                    borderColor: "#6b7280",
+                    color: "#6b7280",
+                    borderRadius: "999px",
+                    fontWeight: 500,
+                    textTransform: "none",
+                    "&:hover": { bgcolor: "rgba(107, 114, 128, 0.04)" },
+                  }}
+                >
+                  Logout
+                </Button>
+              </ListItem>
+            </>
           )}
         </List>
       </Drawer>
