@@ -11,22 +11,22 @@ const AboutSection: React.FC = () => {
 
   // Image carousel data
   const carouselImages = [
-    {
-      src: "/placeholder.svg?height=500&width=600&text=Students+Collaborating",
-      alt: "Students collaborating in study groups",
-      title: "Collaborative Learning",
-    },
-    {
-      src: "/placeholder.svg?height=500&width=600&text=Study+Groups+Meeting",
-      alt: "Study groups meeting online",
-      title: "Study Groups",
-    },
-    {
-      src: "/placeholder.svg?height=500&width=600&text=Academic+Success",
-      alt: "Students achieving academic success",
-      title: "Academic Success",
-    },
-  ]
+  {
+    src: "/assets/collaborative_learning.png",
+    alt: "Students collaborating in study groups",
+    title: "Collaborative Learning",
+  },
+  {
+    src: "/assets/study_groups.png",
+    alt: "Study groups meeting online",
+    title: "Study Groups",
+  },
+  {
+    src: "/assets/academic_success.png",
+    alt: "Students achieving academic success",
+    title: "Academic Success",
+  },
+]
 
   // Auto-advance carousel
   useEffect(() => {

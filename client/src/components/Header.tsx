@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AppBar, Toolbar, IconButton, Typography, Box, Button, Drawer, List, ListItem, ListItemButton, ListItemText, Avatar } from "@mui/material";
@@ -25,7 +26,6 @@ function Header({}: HeaderProps) {
 
   const isHome = location.pathname === "/";
 
-  // Only show nav items relevant to the current page
   const navItems = [
     ...(isHome
       ? [
@@ -33,13 +33,15 @@ function Header({}: HeaderProps) {
           { name: "groups", href: "#groups" },
           { name: "features", href: "#features" },
           { name: "About", href: "#about" },
+          { name: "Login", href: "/login" },
+          { name: "Sign Up", href: "/signup" },
         ]
       : [])
   ];
 
   return (
     <AppBar
-      position={isHome ? "sticky" : "static"} // Sticky only on home page
+      position={isHome ? "sticky" : "static"}
       elevation={1}
       sx={{
         bgcolor: "#fff",
