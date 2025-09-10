@@ -19,6 +19,7 @@ import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
+import { logout } from "../api/authApi";
 
 // Optional: Your logo asset
 import { assets } from "../assets/assets";
@@ -66,10 +67,6 @@ const SidebarMenuItem = ({
 const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) => {
   const [selected, setSelected] = useState<string>("Home");
   const navigate = useNavigate();
-  const handleSignOut = () => {
-  // Add your logout logic here (e.g., clear tokens, reset user state)
-  navigate("/login");
-  };
   const handleToggle = () => setCollapsed((prev) => !prev);
 
   const sidebarWidth = collapsed ? 80 : 250;
@@ -218,7 +215,15 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
           /> */}
           <MenuItem
   icon={<LogoutOutlinedIcon sx={{ color: "white" }} />}
-  onClick={handleSignOut}
+  onClick={async () => {
+    try {
+      logout(); // Call the logout function to clear auth data
+      navigate("/login"); // Redirect to login page
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // Optionally, show an error message to the user
+    }
+  }}
   style={{
     color: "white",
     fontWeight: selected === "Sign Out" ? "bold" : "normal",

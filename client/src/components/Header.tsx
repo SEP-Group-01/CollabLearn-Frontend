@@ -33,8 +33,6 @@ function Header({}: HeaderProps) {
           { name: "groups", href: "#groups" },
           { name: "features", href: "#features" },
           { name: "About", href: "#about" },
-          { name: "Login", href: "/login" },
-          { name: "Sign Up", href: "/signup" },
         ]
       : [])
   ];
