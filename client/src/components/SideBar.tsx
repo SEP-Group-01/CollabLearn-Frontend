@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
 import EditIcon from "@mui/icons-material/Edit";
+
+import { useNavigate } from "react-router-dom";
 import { Box } from "@mui/material";
 import { Link, useNavigate } from "react-router-dom";
 import type { To } from "react-router-dom";
@@ -71,7 +73,10 @@ const SidebarMenuItem = ({
 const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) => {
   const [selected, setSelected] = useState<string>("Home");
   const navigate = useNavigate();
-
+  const handleSignOut = () => {
+  // Add your logout logic here (e.g., clear tokens, reset user state)
+  navigate("/login");
+  };
   const handleToggle = () => setCollapsed((prev) => !prev);
 
   const handleSignOut = () => {
@@ -220,14 +225,16 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
             collapsed={collapsed}
           />
 
-          <SidebarMenuItem
-            title="Sign Out"
-            icon={<LogoutOutlinedIcon sx={{ color: "white" }} />}
-            selected={selected}
-            setSelected={setSelected}
-            collapsed={collapsed}
-            onClick={handleSignOut}
-          />
+          <MenuItem
+  icon={<LogoutOutlinedIcon sx={{ color: "white" }} />}
+  onClick={handleSignOut}
+  style={{
+    color: "white",
+    fontWeight: selected === "Sign Out" ? "bold" : "normal",
+  }}
+>
+  {!collapsed && "Sign Out"}
+</MenuItem>
         </Menu>
       </Sidebar>
     </Box>
