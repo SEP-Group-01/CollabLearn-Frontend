@@ -11,6 +11,7 @@ export const useThreadData = (threadId: string, workspaceId: string): ThreadData
           : threadId === "2"
             ? "Neural Networks"
             : "Optimization and Gradient Descent",
+            
       description:
         threadId === "1"
           ? "Foundation concepts in linear algebra for machine learning including vectors, matrices, eigenvalues, and eigenvectors. This thread covers essential mathematical concepts that form the backbone of most ML algorithms."

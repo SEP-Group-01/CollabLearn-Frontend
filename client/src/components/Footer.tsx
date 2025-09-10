@@ -12,12 +12,23 @@ function Footer() {
   const [email, setEmail] = useState("")
   const [subscribed, setSubscribed] = useState(false)
 
+  // const handleNavigation = (path: string) => {
+  //   navigate(path)
+  //   // Smooth scroll to top
+  //   window.scrollTo({ top: 0, behavior: "smooth" })
+  // }
   const handleNavigation = (path: string) => {
-    navigate(path)
-    // Smooth scroll to top
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  }
-
+    if (path.startsWith("#")) {
+      const sectionId = path.slice(1);
+      const section = document.getElementById(sectionId);
+      if (section) {
+        section.scrollIntoView({ behavior: "smooth" });
+      }
+    } else {
+    navigate(path);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault()
     if (email) {
@@ -34,7 +45,7 @@ function Footer() {
   const companyLinks = [
     { name: "Home", path: "/" },
     { name: "About Us", path: "#about" },
-    { name: "Groups", path: "#groups" },
+    { name: "Groups", path: "#workspaces" },
     { name: "Features", path: "#features" },
   ]
 
