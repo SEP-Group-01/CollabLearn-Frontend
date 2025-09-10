@@ -57,10 +57,10 @@ function SignUpPageContent() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    if (!agreeToTerms) {
-      setError("Please agree to the terms and privacy policy")
-      return
-    }
+    // if (!agreeToTerms) {
+    //   setError("Please agree to the terms and privacy policy")
+    //   return
+    // }
 
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
       setError("Please fill in all fields")
@@ -233,7 +233,7 @@ function SignUpPageContent() {
             />
 
             {/* Terms Agreement */}
-            <FormControlLabel
+            {/* <FormControlLabel
               control={
                 <Checkbox checked={agreeToTerms} onChange={(e) => setAgreeToTerms(e.target.checked)} color="primary" />
               }
@@ -250,7 +250,7 @@ function SignUpPageContent() {
                 </Typography>
               }
               sx={{ mt: 1, mb: 1 }}
-            />
+            /> */}
 
             {/* Error Message */}
             {error && (
