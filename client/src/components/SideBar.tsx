@@ -1,12 +1,9 @@
-
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
 import EditIcon from "@mui/icons-material/Edit";
-
-
 import { Box } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { To } from "react-router-dom";
 
 // Icons
@@ -25,18 +22,18 @@ import { assets } from "../assets/assets";
 
 interface SidebarMenuItemProps {
   title: string;
-  to: To;
+  to?: To;
   icon: ReactNode;
   selected: string;
   setSelected: (title: string) => void;
   collapsed: boolean;
+  onClick?: () => void;
 }
 
 interface SidebarComponentProps {
   collapsed: boolean;
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
-    position?: "fixed" | "static";
-
+  position?: "fixed" | "static";
 }
 
 const SidebarMenuItem = ({
@@ -46,13 +43,21 @@ const SidebarMenuItem = ({
   selected,
   setSelected,
   collapsed,
+  onClick,
 }: SidebarMenuItemProps) => {
+  const handleClick = () => {
+    setSelected(title);
+    if (onClick) {
+      onClick();
+    }
+  };
+
   return (
     <MenuItem
       icon={icon}
       active={selected === title}
-      onClick={() => setSelected(title)}
-      component={<Link to={to} />}
+      onClick={handleClick}
+      component={to ? <Link to={to} /> : undefined}
       style={{
         color: "white",
         fontWeight: selected === title ? "bold" : "normal",
@@ -65,18 +70,29 @@ const SidebarMenuItem = ({
 
 const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) => {
   const [selected, setSelected] = useState<string>("Home");
+  const navigate = useNavigate();
 
   const handleToggle = () => setCollapsed((prev) => !prev);
+
+  const handleSignOut = () => {
+    // Clear any stored authentication data
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('refreshToken');
+    
+    // Navigate to login page
+    navigate('/login');
+  };
 
   const sidebarWidth = collapsed ? 80 : 250;
 
   const sidebarStyles: React.CSSProperties = {
-    position:window.innerWidth < 900 ? "static" : "fixed",
+    position: window.innerWidth < 900 ? "static" : "fixed",
     top: 0,
     left: 0,
     height: "100vh",
     width: sidebarWidth,
-    backgroundColor: "#1a237e",
+    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
     color: "white",
     overflowY: "auto",
     transition: "width 0.3s ease",
@@ -86,7 +102,7 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
   return (
     <Box sx={{ display: "flex" }}>
       <Sidebar collapsed={collapsed} style={sidebarStyles}>
-        <Menu>
+        <Menu style={{ background: "transparent", color: "white" }}>
 
           {/* Toggle */}
           {collapsed ? (
@@ -206,11 +222,11 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
 
           <SidebarMenuItem
             title="Sign Out"
-            to="/signout"
             icon={<LogoutOutlinedIcon sx={{ color: "white" }} />}
             selected={selected}
             setSelected={setSelected}
             collapsed={collapsed}
+            onClick={handleSignOut}
           />
         </Menu>
       </Sidebar>
