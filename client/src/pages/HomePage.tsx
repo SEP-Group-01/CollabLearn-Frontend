@@ -4,11 +4,13 @@ import AboutSection from "../components/AboutSection";
 import Footer from "../components/Footer";
 import { Box } from "@mui/material";
 import Hero from "../components/Hero";
+import Header from "../components/Header";
 
 function HomePage() {
   return (
+
     <Box sx={{ minHeight: "100vh", bgcolor: "#fff" }}>
-      {/* Remove <Header /> here */}
+      <Header />
       <main>
         <Hero />
         <Box sx={{ py: { xs: 2, md: 4 } }}>

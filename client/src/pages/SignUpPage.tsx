@@ -237,7 +237,6 @@ function SignUpPageContent() {
                 ),
               }}
             />
-
             {error && (
               <Box
                 sx={{

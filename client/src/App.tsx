@@ -34,7 +34,7 @@ const App = () => {
   return (
 
       <div className="App">
-      <Header user={dummyUser} /> {/* Pass user prop here */}
+      {/* <Header user={dummyUser} /> Pass user prop here */}
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/signup" element={<SignUpPage />} />
