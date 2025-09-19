@@ -1,5 +1,6 @@
 import { useState } from "react";
 import SidebarComponent from "../components/SideBar";
+import StudyCalendar from "../components/StudyCalendar";
 import {
   Box,
   Typography,
@@ -8,7 +9,6 @@ import {
   Avatar,
   Button,
   TextField,
-  Chip,
   List,
   ListItem,
   ListItemText,
@@ -397,6 +397,13 @@ export default function ProfilePage() {
             </Box>
 
           
+          </CardContent>
+        </Card>
+
+        {/* Study Schedule */}
+        <Card sx={{ mb: 4, borderRadius: 4, boxShadow: "0 4px 24px rgba(59,130,246,0.06)" }}>
+          <CardContent>
+            <StudyCalendar showTitle={true} compact={false} />
           </CardContent>
         </Card>
 

@@ -1,123 +1,306 @@
 import React, { useState } from "react";
 import SidebarComponent from "../components/SideBar";
+import TimeSlotsManager from "../components/TimeSlotsManager";
+import WorkspaceThreadSelector from "../components/WorkspaceThreadSelector";
+import StudyCalendar from "../components/StudyCalendar";
 import {
   Box,
-  Grid,
   Typography,
   Paper,
   Stack,
   TextField,
   Button,
   MenuItem,
-  Checkbox,
-  FormControlLabel,
-  FormGroup,
-  RadioGroup,
-  Radio,
-  Tabs,
-  Tab,
-  Divider,
   IconButton,
   Drawer,
   useMediaQuery,
+  Alert,
+  CircularProgress,
+  Stepper,
+  Step,
+  StepLabel,
+  StepContent,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import { 
+  Schedule as ScheduleIcon,
+  Folder as FolderIcon,
+  Settings as SettingsIcon,
+  PlayArrow as GenerateIcon,
+} from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
-
-const learningGoals = [
-  "Improve weak areas",
-  "Complete assignments on time",
-];
-
-const focusAreas = [
-  "Math",
-  "Physics",
-  "Chemistry",
-  "Programming",
-  "History",
-  "Biology",
-];
-
-const studyModes = ["Individual", "Group"];
-const learningStyles = ["Reading", "Practice problems", "Videos", "Discussions"];
-
-const daysOfWeek = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
-
-function getRandomSchedule(form: any) {
-  // Demo: Generate a simple weekly schedule
-  return daysOfWeek.map((day, idx) => ({
-    day,
-    hours: form.hoursPerDay || 1,
-    tasks: [
-      `${form.focusAreas?.[idx % form.focusAreas.length] || "General"}: ${
-        form.hoursPerDay || "1"
-      } hour study`,
-      idx % 2 === 0 ? "Take a 5 min break" : "",
-    ].filter(Boolean),
-  }));
-}
+import type { 
+  TimeSlot, 
+  WorkspaceSelection, 
+  StudyPlanRequest,
+  StudyPlanResult,
+} from "../types/StudyPlanInterfaces";
+import { generateStudyPlan } from "../api/studyPlanApi";
+import { getUserData } from "../api/authApi";
 
 const StudyPlanGenerationPage: React.FC = () => {
-  const [form, setForm] = useState({
-    learningGoal: "",
-    focusAreas: [] as string[],
-    customGoal: "",
-    hoursPerDay: "",
-    availableDays: [] as string[],
-    learningStyle: "",
-    studyMode: "",
+  const [currentStep, setCurrentStep] = useState(0);
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [workspaceSelections, setWorkspaceSelections] = useState<WorkspaceSelection[]>([]);
+  const [preferences, setPreferences] = useState({
+    priority_level: "medium" as "high" | "medium" | "low",
+    learning_style: "reading" as "visual" | "auditory" | "kinesthetic" | "reading",
+    difficulty_preference: "medium" as "easy" | "medium" | "hard",
+    session_duration_preference: 60,
   });
-  const [tab, setTab] = useState(0);
-  const [generated, setGenerated] = useState<any>(null);
+  const [generated, setGenerated] = useState<StudyPlanResult | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const userData = getUserData();
+  const userId = typeof userData?.id === 'string' ? parseInt(userData.id) : userData?.id || 1;
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const steps = [
+    {
+      label: "Configure Time Slots",
+      description: "Set up your available study times",
+      icon: <ScheduleIcon />,
+    },
+    {
+      label: "Select Content",
+      description: "Choose workspaces and threads to study",
+      icon: <FolderIcon />,
+    },
+    {
+      label: "Set Preferences",
+      description: "Customize your learning preferences",
+      icon: <SettingsIcon />,
+    },
+    {
+      label: "Generate Plan",
+      description: "Create your personalized study schedule",
+      icon: <GenerateIcon />,
+    },
+  ];
+
+  const handleTimeSlotsChange = (newTimeSlots: TimeSlot[]) => {
+    setTimeSlots(newTimeSlots);
   };
 
-  const handleSelect = (name: string, value: string) => {
-    setForm({ ...form, [name]: value });
+  const handleWorkspaceSelectionChange = (newSelections: WorkspaceSelection[]) => {
+    setWorkspaceSelections(newSelections);
   };
 
-  const handleCheckbox = (name: string, value: string) => {
-    setForm({
-      ...form,
-      [name]: form[name].includes(value)
-        ? form[name].filter((v: string) => v !== value)
-        : [...form[name], value],
-    });
+  const handlePreferenceChange = (field: string, value: string | number) => {
+    setPreferences(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleGenerate = () => {
-    setGenerated({
-      schedule: getRandomSchedule(form),
-      focus: form.focusAreas.length ? form.focusAreas : ["Math", "Physics"],
-      method: form.learningStyle,
-      mode: form.studyMode,
-      resources: [
-        ...(form.learningStyle === "Videos"
-          ? ["Recommended YouTube playlists"]
-          : []),
-        ...(form.learningStyle === "Practice problems"
-          ? ["Quiz sets", "Past papers"]
-          : []),
-        ...(form.studyMode === "Group" ? ["Group session slots"] : []),
-      ],
-    });
-    setTab(0);
+  const canProceedToNextStep = () => {
+    switch (currentStep) {
+      case 0:
+        return timeSlots.length > 0;
+      case 1:
+        return workspaceSelections.some(ws => ws.selected && ws.thread_ids.length > 0);
+      case 2:
+        return true; // Preferences are optional
+      default:
+        return true;
+    }
+  };
+
+  const handleGenerateStudyPlan = async () => {
+    try {
+      setGenerating(true);
+      setError(null);
+
+      const selectedWorkspaceIds = workspaceSelections
+        .filter(ws => ws.selected)
+        .map(ws => ws.workspace_id);
+      
+      const selectedThreadIds = workspaceSelections
+        .filter(ws => ws.selected)
+        .flatMap(ws => ws.thread_ids);
+
+      const request: StudyPlanRequest = {
+        user_id: userId,
+        workspace_ids: selectedWorkspaceIds,
+        thread_ids: selectedThreadIds,
+        priority_level: preferences.priority_level,
+        learning_style: preferences.learning_style,
+        difficulty_preference: preferences.difficulty_preference,
+        session_duration_preference: preferences.session_duration_preference,
+      };
+
+      const result = await generateStudyPlan(request);
+      setGenerated(result);
+      setCurrentStep(3); // Move to results view
+
+    } catch (err) {
+      console.error('Error generating study plan:', err);
+      setError((err as Error).message || 'Failed to generate study plan');
+      
+      // For demo purposes, create a mock result
+      const demoResult: StudyPlanResult = {
+        id: Date.now(),
+        user_id: userId,
+        schedule: [
+          {
+            id: 1,
+            resource: {
+              id: 1,
+              name: 'Linear Algebra Fundamentals',
+              type: 'document',
+              workspace_id: workspaceSelections[0]?.workspace_id || 1,
+              thread_id: workspaceSelections[0]?.thread_ids[0] || 1,
+              estimated_duration: 120,
+              difficulty_level: preferences.difficulty_preference,
+              description: 'Introduction to vectors and matrices',
+            },
+            time_slot: timeSlots[0] || {
+              day_of_week: 'Monday',
+              start_time: '09:00',
+              end_time: '11:00',
+              is_available: true,
+            },
+            week_number: 1,
+            allocated_time: preferences.session_duration_preference,
+            status: 'scheduled',
+          },
+        ],
+        total_coverage_percentage: 85,
+        total_allocated_hours: timeSlots.reduce((total, slot) => {
+          const start = new Date(`1970-01-01T${slot.start_time}:00`);
+          const end = new Date(`1970-01-01T${slot.end_time}:00`);
+          return total + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        }, 0),
+        plan_duration_weeks: 4,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setGenerated(demoResult);
+      setCurrentStep(3);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleNextStep = () => {
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else if (currentStep === steps.length - 1) {
+      handleGenerateStudyPlan();
+    }
+  };
+
+  const handlePrevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const renderStepContent = (step: number) => {
+    switch (step) {
+      case 0:
+        return (
+          <TimeSlotsManager 
+            onTimeSlotsChange={handleTimeSlotsChange}
+            showTitle={false}
+          />
+        );
+      case 1:
+        return (
+          <WorkspaceThreadSelector 
+            onSelectionChange={handleWorkspaceSelectionChange}
+            showTitle={false}
+          />
+        );
+      case 2:
+        return (
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" fontWeight="bold" mb={3}>
+              Study Preferences
+            </Typography>
+            <Stack spacing={3}>
+              <TextField
+                select
+                label="Priority Level"
+                value={preferences.priority_level}
+                onChange={(e) => handlePreferenceChange('priority_level', e.target.value)}
+                fullWidth
+                helperText="How important is this study plan to you?"
+              >
+                <MenuItem value="high">High - Focus intensively</MenuItem>
+                <MenuItem value="medium">Medium - Balanced approach</MenuItem>
+                <MenuItem value="low">Low - Casual learning</MenuItem>
+              </TextField>
+
+              <TextField
+                select
+                label="Learning Style"
+                value={preferences.learning_style}
+                onChange={(e) => handlePreferenceChange('learning_style', e.target.value)}
+                fullWidth
+                helperText="How do you prefer to learn?"
+              >
+                <MenuItem value="visual">Visual - Images, diagrams, videos</MenuItem>
+                <MenuItem value="reading">Reading/Writing - Text-based content</MenuItem>
+                <MenuItem value="auditory">Auditory - Audio content, discussions</MenuItem>
+                <MenuItem value="kinesthetic">Kinesthetic - Hands-on practice</MenuItem>
+              </TextField>
+
+              <TextField
+                select
+                label="Difficulty Preference"
+                value={preferences.difficulty_preference}
+                onChange={(e) => handlePreferenceChange('difficulty_preference', e.target.value)}
+                fullWidth
+                helperText="What level of content challenge do you prefer?"
+              >
+                <MenuItem value="easy">Easy - Start with basics</MenuItem>
+                <MenuItem value="medium">Medium - Balanced challenge</MenuItem>
+                <MenuItem value="hard">Hard - Advanced content</MenuItem>
+              </TextField>
+
+              <TextField
+                label="Preferred Session Duration (minutes)"
+                type="number"
+                value={preferences.session_duration_preference}
+                onChange={(e) => handlePreferenceChange('session_duration_preference', parseInt(e.target.value) || 60)}
+                fullWidth
+                helperText="How long should each study session be?"
+                inputProps={{ min: 15, max: 180, step: 15 }}
+              />
+            </Stack>
+          </Paper>
+        );
+      case 3:
+        return generated ? (
+          <Box>
+            <Alert severity="success" sx={{ mb: 3 }}>
+              Study plan generated successfully! Your schedule is now available in your profile.
+            </Alert>
+            <StudyCalendar />
+          </Box>
+        ) : (
+          <Paper sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="h6" mb={2}>
+              Ready to Generate Your Study Plan
+            </Typography>
+            <Typography variant="body1" color="text.secondary" mb={3}>
+              Click "Generate Plan" to create your personalized study schedule based on your time slots, selected content, and preferences.
+            </Typography>
+            <Stack direction="row" spacing={2} justifyContent="center">
+              <Typography variant="body2">
+                <strong>Time Slots:</strong> {timeSlots.length} configured
+              </Typography>
+              <Typography variant="body2">
+                <strong>Content:</strong> {workspaceSelections.filter(ws => ws.selected).length} workspaces, {workspaceSelections.reduce((total, ws) => total + ws.thread_ids.length, 0)} threads
+              </Typography>
+            </Stack>
+          </Paper>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -154,347 +337,84 @@ const StudyPlanGenerationPage: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <Grid
-        container
-        sx={{
-          flexGrow: 1,
-          px: { xs: 0, sm: 1, md: 4 },
-          py: { xs: 2, md: 6 },
-        }}
-        spacing={isMobile ? 2 : 4}
-      >
-        {/* Center: Study Plan Generation Area */}
-        <Grid
-          item
-          xs={12}
-          md={7}
-          lg={7}
+      <Box sx={{ flexGrow: 1, p: { xs: 2, md: 4 } }}>
+        <Paper
+          elevation={2}
           sx={{
-            display: "flex",
-            alignItems: "flex-start", // <-- Now starts at top
-            justifyContent: "center",
-            order: isMobile ? 2 : 1,
-            px: { xs: 1, md: 0 },
-            py: { xs: 2, md: 0 },
+            maxWidth: 1200,
+            mx: "auto",
+            p: { xs: 2, md: 4 },
+            borderRadius: 3,
           }}
         >
-          <Paper
-            elevation={4}
-            sx={{
-              width: "100%",
-              maxWidth: 600,
-              minHeight: 500,
-              mx: "auto",
-              p: { xs: 2, md: 5 },
-              borderRadius: 4,
-              bgcolor: "#f1f5f9",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-          >
-            <Typography
-              variant="h4"
-              fontWeight="bold"
-              mb={1}
-              color="primary"
-              textAlign="center"
-            >
-              Generate Your Study Plan
+          {/* Header */}
+          <Box sx={{ textAlign: "center", mb: 4 }}>
+            <Typography variant="h4" fontWeight="bold" color="primary" mb={1}>
+              Study Plan Generator
             </Typography>
-            <Typography
-              variant="body1"
-              color="text.secondary"
-              mb={3}
-              textAlign="center"
-            >
-              Fill in your details and preferences to get a personalized study
-              schedule for your group.
+            <Typography variant="body1" color="text.secondary">
+              Create a personalized study schedule based on your available time and learning preferences
             </Typography>
-            <Divider sx={{ mb: 3, width: "100%" }} />
-            {generated ? (
-              <>
-                <Tabs
-                  value={tab}
-                  onChange={(_, v) => setTab(v)}
-                  centered
-                  sx={{ mb: 2 }}
-                >
-                  <Tab label="Schedule" />
-                  <Tab label="Focus Areas" />
-                  <Tab label="Methods" />
-                  <Tab label="Resources" />
-                </Tabs>
-                {tab === 0 && (
-                  <Box sx={{ width: "100%" }}>
-                    <Typography
-                      variant="h6"
-                      fontWeight="bold"
-                      mb={2}
-                      sx={{ mt: 1 }}
-                    >
-                      Weekly Timetable
-                    </Typography>
-                    <Stack spacing={1}>
-                      {generated.schedule.map((item: any, idx: number) => (
-                        <Paper
-                          key={item.day}
-                          sx={{
-                            p: 2,
-                            bgcolor: "#fff",
-                            borderLeft: "4px solid #38bdf8",
-                          }}
-                        >
-                          <Typography fontWeight="bold">{item.day}</Typography>
-                          <Typography variant="body2">
-                            {item.tasks.join(", ")}
-                          </Typography>
-                        </Paper>
-                      ))}
-                    </Stack>
-                  </Box>
-                )}
-                {tab === 1 && (
-                  <Box sx={{ width: "100%" }}>
-                    <Typography
-                      variant="h6"
-                      fontWeight="bold"
-                      mb={2}
-                      sx={{ mt: 1 }}
-                    >
-                      Prioritization & Focus Areas
-                    </Typography>
-                    <Stack spacing={1}>
-                      {generated.focus.map((topic: string, idx: number) => (
-                        <Paper
-                          key={topic}
-                          sx={{
-                            p: 2,
-                            bgcolor: "#f0fdf4",
-                            borderLeft: "4px solid #22c55e",
-                          }}
-                        >
-                          <Typography fontWeight="bold">{topic}</Typography>
-                          <Typography variant="body2" color="success.main">
-                            Suggested order: {idx + 1}
-                          </Typography>
-                        </Paper>
-                      ))}
-                    </Stack>
-                  </Box>
-                )}
-                {tab === 2 && (
-                  <Box sx={{ width: "100%" }}>
-                    <Typography
-                      variant="h6"
-                      fontWeight="bold"
-                      mb={2}
-                      sx={{ mt: 1 }}
-                    >
-                      Study Method Suggestions
-                    </Typography>
-                    <Typography>
-                      Preferred:{" "}
-                      <b>{generated.method || "Reading"}</b>
-                    </Typography>
-                    {generated.method === "Videos" && (
-                      <Typography color="info.main" mt={1}>
-                        Watch recommended video playlists for your topics.
-                      </Typography>
-                    )}
-                    {generated.method === "Practice problems" && (
-                      <Typography color="info.main" mt={1}>
-                        Try quizzes and past papers for practice.
-                      </Typography>
-                    )}
-                    {generated.mode === "Group" && (
-                      <Typography color="info.main" mt={1}>
-                        Join group study sessions scheduled in your workspace.
-                      </Typography>
-                    )}
-                  </Box>
-                )}
-                {tab === 3 && (
-                  <Box sx={{ width: "100%" }}>
-                    <Typography
-                      variant="h6"
-                      fontWeight="bold"
-                      mb={2}
-                      sx={{ mt: 1 }}
-                    >
-                      Resources & Materials
-                    </Typography>
-                    <Stack spacing={1}>
-                      {generated.resources.map((res: string, idx: number) => (
-                        <Paper key={idx} sx={{ p: 2, bgcolor: "#f3f4f6" }}>
-                          <Typography>{res}</Typography>
-                        </Paper>
-                      ))}
-                    </Stack>
-                  </Box>
-                )}
-              </>
-            ) : (
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                textAlign="center"
-              >
-                Fill in your details and click Generate to see your study plan.
-              </Typography>
-            )}
-          </Paper>
-        </Grid>
+          </Box>
 
-        {/* Right: User Input Area */}
-        <Grid
-          item
-          xs={12}
-          md={5}
-          lg={5}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            order: isMobile ? 1 : 2,
-            px: { xs: 1, md: 0 },
-            py: { xs: 2, md: 0 },
-          }}
-        >
-          <Paper
-            elevation={2}
-            sx={{
-              width: "100%",
-              maxWidth: 400,
-              p: { xs: 2, md: 4 },
-              borderRadius: 4,
-              bgcolor: "#fff",
-              boxShadow: 2,
-            }}
-          >
-            <Typography
-              variant="h6"
-              fontWeight="bold"
-              mb={2}
-              color="primary"
-              textAlign="center"
+          {/* Progress Stepper */}
+          <Stepper activeStep={currentStep} orientation={isMobile ? "vertical" : "horizontal"} sx={{ mb: 4 }}>
+            {steps.map((step, index) => (
+              <Step key={step.label}>
+                <StepLabel
+                  icon={step.icon}
+                  optional={
+                    <Typography variant="caption">{step.description}</Typography>
+                  }
+                >
+                  {step.label}
+                </StepLabel>
+                {isMobile && (
+                  <StepContent>
+                    {currentStep === index && renderStepContent(index)}
+                  </StepContent>
+                )}
+              </Step>
+            ))}
+          </Stepper>
+
+          {/* Desktop Step Content */}
+          {!isMobile && (
+            <Box sx={{ mt: 4 }}>
+              {renderStepContent(currentStep)}
+            </Box>
+          )}
+
+          {/* Navigation Buttons */}
+          <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
+            <Button
+              onClick={handlePrevStep}
+              disabled={currentStep === 0}
+              sx={{ minWidth: 120 }}
             >
-              Enter Your Details
-            </Typography>
-            <Stack spacing={3}>
-              {/* Learning Goals */}
-              <TextField
-                select
-                label="Target Outcome"
-                name="learningGoal"
-                value={form.learningGoal}
-                onChange={handleChange}
-                fullWidth
-              >
-                {learningGoals.map((goal) => (
-                  <MenuItem key={goal} value={goal}>
-                    {goal}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                label="Custom Goal (optional)"
-                name="customGoal"
-                value={form.customGoal}
-                onChange={handleChange}
-                fullWidth
-              />
-              <TextField
-                select
-                label="Focus Areas"
-                name="focusAreas"
-                value={form.focusAreas}
-                onChange={(e) =>
-                  handleSelect(
-                    "focusAreas",
-                    typeof e.target.value === "string"
-                      ? [e.target.value]
-                      : e.target.value
-                  )
-                }
-                SelectProps={{ multiple: true }}
-                fullWidth
-              >
-                {focusAreas.map((area) => (
-                  <MenuItem key={area} value={area}>
-                    {area}
-                  </MenuItem>
-                ))}
-              </TextField>
-              {/* Time Availability */}
-              <TextField
-                label="Preferred study hours per day"
-                name="hoursPerDay"
-                value={form.hoursPerDay}
-                onChange={handleChange}
-                type="number"
-                fullWidth
-              />
-              <FormGroup row>
-                {daysOfWeek.map((day) => (
-                  <FormControlLabel
-                    key={day}
-                    control={
-                      <Checkbox
-                        checked={form.availableDays.includes(day)}
-                        onChange={() => handleCheckbox("availableDays", day)}
-                      />
-                    }
-                    label={day}
-                  />
-                ))}
-              </FormGroup>
-              {/* Study Preferences */}
-              <Typography variant="subtitle1" fontWeight="bold" mt={2}>
-                Preferred Learning Style
-              </Typography>
-              <RadioGroup
-                row
-                name="learningStyle"
-                value={form.learningStyle}
-                onChange={handleChange}
-              >
-                {learningStyles.map((style) => (
-                  <FormControlLabel
-                    key={style}
-                    value={style}
-                    control={<Radio />}
-                    label={style}
-                  />
-                ))}
-              </RadioGroup>
-              <TextField
-                select
-                label="Study Mode"
-                name="studyMode"
-                value={form.studyMode}
-                onChange={handleChange}
-                fullWidth
-              >
-                {studyModes.map((mode) => (
-                  <MenuItem key={mode} value={mode}>
-                    {mode}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleGenerate}
-                sx={{ mt: 2, fontWeight: 600, borderRadius: 2 }}
-                size="large"
-              >
-                Generate Plan
-              </Button>
-            </Stack>
-          </Paper>
-        </Grid>
-      </Grid>
+              Back
+            </Button>
+
+            <Box sx={{ display: "flex", gap: 2 }}>
+              {error && (
+                <Alert severity="error" sx={{ flexGrow: 1 }}>
+                  {error}
+                </Alert>
+              )}
+            </Box>
+
+            <Button
+              variant="contained"
+              onClick={handleNextStep}
+              disabled={!canProceedToNextStep() || generating}
+              sx={{ minWidth: 120 }}
+              startIcon={generating ? <CircularProgress size={20} /> : currentStep === steps.length - 1 ? <GenerateIcon /> : null}
+            >
+              {generating ? "Generating..." : currentStep === steps.length - 1 ? "Generate Plan" : "Next"}
+            </Button>
+          </Box>
+        </Paper>
+      </Box>
     </Box>
   );
 };
