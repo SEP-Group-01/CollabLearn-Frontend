@@ -19,8 +19,15 @@ import {
   useMediaQuery,
 } from "@mui/material";
 
-import type { Role, Author, ReplyType, MessageType} from "../types/ForumInterfaces";
-import { mockMessages, mockGroup } from "../mocks/Forum";
+import type { Role, MessageType } from "../types/ForumInterfaces";
+import { 
+  getForumMessages, 
+  createForumMessage, 
+  createReply, 
+  likeMessage, 
+  likeReply, 
+  getGroupInfo 
+} from "../api/forumApi";
 
 
 export default function GroupForumPage() {
@@ -28,7 +35,7 @@ export default function GroupForumPage() {
   const groupId = params.id ?? ""; // fallback to empty string if undefined
   const isMobile = useMediaQuery("(max-width:900px)");
 
-  const [messages, setMessages] = useState<MessageType[]>(mockMessages);
+  const [messages, setMessages] = useState<MessageType[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [shownReplies, setShownReplies] = useState<number[]>([]);
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
@@ -36,7 +43,40 @@ export default function GroupForumPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState(isMobile);
   const [image, setImage] = useState<File | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [groupInfo, setGroupInfo] = useState<{ id: number; name: string } | null>(null);
+  const [sending, setSending] = useState(false);
 
+  // Load forum data on component mount
+  useEffect(() => {
+    const loadForumData = async () => {
+      if (!groupId) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Load group info and messages in parallel
+        const [groupData, messagesData] = await Promise.all([
+          getGroupInfo(groupId),
+          getForumMessages(groupId)
+        ]);
+        
+        setGroupInfo(groupData);
+        setMessages(messagesData);
+      } catch (err) {
+        console.error('Error loading forum data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load forum data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadForumData();
+  }, [groupId]);
+
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -47,87 +87,76 @@ export default function GroupForumPage() {
     }
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim() && !image) return;
-    let imageUrl = "";
-    if (image) {
-      imageUrl = URL.createObjectURL(image); // For demo, use local URL
+    if (!groupId) return;
+
+    try {
+      setSending(true);
+      const newMessageData = await createForumMessage(groupId, newMessage, image || undefined);
+      setMessages([...messages, newMessageData]);
+      setNewMessage("");
+      setImage(null);
+    } catch (err) {
+      console.error('Error sending message:', err);
+      setError(err instanceof Error ? err.message : 'Failed to send message');
+    } finally {
+      setSending(false);
     }
-    const message: MessageType = {
-      id: Date.now(),
-      content: newMessage,
-      author: {
-        id: 999,
-        name: "You",
-        avatar: "/placeholder.svg?height=40&width=40&text=Y",
-        role: "member",
-      },
-      timestamp: new Date().toISOString(),
-      isPinned: false,
-      likes: 0,
-      replies: [],
-      isLiked: false,
-      image: imageUrl, // Add image URL to message
-    };
-    setMessages([...messages, message]);
-    setNewMessage("");
-    setImage(null);
   };
 
-  const handleSendReply = (messageId: number) => {
+  const handleSendReply = async (messageId: number) => {
     if (!replyContent.trim()) return;
-    const reply: ReplyType = {
-      id: Date.now(),
-      content: replyContent,
-      author: {
-        id: 999,
-        name: "You",
-        avatar: "/placeholder.svg?height=32&width=32&text=Y",
-        role: "member",
-      },
-      timestamp: new Date().toISOString(),
-      likes: 0,
-      isLiked: false,
-    };
-    setMessages(
-      messages.map((msg) =>
-        msg.id === messageId
-          ? { ...msg, replies: [...msg.replies, reply] }
-          : msg
-      )
-    );
-    setReplyContent("");
-    setReplyingTo(null);
+
+    try {
+      const newReply = await createReply(messageId, replyContent);
+      setMessages(
+        messages.map((msg) =>
+          msg.id === messageId
+            ? { ...msg, replies: [...msg.replies, newReply] }
+            : msg
+        )
+      );
+      setReplyContent("");
+      setReplyingTo(null);
+    } catch (err) {
+      console.error('Error sending reply:', err);
+      setError(err instanceof Error ? err.message : 'Failed to send reply');
+    }
   };
 
-  const toggleLike = (messageId: number, isReply = false, replyId?: number) => {
-    setMessages(
-      messages.map((msg) => {
-        if (msg.id === messageId) {
-          if (isReply && replyId) {
-            return {
-              ...msg,
-              replies: msg.replies.map((reply) =>
-                reply.id === replyId
-                  ? {
-                      ...reply,
-                      likes: reply.isLiked ? reply.likes - 1 : reply.likes + 1,
-                      isLiked: !reply.isLiked,
-                    }
-                  : reply
-              ),
-            };
-          } else {
-            return {
-              ...msg,
-              likes: msg.isLiked ? msg.likes - 1 : msg.likes + 1,
-              isLiked: !msg.isLiked,
-            };
-          }
-        }
-        return msg;
-      })
-    );
+  const toggleLike = async (messageId: number, isReply = false, replyId?: number) => {
+    try {
+      if (isReply && replyId) {
+        const likeData = await likeReply(replyId);
+        setMessages(
+          messages.map((msg) => 
+            msg.id === messageId
+              ? {
+                  ...msg,
+                  replies: msg.replies.map((reply) =>
+                    reply.id === replyId
+                      ? { ...reply, likes: likeData.likes, isLiked: likeData.isLiked }
+                      : reply
+                  ),
+                }
+              : msg
+          )
+        );
+      } else {
+        const likeData = await likeMessage(messageId);
+        setMessages(
+          messages.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, likes: likeData.likes, isLiked: likeData.isLiked }
+              : msg
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Error toggling like:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update like');
+    }
   };
 
   const toggleReplies = (messageId: number) => {
@@ -185,7 +214,7 @@ export default function GroupForumPage() {
           }}
         >
           <Typography variant="h5" fontWeight="bold">
-            {mockGroup.name} Forum
+            {groupInfo?.name || 'Loading...'} Forum
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Discuss topics and share knowledge with group members
@@ -194,7 +223,20 @@ export default function GroupForumPage() {
 
         <Box sx={{ flexGrow: 1, overflowY: "auto", px: 2, py: 2 }}>
           <Stack spacing={2}>
-            {messages.map((message) => {
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <Typography>Loading messages...</Typography>
+              </Box>
+            ) : error ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <Typography color="error">{error}</Typography>
+              </Box>
+            ) : messages.length === 0 ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <Typography color="text.secondary">No messages yet. Start the conversation!</Typography>
+              </Box>
+            ) : (
+              messages.map((message) => {
               const isOwnMessage = message.author.name === "You";
               return (
                 <Box
@@ -405,7 +447,8 @@ export default function GroupForumPage() {
                   </Card>
                 </Box>
               );
-            })}
+              })
+            )}
             <div ref={messagesEndRef} />
           </Stack>
         </Box>
@@ -463,11 +506,11 @@ export default function GroupForumPage() {
               <Button
                 variant="contained"
                 endIcon={<Send />}
-                disabled={!newMessage.trim() && !image}
+                disabled={(!newMessage.trim() && !image) || sending}
                 onClick={handleSendMessage}
                 sx={{ mb: { xs: 0, sm: "4px" }, whiteSpace: "nowrap" }}
               >
-                Send
+                {sending ? 'Sending...' : 'Send'}
               </Button>
             </Stack>
 

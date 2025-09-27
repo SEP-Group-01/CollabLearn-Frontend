@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { ThreadData } from "../types/ThreadInterfaces";
+import { assets } from "../assets/assets";
 
 export const useThreadData = (threadId: string, workspaceId: string): ThreadData => {
   return useMemo(
@@ -180,6 +181,8 @@ export const useThreadData = (threadId: string, workspaceId: string): ThreadData
                   addedAt: "2024-01-19",
                   thumbnail: "/placeholder.svg?height=120&width=200&text=Video",
                   views: 234,
+                  url: "https://www.youtube.com/watch?v=XkY2DOUCWMU",
+                  description: "Learn the fundamentals of matrix multiplication with step-by-step examples and real-world applications in machine learning.",
                 },
                 {
                   id: 2,
@@ -189,6 +192,8 @@ export const useThreadData = (threadId: string, workspaceId: string): ThreadData
                   addedAt: "2024-01-21",
                   thumbnail: "/placeholder.svg?height=120&width=200&text=Video",
                   views: 189,
+                  url: "https://www.youtube.com/watch?v=PFDu9oVAE-g",
+                  description: "Deep dive into eigenvalues and eigenvectors - crucial concepts for understanding PCA, dimensionality reduction, and more.",
                 },
                 {
                   id: 3,
@@ -198,6 +203,19 @@ export const useThreadData = (threadId: string, workspaceId: string): ThreadData
                   addedAt: "2024-01-23",
                   thumbnail: "/placeholder.svg?height=120&width=200&text=Video",
                   views: 156,
+                  url: "https://www.youtube.com/watch?v=k7RM-ot2NWY",
+                  description: "Introduction to vector spaces, linear independence, and basis vectors with intuitive explanations and visual examples.",
+                },
+                {
+                  id: 4,
+                  title: "Linear Algebra Fundamentals - Part 1",
+                  duration: "12:15",
+                  addedBy: "Dr. Johnson",
+                  addedAt: "2024-01-24",
+                  thumbnail: assets.course_1_thumbnail,
+                  views: 89,
+                  url: assets.video1,
+                  description: "Comprehensive introduction to linear algebra concepts with practical examples and applications in machine learning.",
                 },
               ]
             : threadId === "2"
@@ -210,6 +228,8 @@ export const useThreadData = (threadId: string, workspaceId: string): ThreadData
                     addedAt: "2024-01-25",
                     thumbnail: "/placeholder.svg?height=120&width=200&text=Video",
                     views: 312,
+                    url: "https://www.youtube.com/watch?v=aircAruvnKk",
+                    description: "Comprehensive introduction to neural networks, covering neurons, layers, activation functions, and how they process information.",
                   },
                   {
                     id: 5,
@@ -219,6 +239,30 @@ export const useThreadData = (threadId: string, workspaceId: string): ThreadData
                     addedAt: "2024-01-26",
                     thumbnail: "/placeholder.svg?height=120&width=200&text=Video",
                     views: 278,
+                    url: "https://www.youtube.com/watch?v=Ilg3gGewQ5U",
+                    description: "Detailed walkthrough of the backpropagation algorithm, showing how neural networks learn through gradient computation.",
+                  },
+                  {
+                    id: 7,
+                    title: "Activation Functions Explained",
+                    duration: "14:45",
+                    addedBy: "Alex Chen",
+                    addedAt: "2024-01-28",
+                    thumbnail: "/placeholder.svg?height=120&width=200&text=Video",
+                    views: 201,
+                    url: "https://www.youtube.com/watch?v=m0pIlLfpXWE",
+                    description: "Explore different activation functions like ReLU, Sigmoid, and Tanh, and understand when to use each one.",
+                  },
+                  {
+                    id: 9,
+                    title: "Neural Networks Deep Dive - Part 2",
+                    duration: "16:30",
+                    addedBy: "Dr. Johnson",
+                    addedAt: "2024-01-29",
+                    thumbnail: assets.course_2_thumbnail,
+                    views: 142,
+                    url: assets.video2,
+                    description: "Advanced neural network concepts including deep learning architectures, training strategies, and optimization techniques.",
                   },
                 ]
               : [
@@ -230,6 +274,19 @@ export const useThreadData = (threadId: string, workspaceId: string): ThreadData
                     addedAt: "2024-01-29",
                     thumbnail: "/placeholder.svg?height=120&width=200&text=Video",
                     views: 145,
+                    url: "https://www.youtube.com/watch?v=sDv4f4s2SB8",
+                    description: "Visual and intuitive explanation of gradient descent optimization algorithm and how it finds optimal solutions.",
+                  },
+                  {
+                    id: 8,
+                    title: "Learning Rate and Optimization",
+                    duration: "16:20",
+                    addedBy: "Maria R.",
+                    addedAt: "2024-01-30",
+                    thumbnail: "/placeholder.svg?height=120&width=200&text=Video",
+                    views: 98,
+                    url: "https://www.youtube.com/watch?v=mdKjMPmcWjY",
+                    description: "Learn about learning rates, momentum, Adam optimizer, and other advanced optimization techniques.",
                   },
                 ],
       },
