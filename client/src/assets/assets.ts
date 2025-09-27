@@ -43,6 +43,8 @@ import profile_img2 from './profile_img2.png'
 import profile_img3 from './profile_img3.png'
 import lesson_icon from './lesson_icon.svg'
 import favicon from './favicon.svg'
+import video1 from './video1.mp4'
+import video2 from './video2.mp4'
 
 
 export const assets = {
@@ -90,7 +92,9 @@ export const assets = {
     play_icon,
     blue_tick_icon,
     lesson_icon,
-    favicon
+    favicon,
+    video1,
+    video2
 }
 
 export const dummyDashboardData = {

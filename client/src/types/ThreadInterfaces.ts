@@ -27,6 +27,8 @@ export type Video = {
   addedAt: string
   thumbnail: string
   views?: number
+  url: string
+  description?: string
 }
 
 export type QuizType = {
