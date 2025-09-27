@@ -24,6 +24,8 @@ import GroupListPage from './pages/GroupListPage'
 import StudyPlanGenerationPage from './pages/StudyPlanGenerationPage'
 import GroupManagePage from './pages/GroupManagePage';
 import DocumentDetailsPage from './pages/DocumentDetailsPage';
+import LinksPage from './pages/LinksPage';
+import VideosPage from './pages/VideosPage';
 
 const dummyUser = {
   name: "Student Name",
@@ -61,6 +63,8 @@ const App = () => {
           <Route path="/workspace/:workspaceId/threads/:threadId/documents/:docId" element={<DocumentDetailsPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/query" element={<DocumentQuery />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/manage" element={<GroupManagePage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/links" element={<LinksPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/videos" element={<VideosPage />} />
 
           {/* Remove old module-based routes */}
         </Routes>

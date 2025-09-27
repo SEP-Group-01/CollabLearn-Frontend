@@ -6,7 +6,6 @@ import {
   Card,
   CardContent,
   Rating,
-  Chip,
   Button,
   Stack,
   Divider,
@@ -14,7 +13,7 @@ import {
   Paper,
   IconButton,
 } from "@mui/material";
-import { Description, PictureAsPdf, TextSnippet, Tag, ChatBubbleOutline, ArrowBack } from "@mui/icons-material";
+import { ChatBubbleOutline, ArrowBack, OpenInFull } from "@mui/icons-material";
 import { mockDocuments } from "../mocks/Documents";
 
 export default function DocumentDetailsPage() {
@@ -28,8 +27,6 @@ export default function DocumentDetailsPage() {
   const fileUrl = "/sample.pdf";
 
   const [rating, setRating] = useState(document?.rating || 0);
-  const [tagInput, setTagInput] = useState("");
-  const [tags, setTags] = useState<string[]>(document?.tags || []);
   const [comments, setComments] = useState<string[]>(document?.mockComments || []);
   const [commentInput, setCommentInput] = useState("");
 
@@ -43,13 +40,6 @@ export default function DocumentDetailsPage() {
   if (!document) {
     return <Typography variant="h6" color="error">Document not found.</Typography>;
   }
-
-  const handleAddTag = () => {
-    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
-      setTags([...tags, tagInput.trim()]);
-      setTagInput("");
-    }
-  };
 
   const handleAddComment = () => {
     if (commentInput.trim()) {
@@ -81,9 +71,17 @@ export default function DocumentDetailsPage() {
         </Box>
         <Card sx={{ mb: 2 }}>
           <CardContent>
-           
-            {/* Tag Section */}
-           
+            {/* Fullscreen Button */}
+            <Box display="flex" justifyContent="flex-end" mb={1}>
+              <IconButton
+                color="primary"
+                size="small"
+                onClick={() => window.open(fileUrl, '_blank')}
+                aria-label="Open Fullscreen"
+              >
+                <OpenInFull />
+              </IconButton>
+            </Box>
             {/* Document Preview */}
             <Divider sx={{ my: 2 }} />
             <Box sx={{ mt: 2 }}>
@@ -101,42 +99,18 @@ export default function DocumentDetailsPage() {
       </Box>
       {/* Comments Section on the right */}
       <Box sx={{ width: { xs: "100%", md: 350 }, flexShrink: 0 }}>
-
-
-         <Box sx={{ mb: 2 }}>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Tag Related Resources
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap" }}>
-                {tags.map((tag) => (
-                  <Chip key={tag} label={tag} icon={<Tag fontSize="small" />} />
-                ))}
-              </Stack>
-              <Box display="flex" gap={1}>
-                <TextField
-                  size="small"
-                  label="Add Tag"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  sx={{ flex: 1 }}
-                />
-                <Button variant="contained" onClick={handleAddTag}>
-                  Add
-                </Button>
-              </Box>
-            </Box>
-         <Box sx={{ mb: 2 }}>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Rate This Document
-              </Typography>
-              <Rating
-                name="doc-rating"
-                value={rating}
-                precision={0.5}
-                size="large"
-                onChange={(_, value) => setRating(value || 0)}
-              />
-            </Box>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            Rate This Document
+          </Typography>
+          <Rating
+            name="doc-rating"
+            value={rating}
+            precision={0.5}
+            size="large"
+            onChange={(_, value) => setRating(value || 0)}
+          />
+        </Box>
         <Paper elevation={2} sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight="bold" gutterBottom>
             <ChatBubbleOutline sx={{ mr: 1 }} />
