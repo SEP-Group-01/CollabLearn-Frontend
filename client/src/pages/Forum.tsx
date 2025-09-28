@@ -1,14 +1,11 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import SidebarComponent from "../components/SideBar";
 import { AttachFile, Send, Close } from "@mui/icons-material";
-import {Pin, Heart, MessageCircle, Reply } from "lucide-react";
+import {Pin, MessageCircle, Reply } from "lucide-react";
 import {
   Box,
   Button,
-  Card,
-  CardMedia,
-  CardContent,
   TextField,
   Avatar,
   Typography,
@@ -17,64 +14,338 @@ import {
   Paper,
   Stack,
   useMediaQuery,
+  CircularProgress,
+  GlobalStyles,
 } from "@mui/material";
 
-import type { Role, MessageType } from "../types/ForumInterfaces";
+import type { Role, MessageType, ReplyType, Author } from "../types/ForumInterfaces";
 import { 
   getForumMessages, 
   createForumMessage, 
   createReply, 
-  likeMessage, 
-  likeReply, 
-  getGroupInfo 
+  getWorkspaceInfo 
 } from "../api/forumApi";
+import { getUserData } from "../api/authApi";
+import type { User } from "../types/AuthInterfaces";
+import { useForumWebSocket } from "../hooks/useForumWebSocket";
 
 
-export default function GroupForumPage() {
-  const params = useParams<{ id: string }>();
-  const groupId = params.id ?? ""; // fallback to empty string if undefined
+export default function WorkspaceForumPage() {
+  const params = useParams<{ workspaceId: string }>();
+  const workspaceId = params.workspaceId ?? ""; // fallback to empty string if undefined
   const isMobile = useMediaQuery("(max-width:900px)");
+
+  // CSS animations for modern effects
+  const animationStyles = (
+    <GlobalStyles
+      styles={{
+        '@keyframes slideIn': {
+          '0%': {
+            opacity: 0,
+            transform: 'translateX(-10px)',
+          },
+          '100%': {
+            opacity: 1,
+            transform: 'translateX(0)',
+          },
+        },
+        '@keyframes slideDown': {
+          '0%': {
+            opacity: 0,
+            transform: 'translateY(-10px)',
+          },
+          '100%': {
+            opacity: 1,
+            transform: 'translateY(0)',
+          },
+        },
+      }}
+    />
+  );
 
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [shownReplies, setShownReplies] = useState<number[]>([]);
-  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [shownReplies, setShownReplies] = useState<(number | string)[]>([]);
+  const [replyingTo, setReplyingTo] = useState<number | string | null>(null);
   const [replyContent, setReplyContent] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState(isMobile);
   const [image, setImage] = useState<File | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [groupInfo, setGroupInfo] = useState<{ id: number; name: string } | null>(null);
+  const [workspaceInfo, setWorkspaceInfo] = useState<{ id: string; title: string } | null>(null);
   const [sending, setSending] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+
+
+
+  // Manual refresh function with duplicate prevention
+  const refreshMessages = useCallback(async () => {
+    if (!workspaceId || refreshing) return;
+    
+    try {
+      setRefreshing(true);
+      const messagesData = await getForumMessages(workspaceId);
+      // Organize messages and replies
+      const organizedMessages = organizeMessagesWithReplies(messagesData);
+      setMessages(organizedMessages);
+      console.log('Messages refreshed:', messagesData);
+    } catch (err) {
+      console.error('Error refreshing messages:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [workspaceId, refreshing]);
+
+  // WebSocket event handlers for real-time updates
+  const handleNewMessage = useCallback((message: any) => {
+    console.log('📨 New message received via WebSocket:', message);
+    // Instead of refreshing all messages, add the new message directly
+    setMessages(prevMessages => {
+      // Check if message already exists to prevent duplicates
+      const messageExists = prevMessages.some(msg => msg.id.toString() === message.id.toString());
+      if (messageExists) {
+        return prevMessages;
+      }
+      
+      // Add the new message to the list
+      const newMessage: MessageType = {
+        id: message.id,
+        content: message.content,
+        author: message.author,
+        timestamp: message.timestamp,
+        isPinned: message.isPinned || false,
+        likes: 0,
+        isLiked: false,
+        replies: message.replies || [],
+        image: message.image
+      };
+      
+      return [...prevMessages, newMessage].sort((a, b) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+    });
+  }, []);
+
+  const handleNewReply = useCallback((data: { messageId: string; reply: any }) => {
+    console.log('💬 New reply received via WebSocket:', data);
+    // Add the reply directly to the specific message
+    setMessages(prevMessages => {
+      return prevMessages.map(message => {
+        if (message.id.toString() === data.messageId.toString()) {
+          const replyExists = message.replies?.some(reply => reply.id.toString() === data.reply.id.toString());
+          if (!replyExists) {
+            const newReply: ReplyType = {
+              id: data.reply.id,
+              content: data.reply.content,
+              author: data.reply.author,
+              timestamp: data.reply.timestamp,
+              likes: 0,
+              isLiked: false
+            };
+            
+            return {
+              ...message,
+              replies: [...(message.replies || []), newReply].sort((a, b) => 
+                new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+              )
+            };
+          }
+        }
+        return message;
+      });
+    });
+  }, []);
+
+  const handleUserJoined = useCallback((data: { userId: string; userName: string }) => {
+    console.log('� User joined:', data);
+    // You can show a notification here if needed
+  }, []);
+
+  const handleUserLeft = useCallback((data: { userId: string; userName: string }) => {
+    console.log('👋 User left:', data);
+    // You can show a notification here if needed
+  }, []);
+
+  // Initialize Socket.IO WebSocket connection for real-time updates
+  const {
+    isConnected: wsConnected,
+    sendMessage: wsSendMessage,
+    sendReply: wsSendReply,
+    sendTyping: wsSendTyping
+  } = useForumWebSocket({
+    workspaceId,
+    onNewMessage: handleNewMessage,
+    onNewReply: handleNewReply,
+    onUserJoined: handleUserJoined,
+    onUserLeft: handleUserLeft
+  });
+
+  // // Initialize Socket.IO WebSocket connection (disabled due to file issues)
+  // const {
+  //   isConnected: wsConnected,
+  //   sendMessage: wsSendMessage,
+  //   sendReply: wsSendReply,
+  //   sendTyping: wsSendTyping
+  // } = useForumWebSocket({
+  //   workspaceId,
+  //   onNewMessage: handleNewMessage,
+  //   onNewReply: handleNewReply,
+  //   onUserJoined: handleUserJoined,
+  //   onUserLeft: handleUserLeft
+  // });
+
+  // Debug WebSocket connection status
+  React.useEffect(() => {
+    console.log('🔄 WebSocket connection status changed:', wsConnected ? 'CONNECTED' : 'DISCONNECTED');
+    if (wsConnected) {
+      console.log('✅ WebSocket successfully connected to localhost:3003/forum');
+      console.log('📡 Joined room: forum-' + workspaceId);
+    } else {
+      console.log('❌ WebSocket connection failed or lost');
+      console.log('🔧 Check if backend server is running on localhost:3003');
+      console.log('💡 Fallback refresh mechanism will be used instead');
+    }
+  }, [wsConnected, workspaceId]);
+
+  // Multi-tab synchronization: Periodic refresh when WebSocket is unstable
+  React.useEffect(() => {
+    if (!workspaceId) return;
+    
+    // Set up a background refresh interval for multi-tab sync
+    const syncInterval = setInterval(() => {
+      if (!wsConnected) {
+        console.log('🔄 Background sync - WebSocket disconnected, refreshing messages');
+        refreshMessages();
+      } else {
+        // Even when connected, do a light sync every 30 seconds for reliability
+        console.log('🔄 Background sync - Ensuring multi-tab consistency');
+        refreshMessages();
+      }
+    }, wsConnected ? 3000 : 2000); // 3s when connected, 2s when disconnected for faster multi-tab sync
+
+    return () => clearInterval(syncInterval);
+  }, [wsConnected, workspaceId, refreshMessages]);
+
+  // Tab visibility change listener for immediate sync when switching between tabs
+  React.useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && workspaceId) {
+        console.log('🔄 Tab became visible - syncing messages');
+        refreshMessages();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [workspaceId, refreshMessages]);
+
+  // Helper function to organize messages with nested replies
+  const organizeMessagesWithReplies = (messagesData: unknown[]): MessageType[] => {
+    if (!Array.isArray(messagesData)) return [];
+
+    // Separate parent messages and replies
+    const parentMessages: MessageType[] = [];
+    const replyMessages: unknown[] = [];
+
+    messagesData.forEach(msg => {
+      const msgObj = msg as Record<string, unknown>;
+      if (msgObj.parentMessageId || msgObj.parent_message_id) {
+        replyMessages.push(msg);
+      } else {
+        // Ensure the message has all required MessageType properties
+        const messageWithReplies: MessageType = {
+          id: msgObj.id as number | string,
+          content: msgObj.content as string,
+          author: msgObj.author as Author,
+          timestamp: msgObj.timestamp as string,
+          isPinned: (msgObj.isPinned as boolean) || false,
+          likes: 0, // Remove like functionality
+          isLiked: false, // Remove like functionality
+          replies: [],
+          image: msgObj.image as string | undefined
+        };
+        parentMessages.push(messageWithReplies);
+      }
+    });
+
+    // Attach replies to their parent messages
+    replyMessages.forEach(reply => {
+      const replyObj = reply as Record<string, unknown>;
+      const parentId = replyObj.parentMessageId || replyObj.parent_message_id;
+      
+      if (parentId) {
+        const parentIndex = parentMessages.findIndex(msg => 
+          msg.id.toString() === parentId.toString()
+        );
+        
+        if (parentIndex !== -1) {
+          if (!parentMessages[parentIndex].replies) {
+            parentMessages[parentIndex].replies = [];
+          }
+          
+          // Convert reply to proper ReplyType
+          const formattedReply: ReplyType = {
+            id: replyObj.id as number | string,
+            content: replyObj.content as string,
+            author: replyObj.author as Author,
+            timestamp: replyObj.timestamp as string,
+            likes: 0, // Remove like functionality
+            isLiked: false // Remove like functionality
+          };
+          
+          parentMessages[parentIndex].replies.push(formattedReply);
+        }
+      }
+    });
+
+    // Sort parent messages by timestamp (oldest first)
+    parentMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    // Sort replies within each message by timestamp
+    parentMessages.forEach(msg => {
+      if (msg.replies && msg.replies.length > 0) {
+        msg.replies.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      }
+    });
+
+    return parentMessages;
+  };
 
   // Load forum data on component mount
   useEffect(() => {
+    // Load current user data
+    const user = getUserData();
+    setCurrentUser(user);
+    
     const loadForumData = async () => {
-      if (!groupId) return;
+      if (!workspaceId) return;
       
       try {
-        setLoading(true);
         setError(null);
         
-        // Load group info and messages in parallel
-        const [groupData, messagesData] = await Promise.all([
-          getGroupInfo(groupId),
-          getForumMessages(groupId)
+        // Load workspace info and messages in parallel
+        const [workspaceData, messagesData] = await Promise.all([
+          getWorkspaceInfo(workspaceId),
+          getForumMessages(workspaceId)
         ]);
         
-        setGroupInfo(groupData);
-        setMessages(messagesData);
+        setWorkspaceInfo(workspaceData);
+        // Organize messages and replies
+        const organizedMessages = organizeMessagesWithReplies(messagesData);
+        setMessages(organizedMessages);
       } catch (err) {
         console.error('Error loading forum data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load forum data');
-      } finally {
-        setLoading(false);
+        setMessages([]); // Ensure messages is always an array
       }
     };
 
     loadForumData();
-  }, [groupId]);
+  }, [workspaceId]);
+
+
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -89,14 +360,37 @@ export default function GroupForumPage() {
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() && !image) return;
-    if (!groupId) return;
+    if (!workspaceId) return;
 
     try {
       setSending(true);
-      const newMessageData = await createForumMessage(groupId, newMessage, image || undefined);
-      setMessages([...messages, newMessageData]);
+      setError(null);
+      
+      console.log('Sending message:', { workspaceId, content: newMessage });
+      const newMessageData = await createForumMessage(workspaceId, newMessage, image || undefined);
+      console.log('Received new message:', newMessageData);
+      
+      // Send via WebSocket for real-time updates to other users
+      if (wsConnected && wsSendMessage) {
+        wsSendMessage({
+          content: newMessage,
+          author: {
+            id: currentUser?.id || 'unknown',
+            name: currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : 'You',
+            role: 'member'
+          },
+          image: image ? URL.createObjectURL(image) : undefined,
+          timestamp: new Date().toISOString()
+        });
+        console.log('� Message sent via WebSocket for real-time updates');
+      }
+      
+      // Clear the input immediately
       setNewMessage("");
       setImage(null);
+      
+      console.log('🔌 WebSocket Status:', wsConnected ? 'Connected - Real-time updates enabled' : 'Disconnected - Using polling fallback');
+      
     } catch (err) {
       console.error('Error sending message:', err);
       setError(err instanceof Error ? err.message : 'Failed to send message');
@@ -105,64 +399,48 @@ export default function GroupForumPage() {
     }
   };
 
-  const handleSendReply = async (messageId: number) => {
+  const handleSendReply = async (messageId: number | string) => {
     if (!replyContent.trim()) return;
+    if (!workspaceId) return;
 
     try {
-      const newReply = await createReply(messageId, replyContent);
-      setMessages(
-        messages.map((msg) =>
-          msg.id === messageId
-            ? { ...msg, replies: [...msg.replies, newReply] }
-            : msg
-        )
-      );
+      console.log('Sending reply to message:', messageId, 'Content:', replyContent);
+      const newReply = await createReply(workspaceId, Number(messageId), replyContent);
+      console.log('Reply sent successfully:', newReply);
+      
+      // Clear reply input immediately
       setReplyContent("");
       setReplyingTo(null);
+      
+      // Enhanced WebSocket debugging for replies
+      console.log('🔌 Reply WebSocket Status:', wsConnected ? 'Connected' : 'Disconnected');
+      console.log('📡 Reply Socket Room: forum-' + workspaceId);
+      
+      if (wsConnected) {
+        console.log('✅ Reply sent - WebSocket should handle real-time updates');
+        console.log('⏳ Waiting for reply WebSocket broadcast...');
+        // Add a fallback refresh even when WebSocket is connected
+        setTimeout(() => {
+          console.log('🔄 Fallback refresh after reply send (even with WebSocket)');
+          refreshMessages();
+        }, 300);
+      } else {
+        console.log('⚠️ WebSocket not connected - manually refreshing messages');
+        setTimeout(() => refreshMessages(), 500);
+      }
+      
     } catch (err) {
       console.error('Error sending reply:', err);
       setError(err instanceof Error ? err.message : 'Failed to send reply');
     }
   };
 
-  const toggleLike = async (messageId: number, isReply = false, replyId?: number) => {
-    try {
-      if (isReply && replyId) {
-        const likeData = await likeReply(replyId);
-        setMessages(
-          messages.map((msg) => 
-            msg.id === messageId
-              ? {
-                  ...msg,
-                  replies: msg.replies.map((reply) =>
-                    reply.id === replyId
-                      ? { ...reply, likes: likeData.likes, isLiked: likeData.isLiked }
-                      : reply
-                  ),
-                }
-              : msg
-          )
-        );
-      } else {
-        const likeData = await likeMessage(messageId);
-        setMessages(
-          messages.map((msg) =>
-            msg.id === messageId
-              ? { ...msg, likes: likeData.likes, isLiked: likeData.isLiked }
-              : msg
-          )
-        );
-      }
-    } catch (err) {
-      console.error('Error toggling like:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update like');
-    }
-  };
 
-  const toggleReplies = (messageId: number) => {
+
+  const toggleReplies = (messageId: number | string) => {
     setShownReplies((prev) =>
-      prev.includes(messageId)
-        ? prev.filter((id) => id !== messageId)
+      prev.some(id => id.toString() === messageId.toString())
+        ? prev.filter((id) => id.toString() !== messageId.toString())
         : [...prev, messageId]
     );
   };
@@ -183,14 +461,17 @@ export default function GroupForumPage() {
     role === "admin" ? "warning" : "default";
 
   return (
-    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
-      {/* Sidebar */}
+    <>
+      {animationStyles}
+      <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+      {/* Sidebar - Hidden on mobile */}
       <Box
         sx={{
-          width: { xs: "100%", md: collapsed ? 72 : 240 },
+          width: { xs: 0, md: collapsed ? 72 : 240 },
           flexShrink: 0,
           bgcolor: "background.paper",
-          borderRight: "1px solid #e0e0e0",
+          borderRight: { xs: "none", md: "1px solid #e0e0e0" },
+          display: { xs: "none", md: "block" }
         }}
       >
         <SidebarComponent collapsed={collapsed} setCollapsed={setCollapsed} />
@@ -205,323 +486,634 @@ export default function GroupForumPage() {
           overflow: "hidden",
         }}
       >
+        {/* Modern Header */}
         <Box
           sx={{
-            px: 2,
-            py: 2,
-            borderBottom: "1px solid #e0e0e0",
-            bgcolor: "background.default",
+            px: { xs: 2, sm: 3 },
+            py: { xs: 2, sm: 2.5 },
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            borderRadius: { xs: 0, sm: '0 0 20px 20px' },
+            boxShadow: '0 4px 20px rgba(102, 126, 234, 0.25)',
           }}
         >
-          <Typography variant="h5" fontWeight="bold">
-            {groupInfo?.name || 'Loading...'} Forum
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Discuss topics and share knowledge with group members
-          </Typography>
-        </Box>
-
-        <Box sx={{ flexGrow: 1, overflowY: "auto", px: 2, py: 2 }}>
-          <Stack spacing={2}>
-            {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <Typography>Loading messages...</Typography>
-              </Box>
-            ) : error ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <Typography color="error">{error}</Typography>
-              </Box>
-            ) : messages.length === 0 ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <Typography color="text.secondary">No messages yet. Start the conversation!</Typography>
-              </Box>
-            ) : (
-              messages.map((message) => {
-              const isOwnMessage = message.author.name === "You";
-              return (
-                <Box
-                  key={message.id}
-                  sx={{
-                    display: "flex",
-                    justifyContent: isOwnMessage ? "flex-end" : "flex-start",
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <Typography 
+                  variant="h4" 
+                  fontWeight="700" 
+                  sx={{ 
+                    mb: 0.5, 
+                    wordBreak: 'break-word',
+                    fontSize: { xs: '1.5rem', sm: '2.125rem' }
                   }}
                 >
-                  <Card
-                    sx={{
-                      maxWidth: "70%",
-                      backgroundColor: message.isPinned ? "#fff9c4" : "white",
-                      borderTopLeftRadius: 16,
-                      borderTopRightRadius: 16,
-                      borderBottomLeftRadius: isOwnMessage ? 16 : 4,
-                      borderBottomRightRadius: isOwnMessage ? 4 : 16,
-                    }}
-                  >
-                    <CardContent>
-                      <Stack
-                        direction="row"
-                        spacing={2}
-                        alignItems="flex-start"
-                        sx={{
-                          flexDirection: isOwnMessage ? "row-reverse" : "row",
-                        }}
-                      >
-                        <Avatar src={message.author.avatar} />
-                        <Box>
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                            sx={{
-                              justifyContent: isOwnMessage
-                                ? "flex-end"
-                                : "flex-start",
-                            }}
-                          >
-                            <Typography
-                              color="primary"
-                              fontWeight="bold"
-                              sx={{
-                                textAlign: isOwnMessage ? "right" : "left",
-                              }}
-                            >
-                              {message.author.name}
-                            </Typography>
-                            <Chip
-                              label={message.author.role}
-                              size="small"
-                              color={getRoleColor(message.author.role)}
-                            />
-                            {message.isPinned && <Pin size={16} />}
-                          </Stack>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ textAlign: isOwnMessage ? "right" : "left" }}
-                          >
-                            {formatTimestamp(message.timestamp)}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                      <Box mt={2}>
-                        <Typography sx={{ whiteSpace: "pre-wrap" }}>
-                          {message.content}
-                        </Typography>
-                        {message.image && (
-                          <Box mt={1}>
-                            <img
-                              src={message.image}
-                              alt="chat-img"
-                              style={{ maxWidth: "100%", borderRadius: 8 }}
-                            />
-                          </Box>
-                        )}
-                      </Box>
-                      <Stack
-                        direction="row"
-                        spacing={2}
-                        mt={2}
-                        sx={{
-                          justifyContent: isOwnMessage
-                            ? "flex-end"
-                            : "flex-start",
-                        }}
-                      >
-                        <IconButton
-                          onClick={() => toggleLike(message.id)}
-                          color={message.isLiked ? "error" : "default"}
-                          size="small"
-                        >
-                          <Heart size={16} />
-                          <Typography variant="body2" ml={0.5}>
-                            {message.likes}
-                          </Typography>
-                        </IconButton>
-                        <Button
-                          size="small"
-                          onClick={() =>
-                            setReplyingTo(
-                              replyingTo === message.id ? null : message.id
-                            )
-                          }
-                        >
-                          <Reply fontSize="small" /> Reply
-                        </Button>
-                        <Button
-                          size="small"
-                          onClick={() => toggleReplies(message.id)}
-                        >
-                          <MessageCircle fontSize="small" />{" "}
-                          {message.replies.length} replies
-                        </Button>
-                      </Stack>
-
-                      {shownReplies.includes(message.id) &&
-                        message.replies.length > 0 && (
-                          <Stack
-                            spacing={2}
-                            mt={2}
-                            pl={4}
-                            borderLeft={1}
-                            borderColor="divider"
-                          >
-                            {message.replies.map((reply) => (
-                              <Paper key={reply.id} sx={{ p: 2 }}>
-                                <Stack
-                                  direction="row"
-                                  spacing={1}
-                                  alignItems="center"
-                                >
-                                  <Avatar
-                                    src={reply.author.avatar}
-                                    sx={{ width: 24, height: 24 }}
-                                  />
-                                  <Typography
-                                    variant="body2"
-                                    fontWeight="medium"
-                                  >
-                                    {reply.author.name}
-                                  </Typography>
-                                  <Chip
-                                    label={reply.author.role}
-                                    size="small"
-                                    color={getRoleColor(reply.author.role)}
-                                  />
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                  >
-                                    {formatTimestamp(reply.timestamp)}
-                                  </Typography>
-                                </Stack>
-                                <Typography variant="body2" mt={1}>
-                                  {reply.content}
-                                </Typography>
-                                <IconButton
-                                  onClick={() =>
-                                    toggleLike(message.id, true, reply.id)
-                                  }
-                                  color={reply.isLiked ? "error" : "default"}
-                                  size="small"
-                                >
-                                  <Heart size={14} />
-                                  <Typography variant="caption" ml={0.5}>
-                                    {reply.likes}
-                                  </Typography>
-                                </IconButton>
-                              </Paper>
-                            ))}
-                          </Stack>
-                        )}
-
-                      {replyingTo === message.id && (
-                        <Stack spacing={1} mt={2}>
-                          <TextField
-                            fullWidth
-                            multiline
-                            minRows={2}
-                            placeholder="Write a reply..."
-                            value={replyContent}
-                            onChange={(e) => setReplyContent(e.target.value)}
-                          />
-                          <Stack direction="row" spacing={1}>
-                            <Button
-                              onClick={() => handleSendReply(message.id)}
-                              disabled={!replyContent.trim()}
-                              variant="contained"
-                              endIcon={<Send fontSize="small" />}
-                            >
-                              Send
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                setReplyingTo(null);
-                                setReplyContent("");
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </Stack>
-                        </Stack>
-                      )}
-                    </CardContent>
-                  </Card>
+                  💬 {workspaceInfo?.title || 'Loading...'} 
+                </Typography>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 1,
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 2,
+                  bgcolor: wsConnected ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 152, 0, 0.2)',
+                  border: `1px solid ${wsConnected ? 'rgba(76, 175, 80, 0.4)' : 'rgba(255, 152, 0, 0.4)'}`,
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  <Box sx={{ 
+                    width: 8, 
+                    height: 8, 
+                    borderRadius: '50%', 
+                    bgcolor: wsConnected ? '#4CAF50' : '#FF9800',
+                    animation: wsConnected ? 'none' : 'pulse 2s infinite',
+                    '@keyframes pulse': {
+                      '0%': { opacity: 1 },
+                      '50%': { opacity: 0.5 },
+                      '100%': { opacity: 1 }
+                    }
+                  }} />
+                  <Typography variant="caption" sx={{ 
+                    fontWeight: 600, 
+                    color: 'white',
+                    fontSize: '0.75rem'
+                  }}>
+                    {wsConnected ? 'LIVE' : 'OFFLINE'}
+                  </Typography>
                 </Box>
-              );
-              })
-            )}
-            <div ref={messagesEndRef} />
-          </Stack>
+              </Box>
+            </Box>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {currentUser && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Avatar 
+                    src={'/src/assets/profile_img2.png'}
+                    sx={{ 
+                      width: { xs: 32, sm: 36 }, 
+                      height: { xs: 32, sm: 36 },
+                      border: '2px solid rgba(255,255,255,0.3)'
+                    }}
+                  />
+                  <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                    <Typography variant="body2" fontWeight="600">
+                      {currentUser.first_name} {currentUser.last_name}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </Box>
         </Box>
 
-        {/* New Message Input */}
-        <Box
-          sx={{
-            borderTop: "1px solid #e0e0e0",
-            p: 2,
-            bgcolor: "background.paper",
+        {/* Modern Chat Messages Area */}
+        <Box 
+          sx={{ 
+            flexGrow: 1, 
+            overflowY: "auto", 
+            bgcolor: "#f8fafc",
+            position: "relative"
           }}
         >
-          <Stack direction="column" spacing={2}>
-            {/* Message Input and Actions */}
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={2}
-              alignItems="flex-end"
-            >
-              <TextField
-                fullWidth
-                multiline
-                minRows={2}
-                placeholder="Write your message..."
-                variant="outlined"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                    handleSendMessage();
-                  }
-                }}
-                sx={{ flex: 1 }}
-              />
-
-              {/* Image Upload Button */}
-              <input
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                id="image-upload"
-                onChange={handleImageChange}
-              />
-              <label htmlFor="image-upload">
-                <IconButton
-                  component="span"
-                  color="primary"
-                  sx={{ mb: { xs: 0, sm: "4px" } }}
-                >
-                  <AttachFile />
-                </IconButton>
-              </label>
-
-              {/* Send Button */}
-              <Button
-                variant="contained"
-                endIcon={<Send />}
-                disabled={(!newMessage.trim() && !image) || sending}
-                onClick={handleSendMessage}
-                sx={{ mb: { xs: 0, sm: "4px" }, whiteSpace: "nowrap" }}
-              >
-                {sending ? 'Sending...' : 'Send'}
+          {error ? (
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              height: '100%',
+              gap: 2
+            }}>
+              <Typography variant="h6" color="error">Connection Error</Typography>
+              <Typography color="text.secondary">{error}</Typography>
+              <Button variant="outlined" onClick={refreshMessages}>
+                Try Again
               </Button>
-            </Stack>
+            </Box>
+          ) : !Array.isArray(messages) || messages.length === 0 ? (
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              height: '100%',
+              gap: 2,
+              p: 4
+            }}>
+              <Box sx={{
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                bgcolor: 'primary.50',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 2
+              }}>
+                <Typography variant="h3" sx={{ opacity: 0.6 }}>💬</Typography>
+              </Box>
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                No messages yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 300 }}>
+                Start the conversation! Your message will appear here and notify all workspace members.
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ p: { xs: 1, sm: 2 } }}>
+              <Stack spacing={1}>
+                {messages.filter(message => message && message.id && message.author).map((message, index) => {
+                  const isOwnMessage = message.author?.name === "You" || 
+                                       (message.author?.id && currentUser && message.author.id.toString() === currentUser.id);
+                  const prevMessage = index > 0 ? messages[index - 1] : null;
+                  const showAvatar = !prevMessage || prevMessage.author?.id !== message.author?.id;
+                  const isGrouped = prevMessage && prevMessage.author?.id === message.author?.id;
 
-            {/* Image Preview */}
-            {image && (
-              <Card
+                  return (
+                    <Box key={message.id} sx={{ mb: isGrouped ? 0.5 : 2 }}>
+                      {/* Message Bubble Container */}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: isOwnMessage ? "row-reverse" : "row",
+                          alignItems: "flex-end",
+                          gap: 1,
+                          px: 1
+                        }}
+                      >
+                        {/* Avatar */}
+                        {showAvatar ? (
+                          <Avatar 
+                            src={message.author?.avatar || '/src/assets/profile_img.png'} 
+                            sx={{ 
+                              width: { xs: 28, sm: 32 }, 
+                              height: { xs: 28, sm: 32 },
+                              border: isOwnMessage ? '2px solid #e3f2fd' : '2px solid #f3e5f5'
+                            }}
+                          />
+                        ) : (
+                          <Box sx={{ width: { xs: 28, sm: 32 } }} /> // Spacer for alignment
+                        )}
+
+                        {/* Message Bubble */}
+                        <Box
+                          sx={{
+                            maxWidth: { xs: "85%", sm: "70%", md: "60%" },
+                            position: "relative"
+                          }}
+                        >
+                          {/* Author & Time (only show if not grouped) */}
+                          {showAvatar && (
+                            <Box sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              mb: 0.5,
+                              justifyContent: isOwnMessage ? "flex-end" : "flex-start"
+                            }}>
+                              <Typography 
+                                variant="caption" 
+                                fontWeight="600"
+                                color="text.primary"
+                              >
+                                {message.author?.name || 'Unknown User'}
+                                {isOwnMessage && ' (You)'}
+                              </Typography>
+                              <Chip
+                                label={message.author?.role || 'member'}
+                                size="small"
+                                variant="outlined"
+                                sx={{ 
+                                  height: 18, 
+                                  fontSize: '0.65rem',
+                                  color: getRoleColor(message.author?.role || 'member') === 'warning' ? '#f57c00' : '#666'
+                                }}
+                              />
+                              {message.isPinned && (
+                                <Pin size={12} color="#ff9800" />
+                              )}
+                              <Typography variant="caption" color="text.secondary">
+                                {formatTimestamp(message.timestamp)}
+                              </Typography>
+                            </Box>
+                          )}
+
+                          {/* Message Content Bubble */}
+                          <Paper
+                            elevation={0}
+                            className="message-bubble"
+                            sx={{
+                              p: { xs: 1.25, sm: 2 },
+                              borderRadius: { xs: 2.5, sm: 3 },
+                              bgcolor: isOwnMessage 
+                                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                                : 'white',
+                              color: isOwnMessage ? 'white' : 'text.primary',
+                              border: isOwnMessage ? 'none' : '1px solid #e0e7ff',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                              position: 'relative',
+                              background: isOwnMessage 
+                                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                                : message.isPinned ? '#fff3e0' : 'white',
+                              '&::before': showAvatar ? {
+                                content: '""',
+                                position: 'absolute',
+                                width: 0,
+                                height: 0,
+                                bottom: -8,
+                                [isOwnMessage ? 'right' : 'left']: 12,
+                                border: isOwnMessage 
+                                  ? '8px solid transparent'
+                                  : '8px solid transparent',
+                                borderTopColor: isOwnMessage ? '#667eea' : 'white',
+                                borderBottomColor: 'transparent'
+                              } : {}
+                            }}
+                          >
+                            <Typography 
+                              variant="body1"
+                              sx={{ 
+                                whiteSpace: "pre-wrap",
+                                wordBreak: "break-word",
+                                lineHeight: 1.5
+                              }}
+                            >
+                              {message.content}
+                            </Typography>
+
+                            {/* Image in message */}
+                            {message.image && (
+                              <Box sx={{ mt: 1.5 }}>
+                                <Box
+                                  component="img"
+                                  src={message.image}
+                                  alt="Shared image"
+                                  sx={{
+                                    maxWidth: "100%",
+                                    maxHeight: 300,
+                                    borderRadius: 2,
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.2s',
+                                    '&:hover': {
+                                      transform: 'scale(1.02)'
+                                    }
+                                  }}
+                                />
+                              </Box>
+                            )}
+
+                            {/* Reply Button - Positioned in top right corner */}
+                            <Box sx={{
+                              position: 'absolute',
+                              top: 8,
+                              right: 8,
+                              display: 'flex',
+                              gap: 0.5,
+                              opacity: 0,
+                              transition: 'opacity 0.2s',
+                              '.message-bubble:hover &': {
+                                opacity: 1
+                              }
+                            }}>
+                              <IconButton
+                                size="small"
+                                onClick={() => setReplyingTo(
+                                  replyingTo?.toString() === message.id.toString() ? null : message.id
+                                )}
+                                sx={{
+                                  width: 28,
+                                  height: 28,
+                                  bgcolor: isOwnMessage ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)',
+                                  color: isOwnMessage ? 'rgba(255,255,255,0.9)' : 'text.secondary',
+                                  '&:hover': {
+                                    bgcolor: isOwnMessage ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.1)',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                <Reply size={14} />
+                              </IconButton>
+                            </Box>
+
+                            {/* Replies Count - Show at bottom if there are replies */}
+                            {message.replies && message.replies.length > 0 && (
+                              <Box sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mt: 1,
+                                justifyContent: isOwnMessage ? "flex-end" : "flex-start"
+                              }}>
+                                <Button
+                                  size="small"
+                                  startIcon={<MessageCircle size={14} />}
+                                  onClick={() => toggleReplies(message.id)}
+                                  sx={{
+                                    color: isOwnMessage ? 'rgba(255,255,255,0.8)' : 'text.secondary',
+                                    textTransform: 'none',
+                                    fontSize: '0.75rem',
+                                    minWidth: 'auto',
+                                    px: 1,
+                                    '&:hover': {
+                                      bgcolor: isOwnMessage ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)'
+                                    }
+                                  }}
+                                >
+                                  {message.replies.length} {message.replies.length === 1 ? 'reply' : 'replies'}
+                                </Button>
+                              </Box>
+                            )}
+                          </Paper>
+
+                          {/* Replies Thread - Modern Design */}
+                          {shownReplies.some(id => id.toString() === message.id.toString()) &&
+                            message.replies && message.replies.length > 0 && (
+                            <Box sx={{ 
+                              mt: 2, 
+                              ml: isOwnMessage ? 0 : 3,
+                              position: 'relative',
+                              '&::before': {
+                                content: '""',
+                                position: 'absolute',
+                                left: -12,
+                                top: 0,
+                                bottom: 0,
+                                width: 2,
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                borderRadius: 1,
+                                opacity: 0.3
+                              }
+                            }}>
+                              <Stack spacing={1.5}>
+                                {message.replies.filter(reply => reply && reply.id).map((reply, replyIndex) => {
+                                  const isOwnReply = reply.author?.name === "You" || 
+                                                    (reply.author?.id && currentUser && reply.author.id.toString() === currentUser.id);
+                                  
+                                  return (
+                                    <Box
+                                      key={reply.id}
+                                      sx={{
+                                        display: "flex",
+                                        flexDirection: isOwnReply ? "row-reverse" : "row",
+                                        alignItems: "flex-start",
+                                        gap: 1,
+                                        animation: `slideIn 0.3s ease-out ${replyIndex * 0.1}s both`
+                                      }}
+                                    >
+                                      {/* Reply Avatar */}
+                                      <Avatar
+                                        src={reply.author?.avatar || '/src/assets/profile_img.png'}
+                                        sx={{ 
+                                          width: 24, 
+                                          height: 24,
+                                          border: isOwnReply ? '1px solid #e3f2fd' : '1px solid #f3e5f5',
+                                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                        }}
+                                      />
+
+                                      {/* Reply Bubble */}
+                                      <Box sx={{ maxWidth: { xs: "80%", sm: "75%" } }}>
+                                        {/* Author Info */}
+                                        <Box sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.75,
+                                          mb: 0.5,
+                                          justifyContent: isOwnReply ? "flex-end" : "flex-start"
+                                        }}>
+                                          <Typography 
+                                            variant="caption" 
+                                            fontWeight="600"
+                                            sx={{ 
+                                              color: isOwnReply ? 'primary.main' : 'text.primary',
+                                              fontSize: '0.7rem'
+                                            }}
+                                          >
+                                            {reply.author?.name || 'Unknown User'}
+                                            {isOwnReply && ' (You)'}
+                                          </Typography>
+                                          <Typography 
+                                            variant="caption" 
+                                            sx={{ 
+                                              color: 'text.secondary',
+                                              fontSize: '0.65rem'
+                                            }}
+                                          >
+                                            {formatTimestamp(reply.timestamp)}
+                                          </Typography>
+                                        </Box>
+
+                                        {/* Reply Content */}
+                                        <Paper
+                                          elevation={0}
+                                          sx={{
+                                            p: { xs: 1, sm: 1.5 },
+                                            borderRadius: 2,
+                                            bgcolor: isOwnReply 
+                                              ? 'rgba(102, 126, 234, 0.08)'
+                                              : 'rgba(0, 0, 0, 0.03)',
+                                            border: `1px solid ${isOwnReply ? 'rgba(102, 126, 234, 0.2)' : 'rgba(0, 0, 0, 0.08)'}`,
+                                            position: 'relative',
+                                            transition: 'all 0.2s ease',
+                                            '&:hover': {
+                                              bgcolor: isOwnReply 
+                                                ? 'rgba(102, 126, 234, 0.12)'
+                                                : 'rgba(0, 0, 0, 0.05)',
+                                              transform: 'translateY(-1px)',
+                                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                            },
+                                            '&::before': {
+                                              content: '""',
+                                              position: 'absolute',
+                                              width: 0,
+                                              height: 0,
+                                              bottom: -6,
+                                              [isOwnReply ? 'right' : 'left']: 8,
+                                              borderLeft: isOwnReply ? 'none' : '6px solid transparent',
+                                              borderRight: isOwnReply ? '6px solid transparent' : 'none',
+                                              borderTop: `6px solid ${isOwnReply ? 'rgba(102, 126, 234, 0.08)' : 'rgba(0, 0, 0, 0.03)'}`,
+                                            }
+                                          }}
+                                        >
+                                          <Typography 
+                                            variant="body2" 
+                                            sx={{ 
+                                              fontSize: '0.875rem',
+                                              lineHeight: 1.4,
+                                              color: 'text.primary',
+                                              whiteSpace: "pre-wrap",
+                                              wordBreak: "break-word"
+                                            }}
+                                          >
+                                            {reply.content}
+                                          </Typography>
+                                        </Paper>
+                                      </Box>
+                                    </Box>
+                                  );
+                                })}
+                              </Stack>
+                            </Box>
+                          )}
+
+                          {/* Modern Reply Input */}
+                          {replyingTo?.toString() === message.id.toString() && (
+                            <Box sx={{ 
+                              mt: 2, 
+                              ml: isOwnMessage ? 0 : 3,
+                              animation: 'slideDown 0.3s ease-out'
+                            }}>
+                              <Paper 
+                                elevation={0}
+                                sx={{ 
+                                  borderRadius: 4,
+                                  border: '2px solid #e3f2fd',
+                                  overflow: 'hidden',
+                                  transition: 'all 0.2s',
+                                  '&:focus-within': {
+                                    borderColor: 'primary.main',
+                                    boxShadow: '0 0 0 3px rgba(102, 126, 234, 0.1)'
+                                  }
+                                }}
+                              >
+                                {/* Reply Header */}
+                                <Box sx={{
+                                  px: 2,
+                                  py: 1,
+                                  bgcolor: 'rgba(102, 126, 234, 0.05)',
+                                  borderBottom: '1px solid rgba(102, 126, 234, 0.1)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1
+                                }}>
+                                  <Reply size={14} color="#667eea" />
+                                  <Typography variant="caption" fontWeight="600" color="primary.main">
+                                    Replying to {message.author?.name}
+                                  </Typography>
+                                </Box>
+
+                                <Box sx={{ p: 2 }}>
+                                  {/* Reply Text Input */}
+                                  <TextField
+                                    fullWidth
+                                    multiline
+                                    minRows={2}
+                                    maxRows={4}
+                                    placeholder="Write your reply..."
+                                    variant="standard"
+                                    value={replyContent}
+                                    onChange={(e) => setReplyContent(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        if (replyContent.trim()) {
+                                          handleSendReply(message.id);
+                                        }
+                                      }
+                                    }}
+                                    InputProps={{
+                                      disableUnderline: true,
+                                      sx: {
+                                        fontSize: '0.875rem',
+                                        '& .MuiInputBase-input': {
+                                          padding: 0,
+                                        },
+                                        '& .MuiInputBase-input::placeholder': {
+                                          color: 'text.secondary',
+                                          opacity: 0.8
+                                        }
+                                      }
+                                    }}
+                                  />
+
+                                  {/* Reply Actions */}
+                                  <Box sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between',
+                                    mt: 1.5
+                                  }}>
+                                    
+                                    <Stack direction="row" spacing={1}>
+                                      <Button
+                                        onClick={() => {
+                                          setReplyingTo(null);
+                                          setReplyContent("");
+                                        }}
+                                        size="small"
+                                        variant="text"
+                                        sx={{
+                                          color: 'text.secondary',
+                                          textTransform: 'none',
+                                          minWidth: 60,
+                                          '&:hover': {
+                                            bgcolor: 'action.hover'
+                                          }
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button
+                                        onClick={() => handleSendReply(message.id)}
+                                        disabled={!replyContent.trim()}
+                                        variant="contained"
+                                        size="small"
+                                        endIcon={<Send fontSize="small" />}
+                                        sx={{
+                                          borderRadius: 2,
+                                          textTransform: 'none',
+                                          minWidth: 80,
+                                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                          '&:hover': {
+                                            background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                                          },
+                                          '&:disabled': {
+                                            background: '#e0e7ff',
+                                            color: 'text.disabled'
+                                          }
+                                        }}
+                                      >
+                                        Reply
+                                      </Button>
+                                    </Stack>
+                                  </Box>
+                                </Box>
+                              </Paper>
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+          )}
+          <div ref={messagesEndRef} />
+        </Box>
+
+        {/* Modern Message Input */}
+        <Box
+          sx={{
+            borderTop: "1px solid rgba(0,0,0,0.08)",
+            p: { xs: 1.5, sm: 2 },
+            bgcolor: "background.paper",
+            boxShadow: '0 -2px 8px rgba(0,0,0,0.1)',
+          }}
+        >
+          {/* Image Preview */}
+          {image && (
+            <Box sx={{ mb: 2 }}>
+              <Paper
+                elevation={2}
                 sx={{
-                  maxWidth: 220,
-                  borderRadius: 2,
-                  boxShadow: 3,
+                  maxWidth: 300,
+                  borderRadius: 3,
+                  overflow: 'hidden',
                   position: "relative",
+                  bgcolor: 'grey.50'
                 }}
               >
                 <IconButton
@@ -529,32 +1121,163 @@ export default function GroupForumPage() {
                   onClick={() => setImage(null)}
                   sx={{
                     position: "absolute",
-                    top: 4,
-                    right: 4,
-                    bgcolor: "rgba(0,0,0,0.4)",
+                    top: 8,
+                    right: 8,
+                    bgcolor: "rgba(0,0,0,0.7)",
                     color: "white",
-                    "&:hover": { bgcolor: "rgba(0,0,0,0.6)" },
+                    zIndex: 2,
+                    "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
                   }}
                 >
                   <Close fontSize="small" />
                 </IconButton>
-                <CardMedia
+                <Box
                   component="img"
-                  height="140"
-                  image={URL.createObjectURL(image)}
-                  alt="preview"
-                  sx={{ objectFit: "cover" }}
+                  src={URL.createObjectURL(image)}
+                  alt="Image preview"
+                  sx={{
+                    width: '100%',
+                    height: 200,
+                    objectFit: 'cover'
+                  }}
                 />
-                <CardContent sx={{ p: 1 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Image ready to send
+                <Box sx={{ p: 1.5 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    📎 Ready to send
                   </Typography>
-                </CardContent>
-              </Card>
-            )}
-          </Stack>
+                </Box>
+              </Paper>
+            </Box>
+          )}
+
+          {/* Input Container */}
+          <Paper
+            elevation={0}
+            sx={{
+              borderRadius: 4,
+              border: '2px solid #e3f2fd',
+              overflow: 'hidden',
+              transition: 'border-color 0.2s',
+              '&:focus-within': {
+                borderColor: 'primary.main'
+              }
+            }}
+          >
+            <Box sx={{ p: 2 }}>
+              {/* Main Input */}
+              <TextField
+                fullWidth
+                multiline
+                maxRows={6}
+                placeholder="Type your message..."
+                variant="standard"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onFocus={() => wsSendTyping && wsSendTyping(true)}
+                onBlur={() => wsSendTyping && wsSendTyping(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (newMessage.trim() || image) {
+                      handleSendMessage();
+                    }
+                  }
+                }}
+                InputProps={{
+                  disableUnderline: true,
+                  sx: {
+                    fontSize: '1rem',
+                    '& .MuiInputBase-input': {
+                      padding: 0,
+                    },
+                    '& .MuiInputBase-input::placeholder': {
+                      color: 'text.secondary',
+                      opacity: 0.8
+                    }
+                  }
+                }}
+              />
+
+              {/* Actions Row */}
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                mt: 1.5
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {/* File Upload */}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    id="image-upload-modern"
+                    onChange={handleImageChange}
+                  />
+                  <label htmlFor="image-upload-modern">
+                    <IconButton
+                      component="span"
+                      size="small"
+                      sx={{
+                        color: 'text.secondary',
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                          color: 'primary.main'
+                        }
+                      }}
+                    >
+                      <AttachFile fontSize="small" />
+                    </IconButton>
+                  </label>
+
+                  {/* Connection Status - Hidden on mobile */}
+                  <Chip
+                    label={wsConnected ? "🟢 Connected" : "🔴 Offline"}
+                    size="small"
+                    variant="outlined"
+                    sx={{ 
+                      height: 24,
+                      fontSize: '0.7rem',
+                      borderColor: wsConnected ? 'success.main' : 'error.main',
+                      color: wsConnected ? 'success.dark' : 'error.dark',
+                      display: { xs: 'none', sm: 'flex' }
+                    }}
+                  />
+                </Box>
+
+                {/* Send Button */}
+                <Button
+                  variant="contained"
+                  onClick={handleSendMessage}
+                  disabled={(!newMessage.trim() && !image) || sending}
+                  endIcon={sending ? <CircularProgress size={16} /> : <Send fontSize="small" />}
+                  sx={{
+                    borderRadius: 3,
+                    textTransform: 'none',
+                    minWidth: { xs: 80, sm: 100 },
+                    px: { xs: 2, sm: 3 },
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                    },
+                    '&:disabled': {
+                      background: '#e0e7ff',
+                      color: 'text.disabled'
+                    }
+                  }}
+                >
+                  {sending ? (
+                    <Box sx={{ display: { xs: 'none', sm: 'block' } }}>Sending</Box>
+                  ) : (
+                    <Box sx={{ display: { xs: 'none', sm: 'block' } }}>Send</Box>
+                  )}
+                </Button>
+              </Box>
+            </Box>
+          </Paper>
         </Box>
       </Box>
     </Box>
+    </>
   );
 }

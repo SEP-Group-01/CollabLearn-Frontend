@@ -26,11 +26,7 @@ import GroupManagePage from './pages/GroupManagePage';
 import DocumentDetailsPage from './pages/DocumentDetailsPage';
 import LinksPage from './pages/LinksPage';
 import VideosPage from './pages/VideosPage';
-
-const dummyUser = {
-  name: "Student Name",
-  avatarUrl: "https://i.pravatar.cc/150?img=3", // or your user's avatar url
-};
+import WorkspaceForumTester from './components/WorkspaceForumTester';
 
 const App = () => {
   return (
@@ -50,6 +46,7 @@ const App = () => {
 
           <Route path="/forum" element={<Forum />} />
           <Route path="/workspace/:workspaceId" element={<Workspace />} />
+          <Route path="/workspace/:workspaceId/forum" element={<Forum />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/quizzes" element={<QuizesPage />} />
           <Route path="/study-plan" element={<StudyPlanGenerationPage />} />
