@@ -1,0 +1,141 @@
+import axios from "axios";
+import { getAccessToken } from "./authApi";
+import type { 
+  Workspace, 
+  WorkspaceFormData
+} from "../types/WorkspaceInterfaces";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+export const createWorkspace = async (workspaceData: Partial<WorkspaceFormData> | FormData) => {
+  const token = getAccessToken();
+  
+  // Check if workspaceData is FormData (for image uploads)
+  const isFormData = workspaceData instanceof FormData;
+  
+  const headers: any = {
+    Authorization: `Bearer ${token}`,
+  };
+  
+  // Don't set Content-Type for FormData, let axios handle it
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  // Debug logging for FormData
+  if (isFormData) {
+    console.log("Creating workspace with FormData:");
+    for (let [key, value] of (workspaceData as FormData).entries()) {
+      console.log(`${key}:`, value);
+    }
+  } else {
+    console.log("Creating workspace with JSON data:", workspaceData);
+  }
+  console.log("Headers:", headers);
+  
+  const response = await axios.post(`${API_URL}/workspaces/create`, workspaceData, {
+    headers,
+  });
+  return response.data;
+};
+
+export const getWoorkspacesBySearchTerm = async (searchTerm: string) => {
+    const response = await axios.get(`${API_URL}/workspaces/search/${searchTerm}`);
+    return response.data;
+};
+
+export const joinWorkspace = async (workspaceId: string) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/join`, { workspaceId }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const leaveWorkspace = async (workspaceId: string) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/leave`, { workspaceId }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const sendJoinRequest = async (workspaceId: string) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/request`, { workspaceId }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const cancelJoinRequest = async (workspaceId: string) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/cancel-request`, { workspaceId }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const sendInvite = async (workspaceId: string, email: string) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/invite`, { workspaceId, email }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const getThreadsByWorkspaceId = async (workspaceId: string) => {
+    const response = await axios.get(`${API_URL}/workspaces/${workspaceId}/threads`);
+    return response.data;
+};
+
+export const getUserRoleInWorkspace = async (workspaceId: string) => {
+    const token = getAccessToken();
+    const response = await axios.get(`${API_URL}/workspaces/${workspaceId}/user-role`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const getUserRoleInThread = async (threadId: string) => {
+    const token = getAccessToken();
+    const response = await axios.get(`${API_URL}/threads/${threadId}/role`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const createThreadInWorkspace = async (workspaceId: string, threadData: { title: string; description: string }) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/${workspaceId}/threads/create`, threadData, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+// Get workspace data by ID - now returns workspace with role included
+export const getWorkspace = async (workspaceId: string): Promise<Workspace> => {
+    const token = getAccessToken();
+    const response = await axios.get(`${API_URL}/workspaces/${workspaceId}`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    console.log(response.data);
+    return response.data;
+};

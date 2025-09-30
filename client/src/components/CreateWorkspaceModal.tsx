@@ -16,6 +16,8 @@ import {
   InputAdornment,
   IconButton,
   Divider,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -26,25 +28,21 @@ import {
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import DragDropImageUpload from './DragDropImageUpload';
+import type { WorkspaceFormData } from '../types/WorkspaceInterfaces';
+import { createWorkspace } from '../api/workspacesApi';
 
 interface CreateWorkspaceModalProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (workspaceData: WorkspaceFormData) => void;
-}
-
-interface WorkspaceFormData {
-  title: string;
-  description: string;
-  tags: string[];
-  image: File | null;
-  joinPolicy: 'anyone' | 'requests' | 'invites';
-}
+  onSuccess?: (workspace: any) => void;
+};
 
 const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
   open,
   onClose,
   onSubmit,
+  onSuccess,
 }) => {
   const [formData, setFormData] = useState<WorkspaceFormData>({
     title: '',
@@ -56,6 +54,8 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
 
   const [currentTag, setCurrentTag] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleInputChange = (field: keyof WorkspaceFormData) => (
     event: React.ChangeEvent<HTMLInputElement>
@@ -110,10 +110,57 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
     }
   };
 
-  const handleSubmit = () => {
-    if (formData.title.trim()) {
+  const handleSubmit = async () => {
+    if (!formData.title.trim()) {
+      setError('Title is required');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Create FormData for multipart upload
+      const submitData = new FormData();
+      submitData.append('title', formData.title.trim());
+      submitData.append('description', formData.description.trim());
+      submitData.append('tags', JSON.stringify(formData.tags));
+      submitData.append('joinPolicy', formData.joinPolicy);
+      
+      // Add image if provided
+      if (formData.image) {
+        submitData.append('image', formData.image);
+      }
+
+      // Debug: Log what we're sending
+      console.log('Form data being submitted:');
+      console.log('Title:', formData.title.trim());
+      console.log('Description:', formData.description.trim());
+      console.log('Tags:', formData.tags);
+      console.log('Join Policy:', formData.joinPolicy);
+      console.log('Image:', formData.image);
+      
+      console.log('FormData contents:');
+      for (let [key, value] of submitData.entries()) {
+        console.log(`${key}:`, value);
+      }
+
+      const result = await createWorkspace(submitData);
+      
+      // Call the onSubmit prop for any additional handling
       onSubmit(formData);
+      
+      // Call onSuccess if provided
+      if (onSuccess) {
+        onSuccess(result);
+      }
+      
       handleClose();
+    } catch (err: any) {
+      console.error('Error creating workspace:', err);
+      setError(err.response?.data?.message || 'Failed to create workspace. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -127,6 +174,8 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
     });
     setCurrentTag('');
     setIsDragOver(false);
+    setError(null);
+    setIsLoading(false);
     onClose();
   };
 
@@ -201,6 +250,11 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
           </DialogTitle>
 
           <DialogContent sx={{ p: 4 }}>
+            {error && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {error}
+              </Alert>
+            )}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               {/* Title */}
               <Box>
@@ -409,7 +463,7 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
             <Button
               onClick={handleSubmit}
               variant="contained"
-              disabled={!formData.title.trim()}
+              disabled={!formData.title.trim() || isLoading}
               sx={{
                 borderRadius: 2,
                 px: 3,
@@ -420,8 +474,9 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
                   boxShadow: '0 6px 16px rgba(0, 0, 0, 0.2)',
                 },
               }}
+              startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : undefined}
             >
-              Create Workspace
+              {isLoading ? 'Creating...' : 'Create Workspace'}
             </Button>
           </DialogActions>
         </Dialog>
