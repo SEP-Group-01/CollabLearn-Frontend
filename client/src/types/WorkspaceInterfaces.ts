@@ -61,3 +61,33 @@ export interface ThreadLegacy {
 export interface JoinedWorkspace extends Workspace {
   joinedAt: string;
 }
+
+export interface Invite {
+  id: string;
+  workspace_id: string;
+  email: string;
+  status: 'Pending' | 'Accepted' | 'Declined';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmailValidationResult {
+  email: string;
+  isValid: boolean;
+  existsInOrganization: boolean;
+  isWorkspaceMember: boolean;
+  canInvite: boolean;
+  warning?: string;
+}
+
+export interface EmailWithStatus {
+  email: string;
+  validation?: EmailValidationResult;
+}
+
+export interface InviteMembersModalProps {
+  open: boolean;
+  onClose: () => void;
+  workspaceId: string;
+  workspaceTitle: string;
+}

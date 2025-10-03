@@ -83,9 +83,59 @@ export const cancelJoinRequest = async (workspaceId: string) => {
     return response.data;
 };
 
-export const sendInvite = async (workspaceId: string, email: string) => {
+export const validateEmail = async (workspaceId: string, email: string) => {
     const token = getAccessToken();
-    const response = await axios.post(`${API_URL}/workspaces/invite`, { workspaceId, email }, {
+    const response = await axios.post(`${API_URL}/workspaces/validate-email`, { workspaceId, email }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const sendBulkInvites = async (workspaceId: string, emails: string[]) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/bulk-invite`, { workspaceId, emails }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const acceptInvite = async (workspaceId: string) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/accept-invite`, { workspaceId }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const declineInvite = async (workspaceId: string) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/decline-invite`, { workspaceId }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const getWorkspaceInvites = async (workspaceId: string) => {
+    const token = getAccessToken();
+    const response = await axios.get(`${API_URL}/workspaces/${workspaceId}/invites`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+export const deleteInvite = async (inviteId: string) => {
+    const token = getAccessToken();
+    const response = await axios.delete(`${API_URL}/workspaces/invites/${inviteId}`, {
         headers: {
             Authorization: `Bearer ${token}`,
         },
