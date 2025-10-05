@@ -37,6 +37,11 @@ import {
   acceptInvite,
   declineInvite
 } from "../api/workspacesApi";
+import { 
+  subscribeToThread, 
+  unsubscribeFromThread, 
+  getThreadStats 
+} from '../api/threadsApi';
 
 export default function WorkspaceDetailPage() {
   const { workspaceId } = useParams();
@@ -120,8 +125,33 @@ export default function WorkspaceDetailPage() {
         console.log('Original image URL:', workspaceResponse.image_url);
         console.log('Processed image URL:', processedWorkspace.image_url);
 
+        // Enhance threads with statistics
+        const threadsWithStats = await Promise.all(
+          threadsResponse.map(async (thread: any) => {
+            try {
+              const stats = await getThreadStats(thread.id);
+              return {
+                ...thread,
+                subscriber_count: stats.subscriber_count || 0,
+                resource_count: stats.resource_count || 0,
+                quiz_count: stats.quiz_count || 0,
+                isSubscribed: stats.is_subscribed || false, // Assuming the API returns subscription status
+              };
+            } catch (err) {
+              console.warn(`Failed to fetch stats for thread ${thread.id}:`, err);
+              return {
+                ...thread,
+                subscriber_count: 0,
+                resource_count: 0,
+                quiz_count: 0,
+                isSubscribed: false,
+              };
+            }
+          })
+        );
+
         setWorkspace(processedWorkspace);
-        setThreads(threadsResponse);
+        setThreads(threadsWithStats);
       } catch (err) {
         console.error("Error fetching workspace data:", err);
         setError("Failed to load workspace data. Please try again.");
@@ -270,10 +300,23 @@ export default function WorkspaceDetailPage() {
     );
   };
 
-  const handleEnrollThread = (threadId: string) => {
-    setThreads((ths) =>
-      ths.map((t) => (t.id === threadId ? { ...t, subscriber_count: t.subscriber_count > 0 ? t.subscriber_count - 1 : t.subscriber_count + 1 } : t))
-    );
+  const handleEnrollThread = async (threadId: string, isCurrentlySubscribed: boolean) => {
+    try {
+      if (isCurrentlySubscribed) {
+        await unsubscribeFromThread(threadId);
+        setThreads((ths) =>
+          ths.map((t) => (t.id === threadId ? { ...t, subscriber_count: Math.max(0, t.subscriber_count - 1), isSubscribed: false } : t))
+        );
+      } else {
+        await subscribeToThread(threadId);
+        setThreads((ths) =>
+          ths.map((t) => (t.id === threadId ? { ...t, subscriber_count: t.subscriber_count + 1, isSubscribed: true } : t))
+        );
+      }
+    } catch (error) {
+      console.error('Error handling thread subscription:', error);
+      setError('Failed to update subscription. Please try again.');
+    }
   };
 
   const handleThreadClick = (threadId: string) => {
@@ -684,7 +727,7 @@ export default function WorkspaceDetailPage() {
               {workspace.role === 'admin' && (
                 <Card
                   component={Link}
-                  to={`/workspace-manage?workspaceId=${workspaceId}`}
+                  to={`/workspace/${workspaceId}/manage`}
                   sx={{
                     p: 3,
                     textDecoration: 'none',
@@ -750,35 +793,70 @@ export default function WorkspaceDetailPage() {
                 <CardHeader
                   onClick={() => handleThreadClick(t.id)}
                   title={
-                    <Box display="flex" alignItems="center" gap={2} flexWrap="wrap" justifyContent="space-between">
-                      <Box display="flex" alignItems="center" gap={1} flex="1 1 auto" minWidth={0}>
-                        <Typography variant="subtitle1" fontWeight={700} noWrap color="#1976d2">
-                          {t.title || t.description.substring(0, 50) + (t.description.length > 50 ? '...' : '')}
+                    <Box display="flex" flexDirection="column" gap={1}>
+                      {/* Line 1: Thread Name */}
+                      <Box display="flex" alignItems="center" justifyContent="space-between">
+                        <Typography variant="h6" fontWeight={700} color="#1976d2" sx={{ fontSize: '1.25rem' }}>
+                          {t.name || t.title || 'Untitled Thread'}
                         </Typography>
-                        <Box display="flex" alignItems="center" gap={0.5} color="text.secondary">
+                        {/* Show subscribe button only if user is member or admin */}
+                        {(workspace?.role === 'member' || workspace?.role === 'admin') && (
+                          <Button
+                            variant={t.isSubscribed ? "outlined" : "contained"}
+                            color={t.isSubscribed ? "inherit" : "primary"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEnrollThread(t.id, t.isSubscribed || false);
+                            }}
+                            size="small"
+                            sx={{ flexShrink: 0, fontWeight: 700, borderRadius: 2, px: 2 }}
+                          >
+                            {t.isSubscribed ? "Unsubscribe" : "Subscribe"}
+                          </Button>
+                        )}
+                      </Box>
+                      
+                      {/* Line 2: Description */}
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary" 
+                        sx={{ 
+                          fontSize: "0.9rem", 
+                          fontWeight: 500,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}
+                      >
+                        {t.description}
+                      </Typography>
+                      
+                      {/* Line 3: Stats */}
+                      <Box display="flex" alignItems="center" gap={3} mt={0.5}>
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <GroupIcon fontSize="small" sx={{ color: '#1976d2' }} />
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                            {t.subscriber_count} subscribers
+                          </Typography>
+                        </Box>
+                        <Box display="flex" alignItems="center" gap={0.5}>
                           <School fontSize="small" sx={{ color: '#1976d2' }} />
-                          <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                             {t.resource_count} resources
                           </Typography>
                         </Box>
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <MenuBook fontSize="small" sx={{ color: '#1976d2' }} />
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                            {t.quiz_count || 0} quizzes
+                          </Typography>
+                        </Box>
                       </Box>
-                      <Button
-                        variant={t.subscriber_count > 0 ? "outlined" : "contained"}
-                        color={t.subscriber_count > 0 ? "inherit" : "primary"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEnrollThread(t.id);
-                        }}
-                        size="small"
-                        sx={{ flexShrink: 0, fontWeight: 700, borderRadius: 2, px: 2 }}
-                      >
-                        {t.subscriber_count > 0 ? "Subscribed" : "Subscribe"}
-                      </Button>
                     </Box>
                   }
-                  subheader={t.description}
-                  subheaderTypographyProps={{ color: "text.secondary", sx: { fontSize: "0.85rem", mb: 0, fontWeight: 500 } }}
-                  sx={{ pb: 0 }}
+                  sx={{ pb: 1 }}
                 />
               </Card>
             </Box>

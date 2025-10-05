@@ -5,6 +5,7 @@ import Header from "./components/Header";
 
 import Forum from './pages/Forum'
 import Workspace from './pages/Workspace'
+import ManageWorkspace from './pages/ManageWorkspace'
 import Profile from './pages/Profile'
 import HomePage from "./pages/HomePage"
 import SignUpPage from "./pages/SignUpPage"
@@ -50,6 +51,7 @@ const App = () => {
 
           <Route path="/forum" element={<Forum />} />
           <Route path="/workspace/:workspaceId" element={<Workspace />} />
+          <Route path="/workspace/:workspaceId/manage" element={<ManageWorkspace />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/quizzes" element={<QuizesPage />} />
           <Route path="/study-plan" element={<StudyPlanGenerationPage />} />
