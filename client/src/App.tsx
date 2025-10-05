@@ -26,7 +26,6 @@ import GroupManagePage from './pages/GroupManagePage';
 import DocumentDetailsPage from './pages/DocumentDetailsPage';
 import LinksPage from './pages/LinksPage';
 import VideosPage from './pages/VideosPage';
-import WorkspaceForumTester from './components/WorkspaceForumTester';
 
 const App = () => {
   return (
