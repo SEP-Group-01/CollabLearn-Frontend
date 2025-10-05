@@ -832,11 +832,12 @@ export default function ManageWorkspace() {
             gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
             gap: 3,
             mb: 3,
+            alignItems: 'stretch',
           }}
         >
           {/* Workspace Settings */}
           <Box>
-            <Card sx={{ height: '600px', display: 'flex', flexDirection: 'column' }}>
+            <Card sx={{ display: 'flex', flexDirection: 'column' }}>
               <CardHeader
                 title={
                   <Box display="flex" alignItems="center" gap={2}>
@@ -882,7 +883,6 @@ export default function ManageWorkspace() {
                       onImageUpload={(file: File) => setWorkspaceFormData(prev => ({ ...prev, image: file }))}
                       currentImage={workspaceFormData.image}
                       label="Upload workspace image"
-                      fullWidth
                       height="180px"
                       dragOverId="workspace-image"
                       isDragOver={false}
@@ -1146,9 +1146,9 @@ export default function ManageWorkspace() {
           </Box>
 
           {/* Right Column: Members and Join Requests stacked vertically */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '600px' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
             {/* Member Management - Top Half */}
-            <Card sx={{ height: '50%', display: 'flex', flexDirection: 'column' }}>
+            <Card sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '300px' }}>
               <CardHeader
                 title={
                   <Box display="flex" alignItems="center" gap={2}>
@@ -1246,7 +1246,7 @@ export default function ManageWorkspace() {
             </Card>
 
             {/* Join Requests Management - Bottom Half */}
-            <Card sx={{ height: '50%', display: 'flex', flexDirection: 'column' }}>
+            <Card sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '300px' }}>
               <CardHeader
                 title={
                   <Box display="flex" alignItems="center" gap={2}>
