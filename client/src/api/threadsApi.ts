@@ -130,3 +130,36 @@ export const getThreadStats = async (threadId: string) => {
     console.log('Thread stats:', response.data);
     return response.data;
 };
+
+// Get thread resources
+export const getThreadResources = async (threadId: string) => {
+    const token = getAccessToken();
+    const response = await axios.get(`${API_URL}/threads/${threadId}/resources`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+// Get thread quizzes
+export const getThreadQuizzes = async (threadId: string) => {
+    const token = getAccessToken();
+    const response = await axios.get(`${API_URL}/threads/${threadId}/quizzes`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+// Get quiz attempts for a specific quiz
+export const getQuizAttempts = async (quizId: string) => {
+    const token = getAccessToken();
+    const response = await axios.get(`${API_URL}/threads/quizzes/${quizId}/attempts`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import SidebarComponent from "../components/SideBar"
 import { useParams, useNavigate } from "react-router-dom"
 import {
@@ -12,7 +12,9 @@ import {
   Stack,
   IconButton,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  CircularProgress,
+  Alert
 } from "@mui/material"
 import {
   ArrowBack,
@@ -26,8 +28,8 @@ import {
   ArrowForward,
 } from "@mui/icons-material"
 
-import { useThreadData } from "../mocks/Threads"
-import type { ThreadData } from "../types/ThreadInterfaces"
+import { getThread, getThreadResources, getThreadQuizzes } from "../api/threadsApi"
+import type { ThreadData, Document, Link, Video } from "../types/ThreadInterfaces"
 
 export default function ThreadPage() {
   const { workspaceId, threadId } = useParams<{ workspaceId: string; threadId: string }>()
@@ -35,22 +37,150 @@ export default function ThreadPage() {
   const [collapsed, setCollapsed] = useState(false);
   const theme = useTheme()
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'))
-  const threadData: ThreadData = useThreadData(threadId!, workspaceId!)
+  
+  // State for real data
+  const [threadData, setThreadData] = useState<ThreadData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const getFileIcon = (type: string) => {
-    switch (type) {
-      case "pdf":
-        return <PictureAsPdf color="error" />
-      case "doc":
-        return <Description color="info" />
-      case "txt":
-        return <TextSnippet color="success" />
-      default:
-        return <Description />
+  useEffect(() => {
+    const fetchThreadData = async () => {
+      if (!threadId || !workspaceId) {
+        setError("Thread ID or Workspace ID is missing")
+        setLoading(false)
+        return
+      }
+
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Fetch thread details, resources, and quizzes in parallel
+        const [threadResponse, resourcesResponse, quizzesResponse] = await Promise.all([
+          getThread(threadId),
+          getThreadResources(threadId),
+          getThreadQuizzes(threadId)
+        ])
+
+        // Separate resources by type and add display properties
+        const documents: Document[] = resourcesResponse
+          .filter((r: any) => r.resource_type === 'document')
+          .map((r: any) => ({
+            ...r,
+            uploadedBy: getDisplayName(r.user_id),
+            size: formatFileSize(r.file_size),
+            uploadedAt: formatDate(r.created_at)
+          }))
+        
+        const links: Link[] = resourcesResponse
+          .filter((r: any) => r.resource_type === 'link')
+          .map((r: any) => ({
+            ...r,
+            addedBy: getDisplayName(r.user_id),
+            addedAt: formatDate(r.created_at),
+            url: r.firebase_url
+          }))
+        
+        const videos: Video[] = resourcesResponse
+          .filter((r: any) => r.resource_type === 'video')
+          .map((r: any) => ({
+            ...r,
+            addedBy: getDisplayName(r.user_id),
+            addedAt: formatDate(r.created_at),
+            url: r.firebase_url,
+            duration: "5:30", // Hardcoded for now
+            thumbnail: "", // Hardcoded for now
+            views: 0
+          }))
+
+        // Transform quizzes and add display properties
+        const transformedQuizzes = quizzesResponse.map((q: any) => ({
+          ...q,
+          title: q.title || "Untitled Quiz",
+          description: q.description || "No description available",
+          questions: 10, // Hardcoded for now
+          timeLimit: 30, // Hardcoded for now
+          attempts: 0, // Will be populated from attempts API
+          bestScore: null,
+          status: "not_started" as const,
+          difficulty: "Medium" as const,
+          createdBy: getDisplayName(q.creator_id),
+          createdAt: formatDate(q.created_at)
+        }))
+
+        // Transform the data to match ThreadData interface
+        const transformedData: ThreadData = {
+          ...threadResponse,
+          title: threadResponse.name, // Map name to title for backward compatibility
+          workspaceId: workspaceId,
+          workspaceTitle: "Workspace", // You might want to fetch this separately
+          enrolled: true, // Hardcoded for now
+          performance: {
+            // Hardcoded values as requested
+            progress: 75,
+            lastScore: 85,
+            completedQuizzes: 3,
+            totalQuizzes: quizzesResponse.length,
+            studyTime: 120,
+            averageScore: 78,
+            rank: 5,
+            totalStudents: 25,
+            completionRate: 60
+          },
+          resources: {
+            documents,
+            links,
+            videos
+          },
+          quizzes: transformedQuizzes,
+          currentlyEditing: [] // Hardcoded for now
+        }
+
+        setThreadData(transformedData)
+      } catch (err) {
+        console.error("Error fetching thread data:", err)
+        setError("Failed to load thread data")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchThreadData()
+  }, [threadId, workspaceId])
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <CircularProgress size={60} />
+      </Box>
+    )
+  }
+
+  if (error || !threadData) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', p: 3 }}>
+        <Alert severity="error" sx={{ maxWidth: 400 }}>
+          {error || "Failed to load thread data"}
+        </Alert>
+      </Box>
+    )
+  }
+
+  const getFileIcon = (mimeType?: string) => {
+    if (!mimeType) return <Description />
+    
+    if (mimeType.includes("pdf")) {
+      return <PictureAsPdf color="error" />
+    } else if (mimeType.includes("word") || mimeType.includes("document")) {
+      return <Description color="info" />
+    } else if (mimeType.includes("text")) {
+      return <TextSnippet color="success" />
+    } else {
+      return <Description />
     }
   }
 
-  const getDifficultyColor = (difficulty: string) => {
+  const getDifficultyColor = (difficulty?: string) => {
     switch (difficulty) {
       case "Easy":
         return "success"
@@ -63,9 +193,29 @@ export default function ThreadPage() {
     }
   }
 
-
-  const openDocument = (documentId: number) => {
+  const openDocument = (documentId: string) => {
     navigate(`/workspace/${workspaceId}/threads/${threadId}/documents/${documentId}`)
+  }
+
+  // Helper functions to format data
+  const formatFileSize = (bytes?: number): string => {
+    if (!bytes) return "Unknown size"
+    const kb = bytes / 1024
+    const mb = kb / 1024
+    if (mb >= 1) return `${mb.toFixed(1)} MB`
+    if (kb >= 1) return `${kb.toFixed(1)} KB`
+    return `${bytes} B`
+  }
+
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return "Unknown date"
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  const getDisplayName = (userId?: string): string => {
+    // You might want to fetch user names from an API
+    // For now, return a placeholder
+    return userId ? `User ${userId.slice(0, 8)}` : "Unknown user"
   }
 
   const navigateToDocuments = () => {
@@ -500,7 +650,7 @@ export default function ThreadPage() {
                 variant="contained"
                 size="small"
                 endIcon={<ArrowForward />}
-                onClick={() => navigate('/quizzes')}
+                onClick={() => navigate(`/workspace/${workspaceId}/threads/${threadId}/quizzes`)}
                 sx={{ 
                   minWidth: 'auto',
                   textTransform: 'none',
@@ -545,7 +695,7 @@ export default function ThreadPage() {
                         {quiz.title}
                       </Typography>
                       <Box display="flex" gap={1}>
-                        <Chip size="small" label={quiz.difficulty} color={getDifficultyColor(quiz.difficulty) as any} />
+                        <Chip size="small" label={quiz.difficulty || "Medium"} color={getDifficultyColor(quiz.difficulty) as any} />
                       </Box>
                     </Box>
 
@@ -623,7 +773,7 @@ export default function ThreadPage() {
           >
             <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
               <Box display="flex" alignItems="center" gap={2}>
-                {getFileIcon(doc.type)}
+                {getFileIcon(doc.mime_type)}
                 <Box flexGrow={1}>
                   <Typography variant="h6" fontWeight="bold">
                     {doc.title}

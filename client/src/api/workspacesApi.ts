@@ -39,7 +39,19 @@ export const createWorkspace = async (workspaceData: Partial<WorkspaceFormData> 
 };
 
 export const getWoorkspacesBySearchTerm = async (searchTerm: string) => {
-    const response = await axios.get(`${API_URL}/workspaces/search/${searchTerm}`);
+    const token = getAccessToken();
+    
+    const headers: any = {};
+    
+    // Include token if available
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+    
+    const response = await axios.get(`${API_URL}/workspaces/search/${searchTerm}`, {
+        headers,
+    });
+    console.log('Workspace search results:', response.data);
     return response.data;
 };
 

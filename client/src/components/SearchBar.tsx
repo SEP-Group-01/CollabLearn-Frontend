@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, InputBase, IconButton, Button, Paper } from "@mui/material";
-import { assets } from "../assets/assets";
+import { InputBase, IconButton, Button, Paper } from "@mui/material";
+import { ArrowBack as ArrowBackIcon, Search as SearchIcon } from '@mui/icons-material';
 
 interface SearchBarProps {
   data?: string;
@@ -16,6 +16,10 @@ const SearchBar: React.FC<SearchBarProps> = ({ data }) => {
     if (input.trim()) {
       navigate("/workspaces-list/" + input);
     }
+  };
+
+  const handleBackClick = () => {
+    navigate("/");
   };
 
   return (
@@ -40,8 +44,11 @@ const SearchBar: React.FC<SearchBarProps> = ({ data }) => {
         },
       }}
     >
-      <IconButton sx={{ p: 1, ml: 1, bgcolor: "#fff", borderRadius: "50%", boxShadow: "0 2px 8px #bae6fd" }}>
-        <img src={assets.search_icon} alt="Search Icon" style={{ height: 26 }} />
+      <IconButton 
+        onClick={handleBackClick}
+        sx={{ p: 1, ml: 0, bgcolor: "#fff", borderRadius: "50%", boxShadow: "0 2px 8px #bae6fd" }}
+      >
+        <ArrowBackIcon sx={{ color: "#2563eb", fontSize: 26 }} />
       </IconButton>
 
       <InputBase
@@ -69,6 +76,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ data }) => {
         type="submit"
         variant="contained"
         color="primary"
+        startIcon={<SearchIcon />}
         sx={{
           textTransform: "none",
           px: { xs: 2, md: 3 },
