@@ -41,11 +41,14 @@ export interface Thread {
   id: string;
   workspace_id: string;
   title?: string; // Optional since backend doesn't always include it
+  name?: string; // Alternative name field
   description: string;
   created_at: string;
   updated_at: string;
   subscriber_count: number;
   resource_count: number;
+  quiz_count?: number; // Quiz count from stats
+  isSubscribed?: boolean; // User subscription status
 }
 
 // Legacy thread interface for backward compatibility
