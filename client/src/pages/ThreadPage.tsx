@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import SidebarComponent from "../components/SideBar"
 import { useParams, useNavigate } from "react-router-dom"
 import {
@@ -26,8 +26,8 @@ import {
   ArrowForward,
 } from "@mui/icons-material"
 
-import { useThreadData } from "../mocks/Threads"
-import type { ThreadData } from "../types/ThreadInterfaces"
+import { getThread, getThreadResources } from '../api/threadsApi'
+import type { ThreadData, Document, Link, Video } from "../types/ThreadInterfaces"
 
 export default function ThreadPage() {
   const { workspaceId, threadId } = useParams<{ workspaceId: string; threadId: string }>()
@@ -35,7 +35,132 @@ export default function ThreadPage() {
   const [collapsed, setCollapsed] = useState(false);
   const theme = useTheme()
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'))
-  const threadData: ThreadData = useThreadData(threadId!, workspaceId!)
+  const [threadData, setThreadData] = useState<ThreadData | null>(null)
+  const [loading, setLoading] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    const fetchThread = async () => {
+      if (!threadId) return
+      setLoading(true)
+      setError(null)
+      try {
+        const [threadRes, resourcesRes] = await Promise.all([
+          getThread(threadId),
+          getThreadResources(threadId),
+        ])
+
+        if (!mounted) return
+
+        // Map backend shape to frontend ThreadData type
+        type BackendResource = {
+          id?: string
+          user_id?: string
+          title?: string
+          description?: string
+          firebase_url?: string
+          firebase_path?: string
+          file_name?: string
+          file_size?: number
+          mime_type?: string
+          created_at?: string
+        }
+
+        const documents: Document[] = (resourcesRes?.documents || []).map((d: BackendResource, i: number) => ({
+          id: i,
+          title: d.title || d.file_name || 'Document',
+          type: (d.mime_type || '').includes('pdf') ? 'pdf' : (d.mime_type || '').includes('word') ? 'doc' : 'txt',
+          uploadedBy: (d.user_id as string) || 'Unknown',
+          size: d.file_size ? `${Math.round(d.file_size / 1024)} KB` : '—',
+          uploadedAt: d.created_at || '',
+        }))
+
+        const links: Link[] = (resourcesRes?.links || []).map((l: BackendResource, i: number) => ({
+          id: i,
+          title: l.title || l.firebase_url || 'Link',
+          url: l.firebase_url || '',
+          addedBy: (l.user_id as string) || 'Unknown',
+          addedAt: l.created_at || '',
+          description: l.description || '',
+        }))
+
+        const videos: Video[] = (resourcesRes?.videos || []).map((v: BackendResource & { duration?: string; thumbnail?: string }, i: number) => ({
+          id: i,
+          title: v.title || v.file_name || 'Video',
+          duration: v.duration || '0:00',
+          addedBy: (v.user_id as string) || 'Unknown',
+          addedAt: v.created_at || '',
+          thumbnail: v.thumbnail || '',
+          url: v.firebase_url || '',
+          description: v.description || '',
+        }))
+
+        // For now quizzes come from threadRes.quizzes if present else empty
+        type BackendQuiz = {
+          id: string
+          title?: string
+          description?: string
+          questions?: unknown[]
+          time_allocated?: number
+          attempts_count?: number
+          best_score?: number
+          difficulty?: 'Easy' | 'Medium' | 'Hard'
+          creator_id?: string
+          created_at?: string
+        }
+
+        const quizzes = (threadRes?.quizzes || []).map((q: BackendQuiz) => ({
+          id: q.id,
+          title: q.title || 'Quiz',
+          description: q.description || '',
+          questions: q.questions?.length || 0,
+          timeLimit: q.time_allocated || 0,
+          attempts: q.attempts_count || 0,
+          bestScore: q.best_score ?? null,
+          status: 'not_started',
+          difficulty: q.difficulty || 'Easy',
+          createdBy: q.creator_id || '',
+          createdAt: q.created_at || '',
+        }))
+
+        const mapped: ThreadData = {
+          id: threadRes?.id || 0,
+          title: threadRes?.name || threadRes?.title || 'Thread',
+          description: threadRes?.description || '',
+          workspaceId: threadRes?.workspace_id || 0,
+          workspaceTitle: threadRes?.workspace_name || '',
+          enrolled: true,
+          performance: {
+            // Hardcoded / placeholder values as requested
+            progress: 0,
+            lastScore: 0,
+            completedQuizzes: quizzes.length,
+            totalQuizzes: quizzes.length || 0,
+            studyTime: 0,
+            averageScore: 0,
+            rank: 0,
+            totalStudents: 0,
+            completionRate: 0,
+          },
+          resources: { documents, links, videos },
+          quizzes,
+          currentlyEditing: [], // hardcoded empty per instructions
+        }
+
+        setThreadData(mapped)
+      } catch (err: unknown) {
+        console.error('Failed to fetch thread or resources', err)
+        const message = err instanceof Error ? err.message : String(err)
+        setError(message || 'Failed to load thread')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    fetchThread()
+    return () => { mounted = false }
+  }, [threadId])
 
   const getFileIcon = (type: string) => {
     switch (type) {
@@ -124,8 +249,8 @@ export default function ThreadPage() {
           mb: 0, // Remove margin since we're using gap in parent
         }}
       >
-        <IconButton 
-          onClick={() => navigate(`/workspace/:workspaceId`)} 
+          <IconButton 
+          onClick={() => navigate(`/workspace/${workspaceId}`)} 
           sx={{ 
             bgcolor: "action.hover",
             '&:hover': {
@@ -136,18 +261,28 @@ export default function ThreadPage() {
           <ArrowBack />
         </IconButton>
         <Box flex={1}>
-          <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
-            {threadData.title}
-          </Typography>
-          <Typography color="text.secondary" variant="body1">
-            {threadData.description}
-          </Typography>
+          {loading ? (
+            <Typography variant="h5">Loading...</Typography>
+          ) : error ? (
+            <Typography color="error">{error}</Typography>
+          ) : threadData ? (
+            <>
+              <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                {threadData.title}
+              </Typography>
+              <Typography color="text.secondary" variant="body1">
+                {threadData.description}
+              </Typography>
+            </>
+          ) : (
+            <Typography variant="h5">Thread not found</Typography>
+          )}
         </Box>
       </Box>
     
 
       {/* Performance Analytics */}
-      {threadData.enrolled && (
+  {threadData && threadData.enrolled && (
         <Card>
           <CardHeader
             title={
@@ -208,9 +343,9 @@ export default function ThreadPage() {
                   }}
                 >
                   <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                    <Typography variant="h4" fontWeight="bold" color="primary">
-                      {threadData.performance.averageScore}%
-                    </Typography>
+                      <Typography variant="h4" fontWeight="bold" color="primary">
+                        {threadData.performance.averageScore}%
+                      </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Average Score
                     </Typography>
@@ -228,9 +363,9 @@ export default function ThreadPage() {
                   }}
                 >
                   <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                    <Typography variant="h4" fontWeight="bold" color="primary">
-                      {threadData.performance.completedQuizzes}/{threadData.performance.totalQuizzes}
-                    </Typography>
+                      <Typography variant="h4" fontWeight="bold" color="primary">
+                        {threadData.performance.completedQuizzes}/{threadData.performance.totalQuizzes}
+                      </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Quizzes Completed
                     </Typography>
@@ -248,9 +383,9 @@ export default function ThreadPage() {
                   }}
                 >
                   <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                    <Typography variant="h4" fontWeight="bold" color="primary">
-                      {threadData.performance.studyTime}h
-                    </Typography>
+                      <Typography variant="h4" fontWeight="bold" color="primary">
+                        {threadData.performance.studyTime}h
+                      </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Study Time
                     </Typography>
@@ -342,7 +477,7 @@ export default function ThreadPage() {
       {
         title: "Documents",
         icon: <Description fontSize="large" />,
-        count: threadData.resources.documents.length,
+        count: threadData?.resources.documents.length ?? 0,
         onClick: navigateToDocuments,
         color: "primary",
         description: "PDFs, Word docs, and text files"
@@ -350,7 +485,7 @@ export default function ThreadPage() {
       {
         title: "External Links",
         icon: <LinkIcon fontSize="large" />,
-        count: threadData.resources.links.length,
+        count: threadData?.resources.links.length ?? 0,
         onClick: navigateToLinks,
         color: "secondary",
         description: "Courses, tutorials, and references"
@@ -358,7 +493,7 @@ export default function ThreadPage() {
       {
         title: "Video Content",
         icon: <PlayCircle fontSize="large" />,
-        count: threadData.resources.videos.length,
+        count: threadData?.resources.videos.length ?? 0,
         onClick: navigateToVideos,
         color: "info",
         description: "Lectures and demonstrations"
@@ -493,8 +628,8 @@ export default function ThreadPage() {
           title={
             <Box display="flex" alignItems="center" gap={2}>
               <EditIcon color="primary" />
-              <Typography variant="h6" fontWeight="bold">
-                Quizzes ({threadData.quizzes.length})
+                <Typography variant="h6" fontWeight="bold">
+                Quizzes ({threadData?.quizzes.length ?? 0})
               </Typography>
               <Button
                 variant="contained"
@@ -524,7 +659,7 @@ export default function ThreadPage() {
               alignItems: 'stretch',
             }}
           >
-            {threadData.quizzes.map((quiz) => (
+            {threadData?.quizzes.map((quiz) => (
               <Box
                 key={quiz.id}
                 sx={{
@@ -588,9 +723,9 @@ export default function ThreadPage() {
   <CardHeader
     title={
       <Box display="flex" alignItems="center" gap={1}>
-        <EditIcon color={threadData.currentlyEditing.length > 0 ? "primary" : "disabled"} />
+  <EditIcon color={threadData && threadData.currentlyEditing.length > 0 ? "primary" : "disabled"} />
         <Typography variant="h6" fontWeight="bold" color="text.primary">
-          {threadData.currentlyEditing.length > 0 ? "Currently Being Edited" : "No Documents Being Edited"}
+          {threadData && threadData.currentlyEditing.length > 0 ? "Currently Being Edited" : "No Documents Being Edited"}
         </Typography>
       </Box>
     }
@@ -601,7 +736,7 @@ export default function ThreadPage() {
     }}
   />
   <CardContent sx={{ p: 0 }}>
-    {threadData.currentlyEditing.length > 0 ? (
+    {threadData && threadData.currentlyEditing.length > 0 ? (
       <Stack spacing={2} sx={{ p: 2 }}>
         {threadData.currentlyEditing.map((doc) => (
           <Card

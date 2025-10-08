@@ -41,6 +41,7 @@ import SidebarComponent from '../components/SideBar';
 import {mockResources} from '../mocks/Quizzes';
 import type {Option, Question, QuizDetails} from '../types/QuizInterfaces'
 import DragDropImageUpload from '../components/DragDropImageUpload'
+import { createQuiz } from '../api/quizApi';
 
 
 const CreateQuiz: React.FC = () => {
@@ -51,6 +52,7 @@ const CreateQuiz: React.FC = () => {
     const [isAddingQuestion, setIsAddingQuestion] = useState(false);
     const [errors, setErrors] = useState<{[key: string]: string}>({});
     const [dragOver, setDragOver] = useState<string | null>(null);
+    const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
 
     const [quizDetails, setQuizDetails] = useState<QuizDetails>({
         title: '',
@@ -300,7 +302,7 @@ const CreateQuiz: React.FC = () => {
         setErrors({});
     };
 
-    const handleCreateQuiz = () => {
+    const handleCreateQuiz = async () => {
         if (!validateQuizDetails()) {
             return;
         }
@@ -310,12 +312,29 @@ const CreateQuiz: React.FC = () => {
             return;
         }
 
-        // Here you would typically send the data to the backend
-        console.log('Creating quiz with details:', quizDetails);
-        console.log('Questions:', questions);
-        
-        // Show success message or redirect
-        alert('Quiz created successfully!');
+        setIsCreatingQuiz(true);
+        setErrors({}); // Clear any existing errors
+
+        try {
+            console.log('Creating quiz with details:', quizDetails);
+            console.log('Questions:', questions);
+            
+            // Call the API to create the quiz
+            const response = await createQuiz(quizDetails, questions);
+            
+            if (response.success) {
+                alert(`Quiz created successfully! Quiz ID: ${response.quizId}`);
+                // Navigate back to quizzes page or reset form
+                window.history.back();
+            } else {
+                setErrors({ general: response.message || 'Failed to create quiz' });
+            }
+        } catch (error: any) {
+            console.error('Error creating quiz:', error);
+            setErrors({ general: error.message || 'Failed to create quiz. Please try again.' });
+        } finally {
+            setIsCreatingQuiz(false);
+        }
     };
 
     const handleSaveAndExit = () => {
@@ -326,10 +345,10 @@ const CreateQuiz: React.FC = () => {
         setOpenCancelDialog(true);
     };
 
-    const confirmSaveAndExit = () => {
+    const confirmSaveAndExit = async () => {
         setOpenSaveDialog(false);
-        handleCreateQuiz();
-        window.history.back();
+        await handleCreateQuiz();
+        // The navigation will be handled inside handleCreateQuiz on success
     };
 
     const confirmCancelAndExit = () => {
@@ -357,8 +376,9 @@ const CreateQuiz: React.FC = () => {
                         startIcon={<SaveIcon />}
                         sx={{ fontWeight: 'bold', textTransform: 'none', borderRadius: 2, boxShadow: 2 }}
                         onClick={handleSaveAndExit}
+                        disabled={isCreatingQuiz}
                     >
-                        Save and Exit
+                        {isCreatingQuiz ? 'Creating Quiz...' : 'Save and Exit'}
                     </Button>
                     <Button
                         variant="outlined"
