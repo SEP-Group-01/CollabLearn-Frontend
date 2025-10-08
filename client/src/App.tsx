@@ -11,6 +11,7 @@ import SignUpPage from "./pages/SignUpPage"
 import LoginPage from "./pages/LoginPage"
 // import DashboardPage from "./pages/DashboardPage"
 import QuizesPage from './pages/QuizesPage'
+import QuizDebugPage from './pages/QuizDebugPage'
 
 import CreateQuiz from './pages/CreateQuiz'
 import AttemptQuiz from './pages/AttemptQuiz'
@@ -48,6 +49,7 @@ const App = () => {
           <Route path="/workspace/:workspaceId/manage" element={<ManageWorkspace />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/quizzes" element={<QuizesPage />} />
+          <Route path="/quizzes/:quizId" element={<QuizDebugPage />} />
           <Route path="/study-plan" element={<StudyPlanGenerationPage />} />
 
           <Route path="/create-quiz" element={<CreateQuiz />} />

@@ -274,8 +274,8 @@ export default function ThreadPage() {
           mb: 0, // Remove margin since we're using gap in parent
         }}
       >
-        <IconButton 
-          onClick={() => navigate(`/workspace/:workspaceId`)} 
+          <IconButton 
+          onClick={() => navigate(`/workspace/${workspaceId}`)} 
           sx={{ 
             bgcolor: "action.hover",
             '&:hover': {
@@ -286,18 +286,28 @@ export default function ThreadPage() {
           <ArrowBack />
         </IconButton>
         <Box flex={1}>
-          <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
-            {threadData.title}
-          </Typography>
-          <Typography color="text.secondary" variant="body1">
-            {threadData.description}
-          </Typography>
+          {loading ? (
+            <Typography variant="h5">Loading...</Typography>
+          ) : error ? (
+            <Typography color="error">{error}</Typography>
+          ) : threadData ? (
+            <>
+              <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                {threadData.title}
+              </Typography>
+              <Typography color="text.secondary" variant="body1">
+                {threadData.description}
+              </Typography>
+            </>
+          ) : (
+            <Typography variant="h5">Thread not found</Typography>
+          )}
         </Box>
       </Box>
     
 
       {/* Performance Analytics */}
-      {threadData.enrolled && (
+  {threadData && threadData.enrolled && (
         <Card>
           <CardHeader
             title={
@@ -358,9 +368,9 @@ export default function ThreadPage() {
                   }}
                 >
                   <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                    <Typography variant="h4" fontWeight="bold" color="primary">
-                      {threadData.performance.averageScore}%
-                    </Typography>
+                      <Typography variant="h4" fontWeight="bold" color="primary">
+                        {threadData.performance.averageScore}%
+                      </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Average Score
                     </Typography>
@@ -378,9 +388,9 @@ export default function ThreadPage() {
                   }}
                 >
                   <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                    <Typography variant="h4" fontWeight="bold" color="primary">
-                      {threadData.performance.completedQuizzes}/{threadData.performance.totalQuizzes}
-                    </Typography>
+                      <Typography variant="h4" fontWeight="bold" color="primary">
+                        {threadData.performance.completedQuizzes}/{threadData.performance.totalQuizzes}
+                      </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Quizzes Completed
                     </Typography>
@@ -398,9 +408,9 @@ export default function ThreadPage() {
                   }}
                 >
                   <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                    <Typography variant="h4" fontWeight="bold" color="primary">
-                      {threadData.performance.studyTime}h
-                    </Typography>
+                      <Typography variant="h4" fontWeight="bold" color="primary">
+                        {threadData.performance.studyTime}h
+                      </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Study Time
                     </Typography>
@@ -492,7 +502,7 @@ export default function ThreadPage() {
       {
         title: "Documents",
         icon: <Description fontSize="large" />,
-        count: threadData.resources.documents.length,
+        count: threadData?.resources.documents.length ?? 0,
         onClick: navigateToDocuments,
         color: "primary",
         description: "PDFs, Word docs, and text files"
@@ -500,7 +510,7 @@ export default function ThreadPage() {
       {
         title: "External Links",
         icon: <LinkIcon fontSize="large" />,
-        count: threadData.resources.links.length,
+        count: threadData?.resources.links.length ?? 0,
         onClick: navigateToLinks,
         color: "secondary",
         description: "Courses, tutorials, and references"
@@ -508,7 +518,7 @@ export default function ThreadPage() {
       {
         title: "Video Content",
         icon: <PlayCircle fontSize="large" />,
-        count: threadData.resources.videos.length,
+        count: threadData?.resources.videos.length ?? 0,
         onClick: navigateToVideos,
         color: "info",
         description: "Lectures and demonstrations"
@@ -643,8 +653,8 @@ export default function ThreadPage() {
           title={
             <Box display="flex" alignItems="center" gap={2}>
               <EditIcon color="primary" />
-              <Typography variant="h6" fontWeight="bold">
-                Quizzes ({threadData.quizzes.length})
+                <Typography variant="h6" fontWeight="bold">
+                Quizzes ({threadData?.quizzes.length ?? 0})
               </Typography>
               <Button
                 variant="contained"
@@ -674,7 +684,7 @@ export default function ThreadPage() {
               alignItems: 'stretch',
             }}
           >
-            {threadData.quizzes.map((quiz) => (
+            {threadData?.quizzes.map((quiz) => (
               <Box
                 key={quiz.id}
                 sx={{
@@ -738,9 +748,9 @@ export default function ThreadPage() {
   <CardHeader
     title={
       <Box display="flex" alignItems="center" gap={1}>
-        <EditIcon color={threadData.currentlyEditing.length > 0 ? "primary" : "disabled"} />
+  <EditIcon color={threadData && threadData.currentlyEditing.length > 0 ? "primary" : "disabled"} />
         <Typography variant="h6" fontWeight="bold" color="text.primary">
-          {threadData.currentlyEditing.length > 0 ? "Currently Being Edited" : "No Documents Being Edited"}
+          {threadData && threadData.currentlyEditing.length > 0 ? "Currently Being Edited" : "No Documents Being Edited"}
         </Typography>
       </Box>
     }
@@ -751,7 +761,7 @@ export default function ThreadPage() {
     }}
   />
   <CardContent sx={{ p: 0 }}>
-    {threadData.currentlyEditing.length > 0 ? (
+    {threadData && threadData.currentlyEditing.length > 0 ? (
       <Stack spacing={2} sx={{ p: 2 }}>
         {threadData.currentlyEditing.map((doc) => (
           <Card
