@@ -1,10 +1,10 @@
 import { Route, Routes } from 'react-router-dom'
 
 import CollaborativeEditor from './pages/CollaborativeEditor'
-import Header from "./components/Header";
 
 import Forum from './pages/Forum'
 import Workspace from './pages/Workspace'
+import ManageWorkspace from './pages/ManageWorkspace'
 import Profile from './pages/Profile'
 import HomePage from "./pages/HomePage"
 import SignUpPage from "./pages/SignUpPage"
@@ -21,17 +21,12 @@ import ThreadDocumentsPage from './pages/ThreadDocument'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import DocumentQuery from './pages/DocumentQuery'
-import GroupListPage from './pages/GroupListPage'
+import WorkspaceSearchResults from './pages/WorkspaceSearchResults'
 import StudyPlanGenerationPage from './pages/StudyPlanGenerationPage'
 import GroupManagePage from './pages/GroupManagePage';
 import DocumentDetailsPage from './pages/DocumentDetailsPage';
 import LinksPage from './pages/LinksPage';
 import VideosPage from './pages/VideosPage';
-
-const dummyUser = {
-  name: "Student Name",
-  avatarUrl: "https://i.pravatar.cc/150?img=3", // or your user's avatar url
-};
 
 const App = () => {
   return (
@@ -46,11 +41,12 @@ const App = () => {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           {/* <Route path="/dashboard" element={<DashboardPage />} /> */}
           <Route path="/editor" element={<CollaborativeEditor />} />
-          <Route path="/workspaces-list" element={<GroupListPage />} />
-          <Route path="/workspaces-list/:search" element={<GroupListPage />} />
+          <Route path="/workspaces-list" element={<WorkspaceSearchResults />} />
+          <Route path="/workspaces-list/:search" element={<WorkspaceSearchResults />} />
 
           <Route path="/forum" element={<Forum />} />
           <Route path="/workspace/:workspaceId" element={<Workspace />} />
+          <Route path="/workspace/:workspaceId/manage" element={<ManageWorkspace />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/quizzes" element={<QuizesPage />} />
           <Route path="/quizzes/:quizId" element={<QuizDebugPage />} />
@@ -67,6 +63,7 @@ const App = () => {
           <Route path="/workspace/:workspaceId/threads/:threadId/manage" element={<GroupManagePage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/links" element={<LinksPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/videos" element={<VideosPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/quizzes" element={<QuizesPage />} />
 
           {/* Remove old module-based routes */}
         </Routes>
