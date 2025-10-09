@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -24,7 +25,8 @@ import {
   Stack,
   ThemeProvider,
   createTheme,
-  CssBaseline
+  CssBaseline,
+  CircularProgress
 } from '@mui/material';
 import {
   FormatBold,
@@ -60,23 +62,33 @@ import {
   FormatQuote,
   Code,
   Subscript,
-  Superscript
+  Superscript,
+  ArrowBack
 } from '@mui/icons-material';
 
-import type { CollaborativeUser, Operation } from '../types/EditorInterfaces';
+import { useWebSocketCollaboration } from '../lib/websocket/useWebSocketCollaboration';
+import type { CollaborationUser } from '../lib/websocket/WebSocketCollaborationClient';
 import { currentUser, sharedDocuments, fontOptions, fontSizeOptions, textColors, highlightColors } from '../mocks/EditorMocks';
+import { getDocument, type DocumentResponse } from '../api/editorApi';
 
 const CollaborativeEditor = () => {
+  // URL Parameters
+  const { workspaceId, threadId, documentId } = useParams<{ 
+    workspaceId: string; 
+    threadId: string; 
+    documentId: string; 
+  }>();
+  const navigate = useNavigate();
+
+  // Document loading states
+  const [documentData, setDocumentData] = useState<DocumentResponse | null>(null);
+  const [documentLoading, setDocumentLoading] = useState(true);
+  const [documentError, setDocumentError] = useState<string | null>(null);
+  const [editorContent, setEditorContent] = useState<string>('');
+
   // States
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [activeDocument, setActiveDocument] = useState("Team Meeting Notes");
-  const [collaborators, setCollaborators] = useState<CollaborativeUser[]>([
-    { id: '1', name: 'Alice Johnson', avatar: 'AJ', color: 'bg-blue-500', isActive: true },
-    { id: '2', name: 'Bob Smith', avatar: 'BS', color: 'bg-green-500', isActive: true },
-  ]);
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connected');
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
-  const [editorContent, setEditorContent] = useState('');
+  const [activeDocument, setActiveDocument] = useState("Loading...");
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
   const [fontSize, setFontSize] = useState(14);
   const [fontFamily, setFontFamily] = useState('Arial');
@@ -90,12 +102,39 @@ const CollaborativeEditor = () => {
   const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
   const [highlightMenuAnchor, setHighlightMenuAnchor] = useState<null | HTMLElement>(null);
 
+  // Convert currentUser to CollaborationUser type
+  const collaborationUser: CollaborationUser = {
+    id: currentUser.id,
+    name: currentUser.name,
+    avatar: currentUser.avatar,
+    color: '#4caf50', // Default color
+    isActive: true
+  };
+
+  // WebSocket collaboration hook
+  const {
+    content: collaborationContent,
+    collaborators,
+    connectionStatus,
+    isConnected,
+    connect,
+    disconnect,
+    sendContentUpdate,
+    sendCursorUpdate,
+    sendAwarenessUpdate
+  } = useWebSocketCollaboration({
+    documentId: documentId || 'doc-fallback', // Use documentId from URL
+    user: collaborationUser,
+    wsUrl: 'http://localhost:3000', // API Gateway Socket.IO server
+    autoConnect: false, // We'll connect after loading the document
+    debounceMs: 300
+  });
+
   // Refs
   const editorRef = useRef<HTMLDivElement>(null);
-  const websocketRef = useRef<WebSocket | null>(null);
-  const documentStateRef = useRef<string>('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const savedSelectionRef = useRef<Range | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastContentRef = useRef('');
 
   // Create Material-UI theme
   const theme = createTheme({
@@ -110,71 +149,83 @@ const CollaborativeEditor = () => {
     },
   });
 
-  // WebSocket connection and collaboration logic
+  // Derived state for save status
+  const saveStatus = isConnected ? 'saved' : connectionStatus === 'connecting' ? 'saving' : 'local';
+
+  // Load document from API when component mounts
   useEffect(() => {
-    const initializeWebSocket = () => {
+    const loadDocument = async () => {
+      if (!documentId) {
+        setDocumentError('No document ID provided');
+        setDocumentLoading(false);
+        return;
+      }
+
       try {
-        setConnectionStatus('connecting');
+        setDocumentLoading(true);
+        setDocumentError(null);
         
-        // Initialize WebSocket connection
-        websocketRef.current = new WebSocket('ws://localhost:3001/collaboration');
+        console.log('Loading document:', documentId);
+        const document = await getDocument(documentId);
         
-        const ws = websocketRef.current;
-
-        ws.onopen = () => {
-          setConnectionStatus('connected');
-          showNotification('Connected to collaboration server', 'success');
-          
-          // Join document
-          ws.send(JSON.stringify({
-            type: 'joinDocument',
-            data: {
-              documentId: 'doc-2',
-              user: currentUser,
-            }
-          }));
-        };
-
-        ws.onclose = () => {
-          setConnectionStatus('disconnected');
-          showNotification('Disconnected from server', 'warning');
-        };
-
-        ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          setConnectionStatus('disconnected');
-          showNotification('Connection error', 'error');
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            handleWebSocketMessage(message);
-          } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
-          }
-        };
-
-      } catch (error) {
-        console.error('Failed to initialize WebSocket:', error);
-        setConnectionStatus('disconnected');
-        showNotification('Failed to connect to collaboration server', 'error');
+        setDocumentData(document);
+        setActiveDocument(document.title);
+        setEditorContent(document.content || '');
+        
+        // Initialize editor content if available
+        if (editorRef.current) {
+          const contentToSet = document.content || '';
+          editorRef.current.innerHTML = contentToSet;
+          lastContentRef.current = contentToSet;
+        }
+        
+        // Try to connect to WebSocket collaboration after document is loaded
+        try {
+          console.log('Connecting to WebSocket collaboration...');
+          connect();
+        } catch (wsError) {
+          console.warn('WebSocket collaboration connection failed:', wsError);
+          // Document editing still works without WebSocket
+        }
+        
+        console.log('Document loaded successfully:', document);
+      } catch (error: any) {
+        console.error('Error loading document:', error);
+        const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load document';
+        setDocumentError(errorMessage);
+      } finally {
+        setDocumentLoading(false);
       }
     };
 
-    initializeWebSocket();
+    // Only load if we haven't loaded this document yet
+    if (documentId && !documentData) {
+      loadDocument();
+    }
+  }, [documentId]); // Only depend on documentId to prevent infinite loops
 
-    // Cleanup
-    return () => {
-      if (websocketRef.current) {
-        websocketRef.current.send(JSON.stringify({
-          type: 'leaveDocument',
-          data: { documentId: 'doc-2' }
-        }));
-        websocketRef.current.close();
+  // Set editor content when document loads
+  useEffect(() => {
+    if (editorRef.current) {
+      if (editorContent && !documentLoading) {
+        // Set the actual document content
+        editorRef.current.innerHTML = editorContent;
+        lastContentRef.current = editorContent;
+      } else if (documentLoading) {
+        // Show loading placeholder
+        editorRef.current.innerHTML = `
+          <h2 style="color: #666;">Loading Document...</h2>
+          <p style="color: #999;">Please wait while we load your document content.</p>
+        `;
+      } else if (documentError) {
+        // Show error message
+        editorRef.current.innerHTML = `
+          <h2 style="color: #f44336;">Error Loading Document</h2>
+          <p style="color: #999;">${documentError}</p>
+        `;
       }
-    };
-  }, []);
+    }
+  }, [editorContent, documentLoading, documentError]);
 
   // Update word count
   useEffect(() => {
@@ -183,119 +234,58 @@ const CollaborativeEditor = () => {
       const words = text.trim().split(/\s+/).filter(word => word.length > 0);
       setWordCount(words.length);
     }
-  }, [editorContent]);
-
-  // Handle WebSocket messages
-  const handleWebSocketMessage = useCallback((message: any) => {
-    switch (message.type) {
-      case 'documentState':
-        if (message.data.content) {
-          documentStateRef.current = message.data.content;
-          setEditorContent(message.data.content);
-          if (editorRef.current) {
-            editorRef.current.innerHTML = message.data.content;
-          }
-        }
-        if (message.data.users) {
-          setCollaborators(message.data.users.filter((user: CollaborativeUser) => user.id !== currentUser.id));
-        }
-        break;
-
-      case 'documentUpdate':
-        if (message.data.operation && message.data.sender !== currentUser.id) {
-          applyRemoteOperation(message.data.operation);
-        }
-        break;
-
-      case 'usersUpdate':
-        setCollaborators(message.data.users.filter((user: CollaborativeUser) => user.id !== currentUser.id));
-        break;
-
-      case 'userCursorUpdate':
-        const updatedCollaborators = collaborators.map(user => 
-          user.id === message.data.userId 
-            ? { ...user, cursor: message.data.cursor }
-            : user
-        );
-        setCollaborators(updatedCollaborators);
-        break;
-
-      default:
-        console.log('Unknown message type:', message.type);
-    }
-  }, [collaborators, currentUser.id]);
-
-  // Apply remote operations to the document
-  const applyRemoteOperation = useCallback((operation: Operation) => {
-    if (!editorRef.current) return;
-
-    setSaveStatus('saving');
-    
-    const currentContent = editorRef.current.innerHTML;
-    let newContent = currentContent;
-
-    switch (operation.type) {
-      case 'insert':
-        if (operation.text && operation.position <= currentContent.length) {
-          newContent = currentContent.slice(0, operation.position) + 
-                     operation.text + 
-                     currentContent.slice(operation.position);
-        }
-        break;
-
-      case 'delete':
-        if (operation.length && operation.position + operation.length <= currentContent.length) {
-          newContent = currentContent.slice(0, operation.position) + 
-                      currentContent.slice(operation.position + operation.length);
-        }
-        break;
-    }
-
-    if (newContent !== currentContent) {
-      editorRef.current.innerHTML = newContent;
-      setEditorContent(newContent);
-      documentStateRef.current = newContent;
-    }
-
-    setTimeout(() => setSaveStatus('saved'), 1000);
-  }, []);
+  }, [collaborationContent]);
 
   // Handle editor content changes
   const handleEditorChange = useCallback(() => {
-    if (!editorRef.current || !websocketRef.current) return;
+    if (!editorRef.current) return;
 
     const newContent = editorRef.current.innerHTML;
-    const oldContent = documentStateRef.current;
-
-    if (newContent !== oldContent) {
-      const operation: Operation = {
-        type: newContent.length > oldContent.length ? 'insert' : 'delete',
-        position: 0,
-        text: newContent.length > oldContent.length ? newContent : undefined,
-        length: newContent.length < oldContent.length ? oldContent.length - newContent.length : undefined,
-        userId: currentUser.id,
-        timestamp: Date.now(),
-      };
-
-      websocketRef.current.send(JSON.stringify({
-        type: 'documentOperation',
-        data: {
-          documentId: 'doc-2',
-          operation,
-        }
-      }));
-
-      documentStateRef.current = newContent;
-      setEditorContent(newContent);
-      setSaveStatus('saving');
-      setTimeout(() => setSaveStatus('saved'), 1000);
+    
+    // Only send update if content actually changed
+    if (newContent !== lastContentRef.current) {
+      lastContentRef.current = newContent;
+      sendContentUpdate(newContent);
     }
-  }, [currentUser.id]);
+  }, [sendContentUpdate]);
+
+  // Handle cursor/selection changes
+  const handleSelectionChange = useCallback(() => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && editorRef.current) {
+      const range = selection.getRangeAt(0);
+      if (editorRef.current.contains(range.commonAncestorContainer)) {
+        const anchor = range.startOffset;
+        const head = range.endOffset;
+        sendCursorUpdate({ anchor, head });
+        
+        // Save selection for later use
+        savedSelectionRef.current = range.cloneRange();
+      }
+    }
+  }, [sendCursorUpdate]);
+
+  // Update editor content when collaboration content changes
+  useEffect(() => {
+    if (editorRef.current && collaborationContent !== lastContentRef.current) {
+      editorRef.current.innerHTML = collaborationContent;
+      lastContentRef.current = collaborationContent;
+    }
+  }, [collaborationContent]);
+
+  // Handle WebSocket messages
+  // (Removed - now handled by WebSocket collaboration hook)
+
+  // Apply remote operations to the document  
+  // (Removed - now handled by WebSocket collaboration hook)
+
+  // Handle editor content changes
+  // (Updated to use new collaboration system)
 
   // PDF Export functionality
   const exportToPDF = async () => {
     try {
-      setSaveStatus('saving');
+      showNotification('Generating PDF...', 'info');
       
       // Create a new window for PDF generation
       const printWindow = window.open('', '_blank');
@@ -394,14 +384,12 @@ const CollaborativeEditor = () => {
         setTimeout(() => {
           printWindow.print();
           printWindow.close();
-          setSaveStatus('saved');
           showNotification('PDF export completed successfully', 'success');
         }, 500);
       };
 
     } catch (error) {
       console.error('PDF export error:', error);
-      setSaveStatus('error');
       showNotification('Failed to export PDF. Please try again.', 'error');
     }
   };
@@ -582,18 +570,14 @@ const CollaborativeEditor = () => {
   // Auto-save functionality
   useEffect(() => {
     const autoSave = () => {
-      if (editorContent.trim()) {
-        setSaveStatus('saving');
-        // Simulate auto-save delay
-        setTimeout(() => {
-          setSaveStatus('saved');
-        }, 1000);
+      if (collaborationContent.trim() && isConnected) {
+        showNotification('Document auto-saved', 'info');
       }
     };
 
     const interval = setInterval(autoSave, 30000); // Auto-save every 30 seconds
     return () => clearInterval(interval);
-  }, [editorContent]);
+  }, [collaborationContent, isConnected]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -662,6 +646,50 @@ const CollaborativeEditor = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      
+      {/* Loading State */}
+      {documentLoading && (
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '100vh',
+          flexDirection: 'column',
+          gap: 2
+        }}>
+          <CircularProgress size={60} />
+          <Typography variant="h6">Loading document...</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Document ID: {documentId}
+          </Typography>
+        </Box>
+      )}
+
+      {/* Error State */}
+      {documentError && !documentLoading && (
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '100vh',
+          flexDirection: 'column',
+          gap: 2
+        }}>
+          <Typography variant="h6" color="error">Error Loading Document</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {documentError}
+          </Typography>
+          <Button 
+            variant="outlined" 
+            onClick={() => navigate(`/workspace/${workspaceId}/threads/${threadId}`)}
+          >
+            Back to Thread
+          </Button>
+        </Box>
+      )}
+
+      {/* Main Editor Content */}
+      {!documentLoading && !documentError && documentData && (
       <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
         {/* Main Content */}
         <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
@@ -669,6 +697,18 @@ const CollaborativeEditor = () => {
           <AppBar position="static" color="default" elevation={1}>
             <Toolbar sx={{ gap: 2, minHeight: '64px !important' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                {/* Back Button */}
+                <IconButton 
+                  onClick={() => navigate(`/workspace/${workspaceId}/threads/${threadId}`)}
+                  sx={{ 
+                    bgcolor: "action.hover",
+                    '&:hover': {
+                      bgcolor: "action.selected",
+                    }
+                  }}
+                >
+                  <ArrowBack />
+                </IconButton>
                 <Description />
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                   {activeDocument}
@@ -676,10 +716,10 @@ const CollaborativeEditor = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   {saveStatus === 'saved' && <CloudDone color="success" />}
                   {saveStatus === 'saving' && <Cloud color="action" />}
-                  {saveStatus === 'error' && <CloudOff color="error" />}
+                  {saveStatus === 'local' && <Description color="info" />}
                   <Typography variant="body2" color="text.secondary">
                     {saveStatus === 'saved' ? 'All changes saved' : 
-                     saveStatus === 'saving' ? 'Saving...' : 'Save failed'}
+                     saveStatus === 'saving' ? 'Saving...' : 'Editing locally'}
                   </Typography>
                 </Box>
               </Box>
@@ -710,13 +750,13 @@ const CollaborativeEditor = () => {
                 </Box>
 
                 {/* Connection Status */}
-                <Tooltip title={`Connection: ${connectionStatus}`}>
+                <Tooltip title={`Connection: ${connectionStatus === 'disconnected' ? 'Offline mode - document editing available' : connectionStatus}`}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     {connectionStatus === 'connected' && <CloudDone color="success" />}
                     {connectionStatus === 'connecting' && <Cloud color="action" />}
-                    {connectionStatus === 'disconnected' && <CloudOff color="error" />}
+                    {connectionStatus === 'disconnected' && <CloudOff color="warning" />}
                     <Typography variant="body2" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
-                      {connectionStatus}
+                      {connectionStatus === 'disconnected' ? 'Offline' : connectionStatus}
                     </Typography>
                   </Box>
                 </Tooltip>
@@ -1006,8 +1046,14 @@ const CollaborativeEditor = () => {
                         // Save selection when editor loses focus
                         setTimeout(saveSelection, 10);
                       }}
-                      onMouseUp={saveSelection}
-                      onKeyUp={saveSelection}
+                      onMouseUp={() => {
+                        saveSelection();
+                        handleSelectionChange();
+                      }}
+                      onKeyUp={() => {
+                        saveSelection();
+                        handleSelectionChange();
+                      }}
                       sx={{
                         outline: 'none',
                         lineHeight: 1.6,
@@ -1051,42 +1097,7 @@ const CollaborativeEditor = () => {
                           },
                         },
                       }}
-                      dangerouslySetInnerHTML={{
-                        __html: `
-                          <h1>Team Meeting Notes - January 2024</h1>
-                          <p>Welcome to our collaborative document editor! This professional-grade editor includes:</p>
-                          
-                          <h2>Key Features</h2>
-                          <ul>
-                            <li><strong>Real-time collaboration</strong> - Multiple users can edit simultaneously</li>
-                            <li><strong>Rich text formatting</strong> - Bold, italic, underline, colors, and more</li>
-                            <li><strong>PDF Export</strong> - Professional document export functionality</li>
-                            <li><strong>Advanced tools</strong> - Tables, images, links, formatting options</li>
-                            <li><strong>User presence</strong> - See who's online and their cursor positions</li>
-                            <li><strong>Auto-save</strong> - Your changes are automatically saved</li>
-                          </ul>
-                          
-                          <h3>Professional Formatting</h3>
-                          <p>This editor supports comprehensive formatting options including:</p>
-                          <ol>
-                            <li>Multiple font families and sizes</li>
-                            <li>Text and highlight colors</li>
-                            <li>Paragraph alignment options</li>
-                            <li>Lists (bulleted and numbered)</li>
-                            <li>Tables with customizable dimensions</li>
-                            <li>Image insertion and linking</li>
-                          </ol>
-                          
-                          <blockquote>
-                            "Great teams are built on trust, communication, and shared goals." - Team Lead
-                          </blockquote>
-                          
-                          <p>Try out the various formatting tools in the toolbar above. You can export this document as a PDF anytime using the PDF button in the toolbar.</p>
-
-                          <h3>Getting Started</h3>
-                          <p>Start typing anywhere in this document to see the real-time collaboration features in action. Your changes will be automatically saved and synchronized with other users.</p>
-                        `
-                      }}
+                      // Don't use dangerouslySetInnerHTML - we'll set content via useEffect
                     />
 
                     {/* Collaborative Cursors */}
@@ -1638,6 +1649,7 @@ const CollaborativeEditor = () => {
           }}
         />
       </Box>
+      )}
     </ThemeProvider>
   );
 };
