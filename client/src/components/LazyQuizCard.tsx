@@ -36,7 +36,7 @@ const LazyQuizCard = ({
   quiz, 
   index, 
   totalQuizzes, 
-  userRole, 
+  userRole: _userRole, 
   onAttemptQuiz, 
   onReviewAttempt, 
   formatTime, 
@@ -85,14 +85,14 @@ const LazyQuizCard = ({
                     <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                       <PersonIcon fontSize="small" color="action" sx={{ mr: 0.5 }} />
                       <Typography variant="body2" color="text.secondary">
-                        Created by {quiz.creator}
+                        Created by {quiz.creator || 'Unknown'}
                       </Typography>
                     </Box>
                   </Box>
                 </Box>
 
                 <Typography variant="body1" sx={{ mb: 3, lineHeight: 1.6 }}>
-                  {quiz.description}
+                  {quiz.description || 'No description available'}
                 </Typography>
 
                 {/* Quiz Details */}
@@ -101,7 +101,7 @@ const LazyQuizCard = ({
                     <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
                       <TimerIcon color="primary" sx={{ mb: 1 }} />
                       <Typography variant="h6" color="primary">
-                        {formatTime(quiz.timeAllocated)}
+                        {formatTime(quiz.timeAllocated || 0)}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Time Allocated
@@ -112,7 +112,7 @@ const LazyQuizCard = ({
                     <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
                       <GradeIcon color="primary" sx={{ mb: 1 }} />
                       <Typography variant="h6" color="primary">
-                        {quiz.totalMarks}
+                        {quiz.totalMarks || 0}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Total Marks
@@ -127,7 +127,7 @@ const LazyQuizCard = ({
                     Topics Covered:
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {quiz.tags.map((tag, index) => (
+                    {(quiz.tags || []).map((tag, index) => (
                       <Chip key={index} label={tag} size="small" color="primary" variant="outlined" />
                     ))}
                   </Box>
@@ -140,7 +140,7 @@ const LazyQuizCard = ({
                     Related Resources:
                   </Typography>
                   <List dense>
-                    {quiz.resourceTags.map((resource, index) => (
+                    {(quiz.resourceTags || []).map((resource, index) => (
                       <ListItem key={index} sx={{ py: 0.5, px: 0 }}>
                         <ListItemIcon sx={{ minWidth: 32 }}>
                           <AssignmentIcon fontSize="small" color="action" />
@@ -220,7 +220,7 @@ const LazyQuizCard = ({
                     <Box sx={{ flex: 1, textAlign: 'center' }}>
                       <People color="primary" sx={{ mb: 1 }} />
                       <Typography variant="h4" color="primary" sx={{ fontWeight: 600 }}>
-                        {quiz.totalAttempts}
+                        {quiz.totalAttempts || 0}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Total Attempts
@@ -229,7 +229,7 @@ const LazyQuizCard = ({
                     <Box sx={{ flex: 1, textAlign: 'center' }}>
                       <Star color="warning" sx={{ mb: 1 }} />
                       <Typography variant="h4" color="warning.main" sx={{ fontWeight: 600 }}>
-                        {quiz.averageMarks.toFixed(1)}
+                        {(quiz.averageMarks || 0).toFixed(1)}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Average Score
@@ -243,26 +243,26 @@ const LazyQuizCard = ({
                     </Typography>
                     <LinearProgress
                       variant="determinate"
-                      value={(quiz.averageMarks / quiz.totalMarks) * 100}
+                      value={quiz.totalMarks ? ((quiz.averageMarks || 0) / quiz.totalMarks) * 100 : 0}
                       sx={{ height: 10, borderRadius: 5 }}
                     />
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                      {((quiz.averageMarks / quiz.totalMarks) * 100).toFixed(1)}% class average
+                      {quiz.totalMarks ? (((quiz.averageMarks || 0) / quiz.totalMarks) * 100).toFixed(1) : 0}% class average
                     </Typography>
                   </Box>
 
                   <Box sx={{ mt: 3 }}>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      Average Time: {formatTime(quiz.averageTime)}
+                      Average Time: {formatTime(quiz.averageTime || 0)}
                     </Typography>
                     <LinearProgress
                       variant="determinate"
-                      value={(quiz.averageTime / quiz.timeAllocated) * 100}
+                      value={quiz.timeAllocated ? ((quiz.averageTime || 0) / quiz.timeAllocated) * 100 : 0}
                       color="secondary"
                       sx={{ height: 10, borderRadius: 5 }}
                     />
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                      {((quiz.averageTime / quiz.timeAllocated) * 100).toFixed(1)}% of allocated time
+                      {quiz.timeAllocated ? (((quiz.averageTime || 0) / quiz.timeAllocated) * 100).toFixed(1) : 0}% of allocated time
                     </Typography>
                   </Box>
                 </CardContent>

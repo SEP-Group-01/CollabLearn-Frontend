@@ -36,7 +36,19 @@ import { useState } from "react";
 export default function LinksPage() {
   const { workspaceId, threadId } = useParams();
   const navigate = useNavigate();
-  const threadData = useThreadData(threadId || '1', workspaceId || '1');
+  
+  // Show error if required params are missing
+  if (!threadId || !workspaceId) {
+    return (
+      <div>
+        <h2>Error: Missing Thread or Workspace ID</h2>
+        <p>Please navigate to this page from a workspace thread.</p>
+        <button onClick={() => navigate('/')}>Go Home</button>
+      </div>
+    );
+  }
+  
+  const threadData = useThreadData(threadId, workspaceId);
   const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
   const [newLink, setNewLink] = useState({
     title: '',
@@ -236,9 +248,10 @@ export default function LinksPage() {
             }}
           >
             {enhancedLinks.map((link) => {
-              const linkInfo = getLinkTypeAndIcon(link.url);
-              const youtubeVideoId = getYouTubeVideoId(link.url);
-              const youtubeThumbnail = getYouTubeThumbnail(link.url);
+              const linkUrl = link.url || '';
+              const linkInfo = getLinkTypeAndIcon(linkUrl);
+              const youtubeVideoId = getYouTubeVideoId(linkUrl);
+              const youtubeThumbnail = getYouTubeThumbnail(linkUrl);
 
               return (
                 <Card key={link.id}
@@ -265,7 +278,7 @@ export default function LinksPage() {
                           backgroundPosition: 'center',
                           cursor: 'pointer'
                         }}
-                        onClick={() => window.open(link.url, '_blank')}
+                        onClick={() => linkUrl && window.open(linkUrl, '_blank')}
                       >
                         <Box
                           sx={{
@@ -327,7 +340,7 @@ export default function LinksPage() {
                           position: 'relative',
                           overflow: 'hidden'
                         }}
-                        onClick={() => window.open(link.url, '_blank')}
+                        onClick={() => linkUrl && window.open(linkUrl, '_blank')}
                       >
                         <Box sx={{ color: linkInfo.color, fontSize: 48 }}>
                           {linkInfo.icon}
@@ -374,7 +387,7 @@ export default function LinksPage() {
 
                       {/* Link URL Preview */}
                       <MuiLink 
-                        href={link.url} 
+                        href={linkUrl || '#'} 
                         target="_blank" 
                         sx={{ 
                           fontSize: '0.75rem', 
@@ -385,16 +398,16 @@ export default function LinksPage() {
                           '&:hover': { textDecoration: 'underline' }
                         }}
                       >
-                        🌐 {new URL(link.url).hostname}
+                        🌐 {linkUrl ? new URL(linkUrl).hostname : 'No URL'}
                       </MuiLink>
 
                       {/* Meta Information */}
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                         <Avatar sx={{ width: 20, height: 20, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
-                          {link.addedBy.charAt(0)}
+                          {(link.addedBy || 'U').charAt(0)}
                         </Avatar>
                         <Typography variant="caption" color="text.secondary">
-                          Added by {link.addedBy}
+                          Added by {link.addedBy || 'Unknown'}
                         </Typography>
                       </Box>
 
@@ -403,7 +416,7 @@ export default function LinksPage() {
                         variant="contained"
                         endIcon={<OpenInNew />}
                         fullWidth
-                        onClick={() => window.open(link.url, '_blank')}
+                        onClick={() => linkUrl && window.open(linkUrl, '_blank')}
                         sx={{
                           textTransform: 'none',
                           fontWeight: 600,

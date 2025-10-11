@@ -28,14 +28,24 @@ if (import.meta.env.DEV) {
 // Helper to try multiple candidate URLs (useful when backend may or may not use the API prefix)
 const tryGetWithFallback = async (candidates: string[]) => {
   const attempts: { url: string; status?: number; data?: unknown; error?: string }[] = []
+  const token = getAccessToken()
+  const headers: Record<string, string> = {}
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  } else {
+    console.warn('[quizApi] No access token found - requests may fail with 401')
+  }
+
   // collect attempts instead of storing lastErr
   if (import.meta.env.DEV) {
     console.debug('[quizApi] tryGetWithFallback candidates:', candidates)
+    console.debug('[quizApi] token present:', !!token)
   }
   for (const url of candidates) {
     try {
       if (import.meta.env.DEV) console.debug('[quizApi] attempting GET', url)
-      const res = await axios.get(url)
+      const res = await axios.get(url, { headers })
       if (import.meta.env.DEV) console.debug('[quizApi] success GET', url, 'status', res.status)
       // record successful attempt
       attempts.push({ url, status: res.status, data: res.data })
@@ -47,9 +57,14 @@ const tryGetWithFallback = async (candidates: string[]) => {
       const message = (err as Error)?.message || String(err)
       if (import.meta.env.DEV) console.debug('[quizApi] GET failed', url, 'status', status, 'data', data, 'message', message)
       attempts.push({ url, status, data, error: message })
-      // if non-404 server error, throw immediately with attempts attached
+      // if non-404 server error, provide detailed error info but don't throw immediately
       if (status && status !== 404) {
-        const e = new Error('Request failed') as Error & { attempts?: typeof attempts }
+        console.error(`[quizApi] Server error ${status} for ${url}:`, data || message)
+        // For 500 errors, add more context
+        if (status === 500) {
+          console.error('[quizApi] Backend server error - check your backend logs for database/server issues')
+        }
+        const e = new Error(`Server error ${status}: ${message}`) as Error & { attempts?: typeof attempts }
         e.attempts = attempts
         throw e
       }
@@ -71,7 +86,40 @@ export const getQuizzes = async (threadId: string): Promise<Quiz[]> => {
     `${API_URL}/threads/${threadId}/quizzes`,
     `${API_BASE}/threads/${threadId}/quizzes`,
   ]
-  return await tryGetWithFallback(candidates)
+  
+  console.log('[getQuizzes] Trying URLs:', candidates)
+  console.log('[getQuizzes] API_URL:', API_URL)
+  console.log('[getQuizzes] API_BASE:', API_BASE)
+  
+  try {
+    const result = await tryGetWithFallback(candidates)
+    const transformedResult = result.map((quiz: any) => ({
+    ...quiz,
+    title: quiz.title || `Quiz ${quiz.id?.slice(0, 8)}`,
+    description: quiz.description || 'No description available',
+    timeAllocated: quiz.allocated_time || quiz.timeAllocated || 30,
+    totalMarks: quiz.total_marks || quiz.totalMarks || (quiz.questions?.reduce((total: number, q: any) => total + (q.marks || 0), 0)) || 0,
+    creator: quiz.users?.name || quiz.creator || 'Unknown',
+    questions: quiz.questions?.map((question: any) => ({
+      ...question,
+      text: question.question || question.text,
+      options: question.answer_option?.map((option: any) => ({
+        ...option,
+        text: option.text || option.option_text || option.answer,
+        isCorrect: option.is_correct !== undefined ? option.is_correct : option.isCorrect
+      })) || question.options || []
+    })) || []
+  }))
+  
+  console.log('[getQuizzes] Success with result:', result)
+  console.log('[getQuizzes] Transformed result:', transformedResult)
+  return transformedResult
+  } catch (error) {
+    console.error('[getQuizzes] Backend error, returning empty array:', error)
+    // Return empty array instead of crashing the app
+    // This allows the UI to show "No quizzes available" instead of an error
+    return []
+  }
 }
 
 /**
@@ -83,7 +131,31 @@ export const getQuizById = async (quizId: string): Promise<Quiz> => {
     `${API_URL}/quizzes/${quizId}`,
     `${API_BASE}/quizzes/${quizId}`,
   ]
-  return await tryGetWithFallback(candidates)
+  const result = await tryGetWithFallback(candidates)
+  
+  // Transform the quiz data to match frontend expectations
+  const transformedQuiz = {
+    ...result,
+    title: result.title || `Quiz ${result.id?.slice(0, 8)}`,
+    description: result.description || 'No description available',
+    timeAllocated: result.allocated_time || result.timeAllocated || 30,
+    totalMarks: result.total_marks || result.totalMarks || (result.questions?.reduce((total: number, q: any) => total + (q.marks || 0), 0)) || 0,
+    creator: result.users?.name || result.creator || 'Unknown',
+    questions: result.questions?.map((question: any) => ({
+      ...question,
+      text: question.question || question.text,
+      options: question.answer_option?.map((option: any) => ({
+        ...option,
+        text: option.text || option.option_text || option.answer,
+        isCorrect: option.is_correct !== undefined ? option.is_correct : option.isCorrect
+      })) || question.options || []
+    })) || []
+  }
+  
+  console.log('[getQuizById] Original result:', result)
+  console.log('[getQuizById] Transformed result:', transformedQuiz)
+  
+  return transformedQuiz as Quiz
 }
 
 /**
@@ -99,10 +171,25 @@ export const createQuiz = async (threadId: string, quizData: Partial<Quiz> | For
   }
   if (!isFormData) headers['Content-Type'] = 'application/json'
 
-  const response = await axios.post(`${API_URL}/threads/${threadId}/quizzes/create`, quizData, {
-    headers,
-  })
-  return response.data
+  try {
+    const response = await axios.post(`${API_URL}/threads/${threadId}/quizzes/create`, quizData, {
+      headers,
+    })
+    return response.data
+  } catch (error: any) {
+    console.error('[createQuiz] Backend error:', error)
+    
+    // Provide more specific error messages
+    if (error.response?.status === 500) {
+      throw new Error('Server error: Please check if your backend database is connected and running properly.')
+    } else if (error.response?.status === 401) {
+      throw new Error('Authentication error: Please log in again.')
+    } else if (error.response?.status === 404) {
+      throw new Error('API endpoint not found: Please check if your backend server has the quiz creation endpoint.')
+    } else {
+      throw new Error(error.response?.data?.message || error.message || 'Failed to create quiz')
+    }
+  }
 }
 
 /**

@@ -10,6 +10,7 @@ export interface Quiz {
   totalAttempts: number
   averageMarks: number
   averageTime: number // in minutes
+  questions?: Question[] // Questions for the quiz
   studentAttempts?: {
     attemptNumber: number
     marksObtained: number
@@ -51,7 +52,6 @@ export interface QuizDetails {
     title: string;
     description: string;
     allocatedTime: number;
-    topics: string;
     selectedResources: string[];
 }
 

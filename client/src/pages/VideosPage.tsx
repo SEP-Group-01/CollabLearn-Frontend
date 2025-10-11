@@ -8,7 +8,19 @@ import type { Video } from "../types/ThreadInterfaces";
 export default function VideosPage() {
   const { workspaceId, threadId } = useParams();
   const navigate = useNavigate();
-  const threadData = useThreadData(threadId || '1', workspaceId || '1');
+  
+  // Show error if required params are missing
+  if (!threadId || !workspaceId) {
+    return (
+      <div>
+        <h2>Error: Missing Thread or Workspace ID</h2>
+        <p>Please navigate to this page from a workspace thread.</p>
+        <button onClick={() => navigate('/')}>Go Home</button>
+      </div>
+    );
+  }
+  
+  const threadData = useThreadData(threadId, workspaceId);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -21,10 +33,11 @@ export default function VideosPage() {
 
   // Handle video click
   const handleVideoClick = (video: Video) => {
-    if (isLocalVideo(video.url)) {
+    const videoUrl = video.url || '';
+    if (isLocalVideo(videoUrl)) {
       setSelectedVideo(video);
-    } else {
-      window.open(video.url, '_blank');
+    } else if (videoUrl) {
+      window.open(videoUrl, '_blank');
     }
   };
 
@@ -143,7 +156,11 @@ export default function VideosPage() {
             gap: 2 
           }}
         >
-          {threadData.resources.videos.map((video, idx) => (
+          {threadData.resources.videos.map((video, idx) => {
+            const videoUrl = video.url || '';
+            const videoAddedBy = video.addedBy || 'Unknown';
+            
+            return (
             <Card 
               key={idx} 
               sx={{ 
@@ -218,7 +235,7 @@ export default function VideosPage() {
                     position: 'absolute',
                     top: 8,
                     right: 8,
-                    backgroundColor: isLocalVideo(video.url) ? '#1976d2' : '#f44336',
+                    backgroundColor: isLocalVideo(videoUrl) ? '#1976d2' : '#f44336',
                     color: 'white',
                     px: 1,
                     py: 0.5,
@@ -228,7 +245,7 @@ export default function VideosPage() {
                     zIndex: 2
                   }}
                 >
-                  {isLocalVideo(video.url) ? 'LOCAL' : 'EXTERNAL'}
+                  {isLocalVideo(videoUrl) ? 'LOCAL' : 'EXTERNAL'}
                 </Box>
               </CardMedia>
 
@@ -278,7 +295,7 @@ export default function VideosPage() {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Avatar sx={{ width: 20, height: 20, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
-                      {video.addedBy.charAt(0)}
+                      {videoAddedBy.charAt(0)}
                     </Avatar>
                     <Typography variant="caption" color="text.secondary">
                       {video.addedBy}
@@ -287,7 +304,7 @@ export default function VideosPage() {
                   
                   <Button 
                     onClick={() => handleVideoClick(video)}
-                    endIcon={isLocalVideo(video.url) ? <PlayCircle sx={{ fontSize: 16 }} /> : <OpenInNew sx={{ fontSize: 16 }} />} 
+                    endIcon={isLocalVideo(videoUrl) ? <PlayCircle sx={{ fontSize: 16 }} /> : <OpenInNew sx={{ fontSize: 16 }} />} 
                     variant="contained" 
                     size="small"
                     sx={{ 
@@ -299,12 +316,13 @@ export default function VideosPage() {
                       px: 1.5
                     }}
                   >
-                    {isLocalVideo(video.url) ? 'Play' : 'Watch'}
+                    {isLocalVideo(videoUrl) ? 'Play' : 'Watch'}
                   </Button>
                 </Box>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </Box>
       )}
 
@@ -385,7 +403,7 @@ export default function VideosPage() {
                     </Typography>
                     
                     {/* Video URL for External Videos */}
-                    {!isLocalVideo(selectedVideo.url) && (
+                    {!isLocalVideo(selectedVideo.url || '') && (
                       <Box>
                         <Typography variant="subtitle2" fontWeight="bold" mb={1}>
                           🔗 External Link

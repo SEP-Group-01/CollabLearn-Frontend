@@ -43,6 +43,28 @@ export default function ThreadPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Helper functions to format data - moved above useEffect so they are initialized
+  // before being referenced inside the effect (avoids TDZ/ReferenceError)
+  const formatFileSize = (bytes?: number): string => {
+    if (!bytes) return "Unknown size"
+    const kb = bytes / 1024
+    const mb = kb / 1024
+    if (mb >= 1) return `${mb.toFixed(1)} MB`
+    if (kb >= 1) return `${kb.toFixed(1)} KB`
+    return `${bytes} B`
+  }
+
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return "Unknown date"
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  const getDisplayName = (userId?: string): string => {
+    // You might want to fetch user names from an API
+    // For now, return a placeholder
+    return userId ? `User ${userId.slice(0, 8)}` : "Unknown user"
+  }
+
   useEffect(() => {
     const fetchThreadData = async () => {
       if (!threadId || !workspaceId) {
@@ -180,43 +202,11 @@ export default function ThreadPage() {
     }
   }
 
-  const getDifficultyColor = (difficulty?: string) => {
-    switch (difficulty) {
-      case "Easy":
-        return "success"
-      case "Medium":
-        return "warning"
-      case "Hard":
-        return "error"
-      default:
-        return "default"
-    }
-  }
-
   const openDocument = (documentId: string) => {
     navigate(`/workspace/${workspaceId}/threads/${threadId}/documents/${documentId}`)
   }
 
-  // Helper functions to format data
-  const formatFileSize = (bytes?: number): string => {
-    if (!bytes) return "Unknown size"
-    const kb = bytes / 1024
-    const mb = kb / 1024
-    if (mb >= 1) return `${mb.toFixed(1)} MB`
-    if (kb >= 1) return `${kb.toFixed(1)} KB`
-    return `${bytes} B`
-  }
-
-  const formatDate = (dateString?: string): string => {
-    if (!dateString) return "Unknown date"
-    return new Date(dateString).toLocaleDateString()
-  }
-
-  const getDisplayName = (userId?: string): string => {
-    // You might want to fetch user names from an API
-    // For now, return a placeholder
-    return userId ? `User ${userId.slice(0, 8)}` : "Unknown user"
-  }
+  // ...existing code...
 
   const navigateToDocuments = () => {
     navigate(`/workspace/${workspaceId}/threads/${threadId}/documents`)
@@ -648,90 +638,102 @@ export default function ThreadPage() {
       </Box>
 
       {/* Quizzes Section */}
-      <Card>
-        <CardHeader
-          title={
-            <Box display="flex" alignItems="center" gap={2}>
-              <EditIcon color="primary" />
-                <Typography variant="h6" fontWeight="bold">
-                Quizzes ({threadData?.quizzes.length ?? 0})
-              </Typography>
-              <Button
-                variant="contained"
-                size="small"
-                endIcon={<ArrowForward />}
-                onClick={() => navigate(`/workspace/${workspaceId}/threads/${threadId}/quizzes`)}
-                sx={{ 
-                  minWidth: 'auto',
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  px: 2,
-                  py: 0.5,
-                  borderRadius: 2
-                }}
-              >
-                View All
-              </Button>
+      <Card sx={{ 
+        overflow: 'hidden',
+        borderRadius: 3,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        transition: 'all 0.2s ease',
+        '&:hover': {
+          boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+        }
+      }}>
+        {/* Header Section */}
+        <Box
+          sx={{
+            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+            color: 'white',
+            p: 4,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: -50,
+              right: -50,
+              width: 100,
+              height: 100,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.1)',
+            }
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Box
+              sx={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(10px)',
+              }}
+            >
+              <EditIcon sx={{ fontSize: 28 }} />
             </Box>
-          }
-        />
-        <CardContent>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
-              gap: 3,
-              alignItems: 'stretch',
-            }}
-          >
-            {threadData?.quizzes.map((quiz) => (
-              <Box
-                key={quiz.id}
-                sx={{
-                  width: '100%',
-                }}
-              >
-                <Card
-                  variant="outlined"
-                  sx={{
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    "&:hover": { transform: "translateY(-2px)", boxShadow: 2 },
-                  }}
-                >
-                  <CardContent>
-                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-                      <Typography variant="h6" fontWeight="bold">
-                        {quiz.title}
-                      </Typography>
-                      <Box display="flex" gap={1}>
-                        <Chip size="small" label={quiz.difficulty || "Medium"} color={getDifficultyColor(quiz.difficulty) as any} />
-                      </Box>
-                    </Box>
+            <Box>
+              <Typography variant="h5" fontWeight="bold" sx={{ mb: 0.5 }}>
+                Quizzes
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                Test your knowledge and track progress
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
 
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                      <Box display="flex" gap={2}>
-                        <Typography variant="caption" color="text.secondary">
-                          {quiz.questions} questions
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {quiz.timeLimit} min
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {quiz.attempts} attempts
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                      <Button variant={quiz.status === "not_started" ? "contained" : "outlined"} size="small">
-                        {quiz.status === "completed" ? "Review" : quiz.status === "in_progress" ? "Continue" : "Start"}
-                      </Button>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Box>
-            ))}
+        {/* Content Section */}
+        <CardContent sx={{ p: 4 }}>
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography 
+              variant="h2" 
+              sx={{ 
+                fontSize: '4rem',
+                fontWeight: 'bold',
+                color: 'primary.main',
+                mb: 2,
+                lineHeight: 1
+              }}
+            >
+              {threadData?.quizzes.length ?? 0}
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
+              {threadData?.quizzes.length === 0 
+                ? 'No quizzes available yet. Check back later for new assessments.'
+                : `${threadData?.quizzes.length} quiz${threadData?.quizzes.length === 1 ? '' : 'es'} available to test your knowledge and skills.`
+              }
+            </Typography>
+            <Button
+              variant="outlined"
+              size="large"
+              endIcon={<ArrowForward />}
+              onClick={() => navigate(`/workspace/${workspaceId}/threads/${threadId}/quizzes`)}
+              sx={{ 
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 4,
+                py: 1.5,
+                borderRadius: 3,
+                borderWidth: 2,
+                '&:hover': {
+                  borderWidth: 2,
+                  transform: 'translateY(-2px)',
+                }
+              }}
+            >
+              Explore
+            </Button>
           </Box>
         </CardContent>
       </Card>

@@ -64,6 +64,8 @@ const App = () => {
           <Route path="/workspace/:workspaceId/threads/:threadId/links" element={<LinksPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/videos" element={<VideosPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/quizzes" element={<QuizesPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/create-quiz" element={<CreateQuiz />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/quizzes/:quizId/attempt" element={<AttemptQuiz />} />
 
           {/* Remove old module-based routes */}
         </Routes>
