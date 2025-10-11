@@ -38,6 +38,23 @@ export const createWorkspace = async (workspaceData: Partial<WorkspaceFormData> 
   return response.data;
 };
 
+export const getTopWorkspaces = async (limit: number = 10) => {
+  const token = getAccessToken();
+  
+  const headers: any = {};
+  
+  // Include token if available (for user role information)
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  const response = await axios.get(`${API_URL}/workspaces/top?limit=${limit}`, {
+    headers,
+  });
+  console.log('Top workspaces results:', response.data);
+  return response.data;
+};
+
 export const getWoorkspacesBySearchTerm = async (searchTerm: string) => {
     const token = getAccessToken();
     

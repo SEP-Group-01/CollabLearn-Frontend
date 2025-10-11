@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import SearchBar from "./SearchBar";
 import CreateWorkspaceModal from "./CreateWorkspaceModal";
 import { assets } from "../assets/assets";
+import { isAuthenticated } from "../api/authApi";
 
 interface WorkspaceFormData {
   title: string;
@@ -17,11 +18,20 @@ interface WorkspaceFormData {
 const Hero = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
+  const isLoggedIn = isAuthenticated();
 
   const handleCreateWorkspace = (workspaceData: WorkspaceFormData) => {
     console.log('Creating workspace:', workspaceData);
     // Here you would typically send the data to your backend
     // For now, we'll just log it
+  };
+
+  const handleCreateWorkspaceClick = () => {
+    if (!isLoggedIn) {
+      navigate("/login");
+      return;
+    }
+    setIsModalOpen(true);
   };
   
 
@@ -204,7 +214,7 @@ const Hero = () => {
           <motion.div variants={buttonVariants}>
             <Button
               variant="contained"
-              onClick={() => setIsModalOpen(true)}
+              onClick={handleCreateWorkspaceClick}
               sx={{
                 bgcolor: "primary.main",
                 color: "#fff",
@@ -225,36 +235,6 @@ const Hero = () => {
               whileTap="tap"
             >
               Create new Workspace
-            </Button>
-          </motion.div>
-          
-          <motion.div variants={buttonVariants}>
-            <Button
-              variant="outlined"
-              sx={{
-                borderColor: "primary.main",
-                color: "primary.main",
-                px: 4,
-                py: 1.5,
-                borderRadius: "999px",
-                fontSize: "1.125rem",
-                fontWeight: 500,
-                textTransform: "none",
-                bgcolor: "transparent",
-                borderWidth: 2,
-                "&:hover": {
-                  bgcolor: "primary.light",
-                  borderColor: "primary.main",
-                  color: "primary.main",
-                  borderWidth: 2,
-                },
-              }}
-              component={motion.button}
-              whileHover="hover"
-              whileTap="tap"
-              onClick={() => navigate("/workspaces-list/")}
-            >
-              Join a Workspace
             </Button>
           </motion.div>
         </motion.div>
