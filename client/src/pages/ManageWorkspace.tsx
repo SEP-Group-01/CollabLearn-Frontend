@@ -178,6 +178,7 @@ export default function ManageWorkspace() {
     description: '',
     joinPolicy: 'Anyone' as 'Anyone' | 'Requests' | 'Invites',
     image: null as File | null,
+    currentImageUrl: null as string | null, // Track existing image URL
     tags: [] as string[],
   });
   
@@ -191,6 +192,9 @@ export default function ManageWorkspace() {
   
   // Tag management
   const [currentTag, setCurrentTag] = useState('');
+  
+  // Drag and drop state
+  const [dragOverState, setDragOverState] = useState<{[key: string]: boolean}>({});
   
   // Thread deletion
   const [deleteThreadDialog, setDeleteThreadDialog] = useState<{
@@ -298,15 +302,14 @@ export default function ManageWorkspace() {
         await fetchJoinRequests();
         
         // Initialize form data
-        setWorkspaceFormData({
-          title: workspaceData.title,
-          description: workspaceData.description,
-          joinPolicy: workspaceData.join_policy,
-          image: null,
-          tags: workspaceData.tags || [],
-        });
-        
-      } catch (err) {
+          setWorkspaceFormData({
+            title: workspaceData.title,
+            description: workspaceData.description,
+            joinPolicy: workspaceData.join_policy,
+            image: null,
+            currentImageUrl: null,
+            tags: workspaceData.tags || [],
+          });      } catch (err) {
         console.error('Error fetching workspace data:', err);
         setError('Failed to load workspace data');
         // Ensure members is always an array even on error
@@ -431,6 +434,16 @@ export default function ManageWorkspace() {
       const updatedWorkspace = await updateWorkspace(workspaceId, formData);
       setWorkspace(updatedWorkspace);
       setEditingWorkspace(false);
+      
+      // Reset form data
+      setWorkspaceFormData({
+        title: '',
+        description: '',
+        joinPolicy: 'Anyone',
+        image: null,
+        currentImageUrl: null,
+        tags: [],
+      });
       
     } catch (err) {
       console.error('Error updating workspace:', err);
@@ -721,6 +734,33 @@ export default function ManageWorkspace() {
     }));
   };
 
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent, dropId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverState(prev => ({ ...prev, [dropId]: true }));
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverState({});
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverState({});
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        setWorkspaceFormData(prev => ({ ...prev, image: file }));
+      }
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex">
@@ -852,7 +892,18 @@ export default function ManageWorkspace() {
                     <Button
                       variant="outlined"
                       startIcon={<EditIcon />}
-                      onClick={() => setEditingWorkspace(true)}
+                      onClick={() => {
+                        // Initialize form with current workspace data
+                        setWorkspaceFormData({
+                          title: workspace.title || '',
+                          description: workspace.description || '',
+                          joinPolicy: workspace.join_policy || 'Anyone',
+                          image: null, // Reset file input
+                          currentImageUrl: workspace.image_url || null,
+                          tags: workspace.tags || [],
+                        });
+                        setEditingWorkspace(true);
+                      }}
                     >
                       Edit
                     </Button>
@@ -882,13 +933,14 @@ export default function ManageWorkspace() {
                     <DragDropImageUpload
                       onImageUpload={(file: File) => setWorkspaceFormData(prev => ({ ...prev, image: file }))}
                       currentImage={workspaceFormData.image}
+                      currentImageUrl={workspaceFormData.currentImageUrl}
                       label="Upload workspace image"
                       height="180px"
                       dragOverId="workspace-image"
-                      isDragOver={false}
-                      onDragOver={() => {}}
-                      onDragLeave={() => {}}
-                      onDrop={() => {}}
+                      isDragOver={dragOverState['workspace-image'] || false}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
                     />
 
                     {/* Tags Management */}
@@ -1024,6 +1076,7 @@ export default function ManageWorkspace() {
                             description: workspace.description,
                             joinPolicy: workspace.join_policy,
                             image: null,
+                            currentImageUrl: null,
                             tags: workspace.tags || [],
                           });
                         }}
@@ -1034,25 +1087,25 @@ export default function ManageWorkspace() {
                   </Stack>
                 ) : (
                   <Stack spacing={2}>
-                    {workspace.image_url && (
-                      <Box>
-                        <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-                          Workspace Image
-                        </Typography>
-                        <Box
-                          sx={{
-                            width: '100%',
-                            height: '180px',
-                            borderRadius: 2,
-                            overflow: 'hidden',
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            bgcolor: 'grey.50',
-                          }}
-                        >
+                    <Box>
+                      <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+                        Workspace Image
+                      </Typography>
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: '180px',
+                          borderRadius: 2,
+                          overflow: 'hidden',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          bgcolor: 'grey.50',
+                        }}
+                      >
+                        {workspace.image_url ? (
                           <img
                             src={workspace.image_url}
                             alt="Workspace"
@@ -1076,9 +1129,17 @@ export default function ManageWorkspace() {
                               console.log('Workspace image loaded successfully:', workspace.image_url);
                             }}
                           />
-                        </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', p: 2 }}>
+                            No workspace image uploaded
+                            <br />
+                            <Typography variant="caption" color="text.secondary">
+                              Click Edit to add an image
+                            </Typography>
+                          </Typography>
+                        )}
                       </Box>
-                    )}
+                    </Box>
                     
                     <Box>
                       <Typography variant="subtitle1" color="text.secondary" gutterBottom>

@@ -13,6 +13,7 @@ import type { DragDropImageUploadProps } from '../types/QuizInterfaces'
 const DragDropImageUpload: React.FC<DragDropImageUploadProps> = ({
     onImageUpload,
     currentImage,
+    currentImageUrl,
     label,
     fullWidth = false,
     height = '120px',
@@ -73,7 +74,7 @@ const DragDropImageUpload: React.FC<DragDropImageUploadProps> = ({
                 onChange={handleFileChange}
             />
             
-            {currentImage ? (
+            {(currentImage || currentImageUrl) ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
                     <Box sx={{ 
                         position: 'relative',
@@ -82,7 +83,7 @@ const DragDropImageUpload: React.FC<DragDropImageUploadProps> = ({
                         boxShadow: 1
                     }}>
                         <img
-                            src={URL.createObjectURL(currentImage)}
+                            src={currentImage ? URL.createObjectURL(currentImage) : currentImageUrl!}
                             alt="Preview"
                             style={{
                                 maxWidth: '120px',
@@ -93,7 +94,7 @@ const DragDropImageUpload: React.FC<DragDropImageUploadProps> = ({
                         />
                     </Box>
                     <Typography variant="body2" color="primary.main" sx={{ fontWeight: 'medium', fontSize: '0.875rem' }}>
-                        Click or drag to change
+                        {currentImage ? 'Click or drag to change' : 'Click or drag to replace'}
                     </Typography>
                 </Box>
             ) : (
