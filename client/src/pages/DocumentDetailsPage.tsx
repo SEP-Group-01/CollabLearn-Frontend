@@ -96,7 +96,7 @@ export default function DocumentDetailsPage() {
     fetchReviews, 
     handleUpdateReview, 
     fetchUserReview 
-  } = useResourceActions(workspaceId || '1', threadId || '1');
+  } = useResourceActions(workspaceId || '', threadId || '');
 
   // Load reviews for the document
   const loadReviews = useCallback(async (documentId: string) => {

@@ -145,7 +145,7 @@ export default function LinksPage() {
     uploading, 
     error, 
     clearError 
-  } = useResourceActions(workspaceId || '1', threadId || '1');
+  } = useResourceActions(workspaceId || '', threadId || '');
   
   // State for real links from API
   const [realLinks, setRealLinks] = useState<LinkType[]>([]);

@@ -103,7 +103,7 @@ export default function VideoDetailsPage() {
     handleUpdateReview, 
     handleDeleteReview,
     fetchRatingSummary 
-  } = useResourceActions(workspaceId || '1', threadId || '1');
+  } = useResourceActions(workspaceId || '', threadId || '');
 
   // Load video from API
   useEffect(() => {

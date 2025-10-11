@@ -81,7 +81,7 @@ export default function DocumentQuery() {
   const navigate = useNavigate()
   
   // Real API integration
-  const { fetchDocuments } = useResourceActions(workspaceId || '1', threadId || '1')
+  const { fetchDocuments } = useResourceActions(workspaceId || '', threadId || '')
   
   const [documents, setDocuments] = useState<QueryDocument[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([

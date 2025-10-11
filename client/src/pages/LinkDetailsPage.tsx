@@ -93,7 +93,7 @@ export default function LinkDetailsPage() {
     handleAddReview, 
     handleUpdateReview, 
     handleDeleteReview 
-  } = useResourceActions(workspaceId || '1', threadId || '1');
+  } = useResourceActions(workspaceId || '', threadId || '');
 
   // Load link from API
   useEffect(() => {

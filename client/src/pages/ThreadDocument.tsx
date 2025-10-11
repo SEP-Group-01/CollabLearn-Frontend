@@ -89,7 +89,7 @@ export default function ThreadDocumentsPage() {
     error, 
     clearError,
     getFileSize 
-  } = useResourceActions(workspaceId || '1', threadId || '1');
+  } = useResourceActions(workspaceId || '', threadId || '');
   
   // State for real documents from API
   const [realDocuments, setRealDocuments] = useState<DocumentType[]>([]);
@@ -1023,7 +1023,7 @@ export default function ThreadDocumentsPage() {
                   <Add sx={{ fontSize: 24 }} />
                 </Box>
                 <Box>
-                  <Typography variant="h5" fontWeight="bold" sx={{ mb: 0.5 }}>
+                  <Typography variant="h5" component="div" fontWeight="bold" sx={{ mb: 0.5 }}>
                     Add New Document
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>

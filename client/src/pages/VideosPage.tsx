@@ -36,7 +36,7 @@ export default function VideosPage() {
     error,
     clearError,
     isValidFileType 
-  } = useResourceActions(workspaceId || '1', threadId || '1');
+  } = useResourceActions(workspaceId || '', threadId || '');
   
   // State for real videos from API
   const [realVideos, setRealVideos] = useState<Video[]>([]);

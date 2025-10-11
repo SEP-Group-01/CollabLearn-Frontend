@@ -1,33 +1,30 @@
 // resourceService.ts - Frontend API integration with TypeScript
 import axios from "axios";
+import { getAccessToken, getUserData } from "./authApi";
 import type { Document, Link, Video, Review, ResourceRating } from "../types/ThreadInterfaces";
 
 // Generic type for API responses
 type ApiResponse = Record<string, unknown>;
 
 export interface ResourceMetadata {
-  userId: string;
   title: string;
   description?: string;
   tags?: string[];
 }
 
 export interface LinkData {
-  userId: string;
   title: string;
   url: string;
   description?: string;
 }
 
 export interface VideoUploadData {
-  userId: string;
   title: string;
   description?: string;
   file: File;
 }
 
 export interface DocumentUploadData {
-  userId: string;
   title: string;
   description?: string;
   type?: "pdf" | "doc" | "txt";
@@ -43,6 +40,37 @@ export interface AllResources {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
+// Create axios instance with auth header
+const createAuthenticatedRequest = () => {
+  const token = getAccessToken();
+  
+  let baseURL;
+  if (API_URL.includes('/api')) {
+    baseURL = API_URL;
+  } else {
+    baseURL = `${API_URL}/api`;
+  }
+  
+  const instance = axios.create({
+    baseURL: baseURL,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  });
+  
+  return instance;
+};
+
+// Get current user ID from stored user data
+const getCurrentUserId = (): string => {
+  const userData = getUserData();
+  if (!userData || !userData.id) {
+    throw new Error('User not authenticated or user ID not found');
+  }
+  return userData.id.toString();
+};
+
 // ===== DOCUMENT OPERATIONS =====
 
 export const uploadDocument = async (
@@ -50,9 +78,10 @@ export const uploadDocument = async (
   threadId: string,
   uploadData: DocumentUploadData,
 ): Promise<Document> => {
+  const currentUserId = getCurrentUserId();
   const formData = new FormData();
   formData.append('file', uploadData.file);
-  formData.append('user_id', uploadData.userId);
+  formData.append('user_id', currentUserId);
   formData.append('title', uploadData.title);
   formData.append('description', uploadData.description || '');
   formData.append('type', uploadData.type || 'pdf');
@@ -61,14 +90,13 @@ export const uploadDocument = async (
     formData.append('tags', JSON.stringify(uploadData.tags));
   }
 
-  const response = await axios.post(
-    `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/documents`,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }
+  const api = createAuthenticatedRequest();
+  // Override content type for multipart form data
+  api.defaults.headers['Content-Type'] = 'multipart/form-data';
+  
+  const response = await api.post(
+    `/workspaces/${workspaceId}/threads/${threadId}/documents`,
+    formData
   );
   
   // Transform API response to frontend format
@@ -155,23 +183,24 @@ export const uploadVideo = async (
 ): Promise<Video> => {
   console.log('🔍 uploadVideo called with:', { workspaceId, threadId, uploadData: { ...uploadData, file: uploadData.file.name } });
   
+  const currentUserId = getCurrentUserId();
   const formData = new FormData();
   formData.append('file', uploadData.file);
-  formData.append('user_id', uploadData.userId);
+  formData.append('user_id', currentUserId);
   formData.append('title', uploadData.title);
   formData.append('description', uploadData.description || '');
 
-  const uploadUrl = `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/videos`;
-  console.log('📡 Video upload URL:', uploadUrl);
+  const api = createAuthenticatedRequest();
+  // Override content type for multipart form data
+  api.defaults.headers['Content-Type'] = 'multipart/form-data';
+  
+  console.log('📡 Video upload URL:', `/workspaces/${workspaceId}/threads/${threadId}/videos`);
 
-  const response = await axios.post(
-    uploadUrl,
+  const response = await api.post(
+    `/workspaces/${workspaceId}/threads/${threadId}/videos`,
     formData,
     {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      onUploadProgress: (progressEvent) => {
+      onUploadProgress: (progressEvent: any) => {
         const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
         console.log(`Upload Progress: ${percentCompleted}%`);
       },
@@ -260,22 +289,20 @@ export const createLink = async (
   threadId: string,
   linkData: LinkData,
 ): Promise<Link> => {
-  const url = `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/links`;
+  const currentUserId = getCurrentUserId();
+  const api = createAuthenticatedRequest();
+  
   const payload = {
-    user_id: linkData.userId,
+    user_id: currentUserId,
     title: linkData.title,
     url: linkData.url,
     description: linkData.description || '',
   };
   
-  console.log('🚀 Creating link with URL:', url);
+  console.log('🚀 Creating link with URL:', `/workspaces/${workspaceId}/threads/${threadId}/links`);
   console.log('🚀 Payload:', payload);
   
-  const response = await axios.post(url, payload, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  const response = await api.post(`/workspaces/${workspaceId}/threads/${threadId}/links`, payload);
   
   console.log('✅ Backend response:', response.data);
   
@@ -362,15 +389,14 @@ export const deleteResource = async (
   threadId: string,
   resourceType: 'documents' | 'videos' | 'links',
   resourceId: string,
-  userId: string,
 ) => {
-  const response = await axios.delete(
-    `${API_URL}/resource-service/workspace/${workspaceId}/threads/${threadId}/${resourceType}/${resourceId}`,
+  const currentUserId = getCurrentUserId();
+  const api = createAuthenticatedRequest();
+  
+  const response = await api.delete(
+    `/workspace/${workspaceId}/threads/${threadId}/${resourceType}/${resourceId}`,
     {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      data: { user_id: userId },
+      data: { user_id: currentUserId },
     }
   );
   return response.data;
@@ -864,17 +890,14 @@ export const updateReview = async (
   workspaceId: string,
   threadId: string,
   resourceId: string,
-  userId: string,
   updateData: ReviewUpdateData,
 ): Promise<Review> => {
-  const response = await axios.put(
-    `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews/user/${userId}`,
-    updateData,
-    {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }
+  const currentUserId = getCurrentUserId();
+  const api = createAuthenticatedRequest();
+  
+  const response = await api.put(
+    `/workspaces/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews/user/${currentUserId}`,
+    updateData
   );
   
   // Transform backend response to frontend format
@@ -913,20 +936,32 @@ export const deleteReview = async (
 };
 
 // Get user's review for a resource (if any)
+// Wrapper functions for backward compatibility
+export const handleUpdateReview = async (
+  resourceType: string,
+  resourceId: string,
+  _userId: string, // Deprecated - now uses current user automatically
+  updateData: ReviewUpdateData,
+): Promise<Review> => {
+  // For now, we'll assume workspaceId and threadId are available from context
+  // This is a temporary solution - ideally these should be passed properly
+  const workspaceId = "temp-workspace"; // TODO: Get from context
+  const threadId = "temp-thread"; // TODO: Get from context
+  
+  return updateReview(workspaceId, threadId, resourceId, updateData);
+};
+
 export const getUserReview = async (
   workspaceId: string,
   threadId: string,
   resourceId: string,
-  userId: string,
 ): Promise<Review | null> => {
+  const currentUserId = getCurrentUserId();
+  const api = createAuthenticatedRequest();
+  
   try {
-    const response = await axios.get(
-      `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews/user/${userId}`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+    const response = await api.get(
+      `/workspaces/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews/user/${currentUserId}`
     );
     
     // Transform backend response to frontend format
