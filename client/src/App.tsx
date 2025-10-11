@@ -1,7 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 
 import CollaborativeEditor from './pages/CollaborativeEditor'
-import Header from "./components/Header";
 
 import Forum from './pages/Forum'
 import Workspace from './pages/Workspace'
@@ -26,6 +25,8 @@ import GroupManagePage from './pages/GroupManagePage';
 import DocumentDetailsPage from './pages/DocumentDetailsPage';
 import LinksPage from './pages/LinksPage';
 import VideosPage from './pages/VideosPage';
+import VideoDetailsPage from './pages/VideoDetailsPage';
+import LinkDetailsPage from './pages/LinkDetailsPage';
 
 const App = () => {
   return (
@@ -60,7 +61,9 @@ const App = () => {
           <Route path="/workspace/:workspaceId/threads/:threadId/query" element={<DocumentQuery />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/manage" element={<GroupManagePage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/links" element={<LinksPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/links/:linkId" element={<LinkDetailsPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/videos" element={<VideosPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/videos/:videoId" element={<VideoDetailsPage />} />
 
           {/* Remove old module-based routes */}
         </Routes>

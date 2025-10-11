@@ -64,7 +64,13 @@ export default function ThreadPage() {
   }
 
 
-  const openDocument = (documentId: number) => {
+  const openDocument = (documentId: number | string) => {
+    // Check if documentId is valid before navigation
+    if (!documentId || documentId === null || documentId === undefined) {
+      console.error('❌ Invalid document ID for navigation:', documentId);
+      return;
+    }
+    
     navigate(`/workspace/${workspaceId}/threads/${threadId}/documents/${documentId}`)
   }
 
@@ -619,7 +625,14 @@ export default function ThreadPage() {
                 borderColor: "primary.main"
               },
             }}
-            onClick={() => openDocument(doc.id)}
+            onClick={() => {
+              // Ensure doc.id exists and is valid before navigation
+              if (doc.id && doc.id !== null && doc.id !== undefined) {
+                openDocument(doc.id);
+              } else {
+                console.error('❌ Document has invalid ID:', doc);
+              }
+            }}
           >
             <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
               <Box display="flex" alignItems="center" gap={2}>

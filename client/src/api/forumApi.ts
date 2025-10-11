@@ -1,19 +1,39 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import type { MessageType, ReplyType } from '../types/ForumInterfaces';
 import { getAccessToken, getUserData } from './authApi';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+console.log('🔧 API_URL from environment:', API_URL);
+console.log('🔧 API_URL ends with /api:', API_URL.endsWith('/api'));
 
 // Create axios instance with auth header
 const createAuthenticatedRequest = () => {
   const token = getAccessToken();
-  return axios.create({
-    baseURL: API_URL,
+  
+  // If API_URL already includes /api, use it directly. Otherwise add /api
+  let baseURL;
+  if (API_URL.includes('/api')) {
+    baseURL = API_URL; // Already includes /api
+  } else {
+    baseURL = `${API_URL}/api`; // Need to add /api
+  }
+  console.log('🔧 Final baseURL used:', baseURL);
+  
+  const instance = axios.create({
+    baseURL: baseURL,
     headers: {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
     },
   });
+  
+  // Add request interceptor to log full URLs
+  instance.interceptors.request.use((config) => {
+    console.log('🔧 Making request to:', (config.baseURL || '') + (config.url || ''));
+    return config;
+  });
+  
+  return instance;
 };
 
 // Get current user ID from stored user data
@@ -30,9 +50,16 @@ let mockMessages: MessageType[] = [];
 
 // Forum API Functions
 export const getForumMessages = async (workspaceId: string): Promise<MessageType[]> => {
+  console.log('🔍 getForumMessages called with workspaceId:', workspaceId);
+  console.log('🔍 WorkspaceId length:', workspaceId.length);
+  console.log('🔍 WorkspaceId characters:', workspaceId.split('').map((char, i) => `${i}: '${char}'`));
+  
   try {
+    console.log('🔧 Fetching forum messages for workspace:', workspaceId);
     const api = createAuthenticatedRequest();
-    const response = await api.get(`/api/workspaces/${workspaceId}/forum/messages`);
+    const fullPath = `/workspaces/${workspaceId}/forum/messages`;
+    console.log('🔍 Full request path:', fullPath);
+    const response = await api.get(fullPath);
     console.log('✅ Successfully connected to backend API');
     
     // Check if backend returned an error object instead of data
@@ -50,23 +77,27 @@ export const getForumMessages = async (workspaceId: string): Promise<MessageType
     }
     
     return response.data;
-  } catch (error: any) {
-    console.error('Error fetching forum messages:', error);
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{message?: string}>;
+    console.error('Error fetching forum messages:', axiosError);
     console.log('Full error details:', {
-      code: error.code,
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
+      code: axiosError.code,
+      status: axiosError.response?.status,
+      data: axiosError.response?.data,
+      message: axiosError.message
     });
     
     // Check if this is a network/backend issue, server error, or the specific message_likes relationship error
-    const shouldUseFallback = error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || 
-                             error.response?.status >= 500 || !error.response ||
-                             error.code === 'ERR_BAD_RESPONSE' ||
-                             (error.message && error.message.includes('message_likes'));
+    const shouldUseFallback = axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ERR_NETWORK' || 
+                             (axiosError.response?.status && axiosError.response.status >= 500) || !axiosError.response ||
+                             axiosError.code === 'ERR_BAD_RESPONSE' ||
+                             axiosError.response?.status === 404 ||
+                             (axiosError.message && axiosError.message.includes('message_likes')) ||
+                             (axiosError.message && axiosError.message.includes('uuid')) || // Add UUID parsing errors
+                             (axiosError.message && axiosError.message.includes('Backend Error')); // Add backend errors
     
     if (shouldUseFallback && workspaceId === '09700b1d-ebc5-4d53-ba83-2434505fd21a') {
-      const errorType = error.message && error.message.includes('message_likes') ? 'Schema/Likes' : error.response?.status || 'Network';
+      const errorType = axiosError.message && axiosError.message.includes('message_likes') ? 'Schema/Likes' : axiosError.response?.status || 'Network';
       console.log(`🎭 Backend error (${errorType}) - Using mock data fallback for testing`);
       
       // Initialize mock messages if empty
@@ -106,6 +137,9 @@ export const createForumMessage = async (
   try {
     const api = createAuthenticatedRequest();
     const authorId = getCurrentUserId(); // Get current user ID
+    const requestPath = `/workspaces/${workspaceId}/forum/messages`;
+    console.log('🔧 Making POST request to path:', requestPath);
+    console.log('🔧 Full URL will be:', api.defaults.baseURL + requestPath);
     
     if (image) {
       // Handle image upload
@@ -114,7 +148,7 @@ export const createForumMessage = async (
       formData.append('authorId', authorId);
       formData.append('image', image);
       
-      const response = await api.post(`/api/workspaces/${workspaceId}/forum/messages`, formData, {
+      const response = await api.post(requestPath, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -128,7 +162,7 @@ export const createForumMessage = async (
       return response.data;
     } else {
       // Text-only message
-      const response = await api.post(`/api/workspaces/${workspaceId}/forum/messages`, {
+      const response = await api.post(requestPath, {
         content,
         authorId, // Include authorId as required by backend
       });
@@ -145,23 +179,27 @@ export const createForumMessage = async (
       
       return response.data;
     }
-  } catch (error: any) {
-    console.error('Error creating forum message:', error);
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{message?: string}>;
+    console.error('Error creating forum message:', axiosError);
     console.log('Full error details for message creation:', {
-      code: error.code,
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
+      code: axiosError.code,
+      status: axiosError.response?.status,
+      data: axiosError.response?.data,
+      message: axiosError.message
     });
     
-    // Check if this is a backend issue (including 500 errors)
-    const shouldUseFallback = error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || 
-                             error.response?.status >= 500 || !error.response ||
-                             error.code === 'ERR_BAD_RESPONSE';
+    // Check if this is a backend issue (including 500 errors and 404 errors)
+    const shouldUseFallback = axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ERR_NETWORK' || 
+                             (axiosError.response?.status && axiosError.response.status >= 500) || !axiosError.response ||
+                             axiosError.code === 'ERR_BAD_RESPONSE' ||
+                             axiosError.response?.status === 404 ||
+                             (axiosError.message && axiosError.message.includes('uuid')) || // Add UUID parsing errors
+                             (axiosError.message && axiosError.message.includes('Backend Error')); // Add backend errors
     
     // Temporary mock fallback for testing
     if (shouldUseFallback && workspaceId === '09700b1d-ebc5-4d53-ba83-2434505fd21a') {
-      console.log(`🎭 Backend error (${error.response?.status || 'Network'}) - Using mock message creation for testing`);
+      console.log(`🎭 Backend error (${axiosError.response?.status || 'Network'}) - Using mock message creation for testing`);
       const userData = getUserData();
       
       const newMessage: MessageType = {
@@ -198,7 +236,7 @@ export const createForumMessage = async (
       return newMessage;
     }
     
-    throw new Error(error.response?.data?.message || 'Failed to create message');
+    throw new Error(axiosError.response?.data?.message || 'Failed to create message');
   }
 };
 
@@ -211,10 +249,10 @@ export const createReply = async (
     const api = createAuthenticatedRequest();
     const authorId = getCurrentUserId(); // Get current user ID
     
-    const response = await api.post(`/api/workspaces/${workspaceId}/forum/messages`, {
+    const response = await api.post(`/workspaces/${workspaceId}/forum/messages`, {
       content,
       authorId,
-      parentMessageId: messageId.toString(), // This creates a reply by setting parentMessageId
+      parent_id: messageId.toString(), // Use parent_id to match your database schema
     });
     
     // Handle wrapped response format: {success: true, data: {...}}
@@ -223,9 +261,42 @@ export const createReply = async (
     }
     
     return response.data;
-  } catch (error: any) {
-    console.error('Error creating reply:', error);
-    throw new Error(error.response?.data?.message || 'Failed to create reply');
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{message?: string}>;
+    console.error('Error creating reply:', axiosError);
+    
+    // Check if this is a backend issue - add fallback for replies
+    const shouldUseFallback = axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ERR_NETWORK' || 
+                             (axiosError.response?.status && axiosError.response.status >= 500) || !axiosError.response ||
+                             axiosError.code === 'ERR_BAD_RESPONSE' ||
+                             axiosError.response?.status === 404 ||
+                             (axiosError.message && axiosError.message.includes('uuid')) ||
+                             (axiosError.message && axiosError.message.includes('Backend Error'));
+    
+    // Temporary mock fallback for replies when backend is not ready
+    if (shouldUseFallback && workspaceId === '09700b1d-ebc5-4d53-ba83-2434505fd21a') {
+      console.log(`🎭 Backend error creating reply - Using mock reply for testing`);
+      const userData = getUserData();
+      
+      const newReply: ReplyType = {
+        id: Date.now(), // Use timestamp as ID for uniqueness
+        content,
+        author: {
+          id: userData ? parseInt(userData.id.toString()) : 1,
+          name: userData ? `${userData.first_name} ${userData.last_name}` : 'Mock User',
+          avatar: '/src/assets/profile_img2.png',
+          role: 'member',
+        },
+        timestamp: new Date().toISOString(),
+        likes: 0,
+        isLiked: false
+      };
+      
+      console.log(`✅ Mock reply created for message ${messageId}`);
+      return newReply;
+    }
+    
+    throw new Error(axiosError.response?.data?.message || 'Failed to create reply');
   }
 };
 
@@ -234,7 +305,7 @@ export const pinMessage = async (workspaceId: string, messageId: number): Promis
     const api = createAuthenticatedRequest();
     const userId = getCurrentUserId(); // Get current user ID
     
-    const response = await api.put(`/api/workspaces/${workspaceId}/forum/messages/${messageId}/pin`, {
+    const response = await api.put(`/workspaces/${workspaceId}/forum/messages/${messageId}/pin`, {
       userId, // Include userId as required by backend
     });
     
@@ -244,16 +315,17 @@ export const pinMessage = async (workspaceId: string, messageId: number): Promis
     }
     
     return response.data;
-  } catch (error: any) {
-    console.error('Error pinning message:', error);
-    throw new Error(error.response?.data?.message || 'Failed to pin message');
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{message?: string}>;
+    console.error('Error pinning message:', axiosError);
+    throw new Error(axiosError.response?.data?.message || 'Failed to pin message');
   }
 };
 
 export const getWorkspaceInfo = async (workspaceId: string) => {
   try {
     const api = createAuthenticatedRequest();
-    const response = await api.get(`/api/workspaces/${workspaceId}`);
+    const response = await api.get(`/workspaces/${workspaceId}`);
     
     // Handle wrapped response format: {success: true, data: {...}}
     if (response.data && response.data.success === true && response.data.data) {
@@ -261,12 +333,20 @@ export const getWorkspaceInfo = async (workspaceId: string) => {
     }
     
     return response.data;
-  } catch (error: any) {
-    console.error('Error fetching workspace info:', error);
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{message?: string}>;
+    console.error('Error fetching workspace info:', axiosError);
+    
+    // Handle backend errors (500, 404, UUID parsing errors) with fallback
+    const shouldUseFallback = axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ERR_NETWORK' || 
+                             (axiosError.response?.status && axiosError.response.status >= 500) || !axiosError.response ||
+                             axiosError.code === 'ERR_BAD_RESPONSE' ||
+                             axiosError.response?.status === 404 ||
+                             (axiosError.message && axiosError.message.includes('uuid'));
     
     // Temporary mock data fallback for testing
-    if (workspaceId === '09700b1d-ebc5-4d53-ba83-2434505fd21a') {
-      console.log('🎭 Using mock workspace info for testing');
+    if (shouldUseFallback && workspaceId === '09700b1d-ebc5-4d53-ba83-2434505fd21a') {
+      console.log(`🎭 Backend error (${axiosError.response?.status || axiosError.code || 'Network'}) - Using mock workspace info for testing`);
       return {
         id: workspaceId,
         title: 'Web Design',
@@ -280,6 +360,6 @@ export const getWorkspaceInfo = async (workspaceId: string) => {
       };
     }
     
-    throw new Error(error.response?.data?.message || 'Failed to fetch workspace info');
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch workspace info');
   }
 };

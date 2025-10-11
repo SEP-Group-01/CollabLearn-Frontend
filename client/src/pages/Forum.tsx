@@ -35,6 +35,11 @@ export default function WorkspaceForumPage() {
   const workspaceId = params.workspaceId ?? ""; // fallback to empty string if undefined
   const isMobile = useMediaQuery("(max-width:900px)");
 
+  // Debug the workspace ID only once
+  React.useEffect(() => {
+    console.log('🔍 Forum Component Mounted with workspaceId:', workspaceId);
+  }, [workspaceId]);
+
   // CSS animations for modern effects
   const animationStyles = (
     <GlobalStyles
@@ -84,74 +89,109 @@ export default function WorkspaceForumPage() {
   const refreshMessages = useCallback(async () => {
     if (!workspaceId || refreshing) return;
     
+    // Validate workspaceId before making API call
+    if (workspaceId.length < 10) {
+      console.warn('⚠️ Invalid workspace ID, skipping forum messages fetch:', workspaceId);
+      return;
+    }
+    
     try {
       setRefreshing(true);
       const messagesData = await getForumMessages(workspaceId);
       // Organize messages and replies
       const organizedMessages = organizeMessagesWithReplies(messagesData);
       setMessages(organizedMessages);
-      console.log('Messages refreshed:', messagesData);
+      // Reduce refresh logging
+      if (Math.random() < 0.3) { // 30% chance to log
+        console.log('Messages refreshed:', messagesData.length, 'messages');
+      }
     } catch (err) {
       console.error('Error refreshing messages:', err);
+      // Don't show error to user for 404s during background sync
+      if (err instanceof Error && err.message.includes('404')) {
+        console.warn('📝 Forum endpoint not found - this workspace may not have forum functionality enabled');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load messages');
+      }
     } finally {
       setRefreshing(false);
     }
   }, [workspaceId, refreshing]);
 
   // WebSocket event handlers for real-time updates
-  const handleNewMessage = useCallback((message: any) => {
-    console.log('📨 New message received via WebSocket:', message);
-    // Instead of refreshing all messages, add the new message directly
+  const handleNewMessage = useCallback((message: unknown) => {
+    const msgData = message as Record<string, unknown>;
+    
+    // Add the new message directly with better duplicate prevention
     setMessages(prevMessages => {
-      // Check if message already exists to prevent duplicates
-      const messageExists = prevMessages.some(msg => msg.id.toString() === message.id.toString());
+      // More robust duplicate checking
+      const messageExists = prevMessages.some(msg => {
+        // Check by ID first, then by content and timestamp for safety
+        return msg.id.toString() === msgData.id?.toString() ||
+               (msg.content === msgData.content && 
+                Math.abs(new Date(msg.timestamp).getTime() - new Date(msgData.timestamp as string).getTime()) < 2000);
+      });
+      
       if (messageExists) {
+        // Don't log for every duplicate - just return existing
         return prevMessages;
       }
       
       // Add the new message to the list
       const newMessage: MessageType = {
-        id: message.id,
-        content: message.content,
-        author: message.author,
-        timestamp: message.timestamp,
-        isPinned: message.isPinned || false,
+        id: msgData.id as number | string,
+        content: msgData.content as string,
+        author: msgData.author as Author,
+        timestamp: msgData.timestamp as string,
+        isPinned: (msgData.isPinned as boolean) || false,
         likes: 0,
         isLiked: false,
-        replies: message.replies || [],
-        image: message.image
+        replies: (msgData.replies as ReplyType[]) || [],
+        image: msgData.image as string | undefined
       };
       
+      console.log('📨 New message via WebSocket added to UI');
       return [...prevMessages, newMessage].sort((a, b) => 
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
     });
   }, []);
 
-  const handleNewReply = useCallback((data: { messageId: string; reply: any }) => {
-    console.log('💬 New reply received via WebSocket:', data);
-    // Add the reply directly to the specific message
+  const handleNewReply = useCallback((data: { messageId: string; reply: unknown }) => {
+    const replyData = data.reply as Record<string, unknown>;
+    
+    // Add the reply directly to the specific message with better duplicate prevention
     setMessages(prevMessages => {
       return prevMessages.map(message => {
         if (message.id.toString() === data.messageId.toString()) {
-          const replyExists = message.replies?.some(reply => reply.id.toString() === data.reply.id.toString());
-          if (!replyExists) {
-            const newReply: ReplyType = {
-              id: data.reply.id,
-              content: data.reply.content,
-              author: data.reply.author,
-              timestamp: data.reply.timestamp,
-              likes: 0,
-              isLiked: false
-            };
-            
-            return {
-              ...message,
-              replies: [...(message.replies || []), newReply].sort((a, b) => 
-                new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-              )
-            };
+          // More robust duplicate checking for replies
+          const replyExists = message.replies?.some(reply => {
+            return reply.id.toString() === replyData.id?.toString() ||
+                   (reply.content === replyData.content && 
+                    Math.abs(new Date(reply.timestamp).getTime() - new Date(replyData.timestamp as string).getTime()) < 2000);
+          });
+          
+          if (replyExists) {
+            // Don't log for every duplicate - just return existing
+            return message;
           }
+          
+          const newReply: ReplyType = {
+            id: replyData.id as number | string,
+            content: replyData.content as string,
+            author: replyData.author as Author,
+            timestamp: replyData.timestamp as string,
+            likes: 0,
+            isLiked: false
+          };
+          
+          console.log('💬 New reply via WebSocket added to UI');
+          return {
+            ...message,
+            replies: [...(message.replies || []), newReply].sort((a, b) => 
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            )
+          };
         }
         return message;
       });
@@ -171,8 +211,6 @@ export default function WorkspaceForumPage() {
   // Initialize Socket.IO WebSocket connection for real-time updates
   const {
     isConnected: wsConnected,
-    sendMessage: wsSendMessage,
-    sendReply: wsSendReply,
     sendTyping: wsSendTyping
   } = useForumWebSocket({
     workspaceId,
@@ -196,34 +234,30 @@ export default function WorkspaceForumPage() {
   //   onUserLeft: handleUserLeft
   // });
 
-  // Debug WebSocket connection status
+  // Debug WebSocket connection status (reduced logging)
   React.useEffect(() => {
-    console.log('🔄 WebSocket connection status changed:', wsConnected ? 'CONNECTED' : 'DISCONNECTED');
     if (wsConnected) {
-      console.log('✅ WebSocket successfully connected to localhost:3003/forum');
-      console.log('📡 Joined room: forum-' + workspaceId);
+      console.log('✅ WebSocket connected - Real-time updates enabled');
     } else {
-      console.log('❌ WebSocket connection failed or lost');
-      console.log('🔧 Check if backend server is running on localhost:3003');
-      console.log('💡 Fallback refresh mechanism will be used instead');
+      console.log('❌ WebSocket disconnected - Using API fallback');
     }
-  }, [wsConnected, workspaceId]);
+  }, [wsConnected]);
 
-  // Multi-tab synchronization: Periodic refresh when WebSocket is unstable
+  // Multi-tab synchronization: Reduced frequency background refresh
   React.useEffect(() => {
-    if (!workspaceId) return;
+    if (!workspaceId || workspaceId.length < 10) return;
     
-    // Set up a background refresh interval for multi-tab sync
+    // Set up a background refresh interval for multi-tab sync (less aggressive)
     const syncInterval = setInterval(() => {
       if (!wsConnected) {
-        console.log('🔄 Background sync - WebSocket disconnected, refreshing messages');
-        refreshMessages();
-      } else {
-        // Even when connected, do a light sync every 30 seconds for reliability
-        console.log('🔄 Background sync - Ensuring multi-tab consistency');
+        // Only log occasionally to reduce noise
+        if (Math.random() < 0.1) { // 10% chance to log
+          console.log('🔄 Background sync - refreshing messages');
+        }
         refreshMessages();
       }
-    }, wsConnected ? 3000 : 2000); // 3s when connected, 2s when disconnected for faster multi-tab sync
+      // Remove the "even when connected" refresh to reduce load
+    }, wsConnected ? 60000 : 30000); // 60s when connected, 30s when disconnected
 
     return () => clearInterval(syncInterval);
   }, [wsConnected, workspaceId, refreshMessages]);
@@ -231,15 +265,16 @@ export default function WorkspaceForumPage() {
   // Tab visibility change listener for immediate sync when switching between tabs
   React.useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && workspaceId) {
-        console.log('🔄 Tab became visible - syncing messages');
+      if (!document.hidden && workspaceId && !wsConnected) {
+        // Only refresh when tab becomes visible AND WebSocket is disconnected
+        console.log('🔄 Tab visible + WebSocket offline - syncing messages');
         refreshMessages();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [workspaceId, refreshMessages]);
+  }, [workspaceId, refreshMessages, wsConnected]);
 
   // Helper function to organize messages with nested replies
   const organizeMessagesWithReplies = (messagesData: unknown[]): MessageType[] => {
@@ -251,7 +286,7 @@ export default function WorkspaceForumPage() {
 
     messagesData.forEach(msg => {
       const msgObj = msg as Record<string, unknown>;
-      if (msgObj.parentMessageId || msgObj.parent_message_id) {
+      if (msgObj.parentMessageId || msgObj.parent_message_id || msgObj.parent_id) {
         replyMessages.push(msg);
       } else {
         // Ensure the message has all required MessageType properties
@@ -273,7 +308,7 @@ export default function WorkspaceForumPage() {
     // Attach replies to their parent messages
     replyMessages.forEach(reply => {
       const replyObj = reply as Record<string, unknown>;
-      const parentId = replyObj.parentMessageId || replyObj.parent_message_id;
+      const parentId = replyObj.parentMessageId || replyObj.parent_message_id || replyObj.parent_id;
       
       if (parentId) {
         const parentIndex = parentMessages.findIndex(msg => 
@@ -320,7 +355,17 @@ export default function WorkspaceForumPage() {
     setCurrentUser(user);
     
     const loadForumData = async () => {
-      if (!workspaceId) return;
+      if (!workspaceId) {
+        console.warn('⚠️ No workspace ID provided, skipping forum data load');
+        return;
+      }
+      
+      // Validate workspaceId format
+      if (workspaceId.length < 10) {
+        console.warn('⚠️ Invalid workspace ID format, skipping forum data load:', workspaceId);
+        setError('Invalid workspace ID. Please ensure you are accessing the forum from a valid workspace URL.');
+        return;
+      }
       
       try {
         setError(null);
@@ -337,7 +382,13 @@ export default function WorkspaceForumPage() {
         setMessages(organizedMessages);
       } catch (err) {
         console.error('Error loading forum data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load forum data');
+        
+        // More specific error handling
+        if (err instanceof Error && err.message.includes('404')) {
+          setError('Forum not found. This workspace may not have forum functionality enabled.');
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to load forum data');
+        }
         setMessages([]); // Ensure messages is always an array
       }
     };
@@ -370,26 +421,36 @@ export default function WorkspaceForumPage() {
       const newMessageData = await createForumMessage(workspaceId, newMessage, image || undefined);
       console.log('Received new message:', newMessageData);
       
-      // Send via WebSocket for real-time updates to other users
-      if (wsConnected && wsSendMessage) {
-        wsSendMessage({
-          content: newMessage,
-          author: {
-            id: currentUser?.id || 'unknown',
-            name: currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : 'You',
-            role: 'member'
-          },
-          image: image ? URL.createObjectURL(image) : undefined,
-          timestamp: new Date().toISOString()
-        });
-        console.log('� Message sent via WebSocket for real-time updates');
-      }
+      // ALWAYS add the message immediately to UI for instant feedback
+      const messageWithReplies: MessageType = {
+        id: newMessageData.id,
+        content: newMessageData.content,
+        author: newMessageData.author,
+        timestamp: newMessageData.timestamp,
+        isPinned: newMessageData.isPinned || false,
+        likes: 0,
+        isLiked: false,
+        replies: newMessageData.replies || [],
+        image: newMessageData.image
+      };
+      
+      setMessages(prev => {
+        // Check for duplicates before adding
+        const exists = prev.some(msg => msg.id.toString() === newMessageData.id.toString());
+        if (exists) {
+          console.log('Message already exists in UI, skipping duplicate');
+          return prev;
+        }
+        
+        console.log('Adding new message to UI immediately');
+        return [...prev, messageWithReplies].sort((a, b) => 
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+      });
       
       // Clear the input immediately
       setNewMessage("");
       setImage(null);
-      
-      console.log('🔌 WebSocket Status:', wsConnected ? 'Connected - Real-time updates enabled' : 'Disconnected - Using polling fallback');
       
     } catch (err) {
       console.error('Error sending message:', err);
@@ -412,22 +473,39 @@ export default function WorkspaceForumPage() {
       setReplyContent("");
       setReplyingTo(null);
       
-      // Enhanced WebSocket debugging for replies
-      console.log('🔌 Reply WebSocket Status:', wsConnected ? 'Connected' : 'Disconnected');
-      console.log('📡 Reply Socket Room: forum-' + workspaceId);
+      // ALWAYS add the reply immediately to UI for instant feedback
+      const formattedReply: ReplyType = {
+        id: newReply.id,
+        content: newReply.content,
+        author: newReply.author,
+        timestamp: newReply.timestamp,
+        likes: 0,
+        isLiked: false
+      };
       
-      if (wsConnected) {
-        console.log('✅ Reply sent - WebSocket should handle real-time updates');
-        console.log('⏳ Waiting for reply WebSocket broadcast...');
-        // Add a fallback refresh even when WebSocket is connected
-        setTimeout(() => {
-          console.log('🔄 Fallback refresh after reply send (even with WebSocket)');
-          refreshMessages();
-        }, 300);
-      } else {
-        console.log('⚠️ WebSocket not connected - manually refreshing messages');
-        setTimeout(() => refreshMessages(), 500);
-      }
+      setMessages(prevMessages => {
+        return prevMessages.map(message => {
+          if (message.id.toString() === messageId.toString()) {
+            // Check for duplicate replies
+            const replyExists = message.replies?.some(reply => 
+              reply.id.toString() === newReply.id.toString()
+            );
+            if (replyExists) {
+              console.log('Reply already exists in UI, skipping duplicate');
+              return message;
+            }
+            
+            console.log('Adding new reply to UI immediately');
+            return {
+              ...message,
+              replies: [...(message.replies || []), formattedReply].sort((a, b) => 
+                new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+              )
+            };
+          }
+          return message;
+        });
+      });
       
     } catch (err) {
       console.error('Error sending reply:', err);
@@ -543,9 +621,62 @@ export default function WorkspaceForumPage() {
                   </Typography>
                 </Box>
               </Box>
+              
+              {/* Debug Info - Only show in development */}
+              {import.meta.env.DEV && (
+                <Typography variant="caption" sx={{ 
+                  display: 'block',
+                  mt: 1,
+                  opacity: 0.7,
+                  fontSize: '0.7rem'
+                }}>
+                  Debug: Workspace ID: {workspaceId || 'Not Found'} | 
+                  API: {import.meta.env.VITE_API_URL || 'http://localhost:3000'}
+                </Typography>
+              )}
             </Box>
             
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {/* Debug Button - Only show in development */}
+              {import.meta.env.DEV && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    console.log('🔍 Debug Info:');
+                    console.log('- Workspace ID:', workspaceId);
+                    console.log('- API URL:', import.meta.env.VITE_API_URL || 'http://localhost:3000');
+                    console.log('- Full API Endpoint:', `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/workspaces/${workspaceId}/forum/messages`);
+                    console.log('- WebSocket Connected:', wsConnected);
+                    console.log('- Messages Count:', messages.length);
+                    console.log('- Error State:', error);
+                    
+                    // Test the API endpoint manually
+                    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/workspaces/${workspaceId}/forum/messages`)
+                      .then(response => {
+                        console.log('🧪 Manual API Test Response Status:', response.status);
+                        return response.text();
+                      })
+                      .then(text => {
+                        console.log('🧪 Manual API Test Response Body:', text);
+                      })
+                      .catch(err => {
+                        console.log('🧪 Manual API Test Error:', err);
+                      });
+                  }}
+                  sx={{
+                    color: 'white',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      borderColor: 'white',
+                      bgcolor: 'rgba(255,255,255,0.1)'
+                    }
+                  }}
+                >
+                  Debug
+                </Button>
+              )}
+              
               {currentUser && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Avatar 
