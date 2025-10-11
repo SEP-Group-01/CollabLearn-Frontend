@@ -14,22 +14,37 @@ import {
   useTheme,
   useMediaQuery,
   CircularProgress,
-  Alert
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControlLabel,
+  Switch,
+  Snackbar
 } from "@mui/material"
 import {
   ArrowBack,
-  PictureAsPdf,
   Description,
-  TextSnippet,
   PlayCircle,
   Link as LinkIcon,
   Edit as EditIcon,
-  Visibility,
   ArrowForward,
+  Add as AddIcon,
+  PictureAsPdf,
+  TextSnippet,
 } from "@mui/icons-material"
 
 import { getThread, getThreadResources, getThreadQuizzes } from "../api/threadsApi"
+import { createDocument, checkAdminOrModerator, getDocumentsByThread } from "../api/editorApi"
+
 import type { ThreadData, Document, Link, Video } from "../types/ThreadInterfaces"
+
+// Extend Document interface with additional properties for editing documents
+type EditingDocument = Document & {
+  userPermission?: 'read' | 'write' | 'admin';
+}
 
 export default function ThreadPage() {
   const { workspaceId, threadId } = useParams<{ workspaceId: string; threadId: string }>()
@@ -42,6 +57,20 @@ export default function ThreadPage() {
   const [threadData, setThreadData] = useState<ThreadData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editingDocuments, setEditingDocuments] = useState<EditingDocument[]>([])
+  const [editingDocsLoading, setEditingDocsLoading] = useState(false)
+
+  // State for document creation modal
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [checkingPermissions, setCheckingPermissions] = useState(true)
+  const [documentForm, setDocumentForm] = useState({
+    title: '',
+    content: '',
+    isPublic: false
+  })
+  const [createLoading, setCreateLoading] = useState(false)
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' })
 
   // Helper functions to format data - moved above useEffect so they are initialized
   // before being referenced inside the effect (avoids TDZ/ReferenceError)
@@ -155,7 +184,7 @@ export default function ThreadPage() {
             videos
           },
           quizzes: transformedQuizzes,
-          currentlyEditing: [] // Hardcoded for now
+          currentlyEditing: editingDocuments // Use real editing documents data
         }
 
         setThreadData(transformedData)
@@ -169,6 +198,141 @@ export default function ThreadPage() {
 
     fetchThreadData()
   }, [threadId, workspaceId])
+
+  // Check admin/moderator permissions
+  useEffect(() => {
+    const checkPermissions = async () => {
+      if (!threadId) return
+
+      try {
+        setCheckingPermissions(true)
+        const result = await checkAdminOrModerator(threadId)
+        setIsAdmin(result.isAdminOrModerator)
+      } catch (error) {
+        console.error('Error checking permissions:', error)
+        setIsAdmin(false)
+      } finally {
+        setCheckingPermissions(false)
+      }
+    }
+
+    checkPermissions()
+  }, [threadId])
+
+
+
+  // Fetch editing documents for this thread
+  useEffect(() => {
+    const fetchEditingDocuments = async () => {
+      if (!threadId) return
+
+      try {
+        setEditingDocsLoading(true)
+        const documents = await getDocumentsByThread(threadId)
+        
+        // Transform documents to match the Document interface expected by the UI
+        const transformedDocs: EditingDocument[] = documents.map(doc => ({
+          id: doc.id,
+          title: doc.title,
+          mime_type: 'application/vnd.collaborative-document', // For collaborative documents
+          uploadedBy: getDisplayName(doc.createdBy),
+          uploadedAt: formatDate(doc.updatedAt),
+          size: 'Collaborative Doc',
+          user_id: doc.createdBy,
+          thread_id: doc.threadId,
+          resource_type: 'document' as const,
+          created_at: doc.createdAt,
+          updated_at: doc.updatedAt,
+          isCurrentlyEditing: doc.isCurrentlyEditing || false,
+          editedBy: doc.lastEditedBy,
+          lastEditTime: doc.lastEditedAt,
+          userPermission: doc.userPermission || 'read'
+        }))
+        
+        setEditingDocuments(transformedDocs)
+      } catch (error) {
+        console.error('Error fetching editing documents:', error)
+      } finally {
+        setEditingDocsLoading(false)
+      }
+    }
+
+    fetchEditingDocuments()
+  }, [threadId])
+
+  // Update threadData when editingDocuments changes
+  useEffect(() => {
+    if (threadData && editingDocuments.length !== threadData.currentlyEditing.length) {
+      setThreadData(prev => prev ? { ...prev, currentlyEditing: editingDocuments } : null)
+    }
+  }, [editingDocuments, threadData])
+
+  // Handle document creation
+  const handleCreateDocument = async () => {
+    if (!threadId || !documentForm.title.trim()) return
+
+    try {
+      setCreateLoading(true)
+      const newDocument = await createDocument({
+        title: documentForm.title,
+        content: documentForm.content || '',
+        threadId: threadId,
+        isPublic: documentForm.isPublic
+      })
+
+      setSnackbar({
+        open: true,
+        message: 'Document created successfully!',
+        severity: 'success'
+      })
+
+      // Reset form and close modal
+      setDocumentForm({ title: '', content: '', isPublic: false })
+      setCreateModalOpen(false)
+
+      // Refresh the editing documents list
+      try {
+        const documents = await getDocumentsByThread(threadId)
+        const transformedDocs: EditingDocument[] = documents.map(doc => ({
+          id: doc.id,
+          title: doc.title,
+          mime_type: 'application/vnd.collaborative-document',
+          uploadedBy: getDisplayName(doc.createdBy),
+          uploadedAt: formatDate(doc.updatedAt),
+          size: 'Collaborative Doc',
+          user_id: doc.createdBy,
+          thread_id: doc.threadId,
+          resource_type: 'document' as const,
+          created_at: doc.createdAt,
+          updated_at: doc.updatedAt,
+          isCurrentlyEditing: doc.isCurrentlyEditing || false,
+          editedBy: doc.lastEditedBy,
+          lastEditTime: doc.lastEditedAt,
+          userPermission: doc.userPermission || 'read'
+        }))
+        setEditingDocuments(transformedDocs)
+      } catch (error) {
+        console.error('Error refreshing documents list:', error)
+      }
+
+      // Navigate to the collaborative editor for the new document
+      navigate(`/workspace/${workspaceId}/threads/${threadId}/editor/${newDocument.id}`)
+    } catch (error) {
+      console.error('Error creating document:', error)
+      setSnackbar({
+        open: true,
+        message: 'Failed to create document. Please try again.',
+        severity: 'error'
+      })
+    } finally {
+      setCreateLoading(false)
+    }
+  }
+
+  const handleModalClose = () => {
+    setCreateModalOpen(false)
+    setDocumentForm({ title: '', content: '', isPublic: false })
+  }
 
   if (loading) {
     return (
@@ -202,11 +366,25 @@ export default function ThreadPage() {
     }
   }
 
-  const openDocument = (documentId: string) => {
-    navigate(`/workspace/${workspaceId}/threads/${threadId}/documents/${documentId}`)
+  const getDifficultyColor = (difficulty?: string) => {
+    switch (difficulty) {
+      case "Easy":
+        return "success"
+      case "Medium":
+        return "warning"
+      case "Hard":
+        return "error"
+      default:
+        return "default"
+    }
   }
 
-  // ...existing code...
+  const openDocument = (documentId: string) => {
+    // Navigate to the collaborative editor for editing documents
+    navigate(`/workspace/${workspaceId}/threads/${threadId}/editor/${documentId}`)
+  }
+
+
 
   const navigateToDocuments = () => {
     navigate(`/workspace/${workspaceId}/threads/${threadId}/documents`)
@@ -749,11 +927,36 @@ export default function ThreadPage() {
 }}>
   <CardHeader
     title={
-      <Box display="flex" alignItems="center" gap={1}>
-  <EditIcon color={threadData && threadData.currentlyEditing.length > 0 ? "primary" : "disabled"} />
-        <Typography variant="h6" fontWeight="bold" color="text.primary">
-          {threadData && threadData.currentlyEditing.length > 0 ? "Currently Being Edited" : "No Documents Being Edited"}
-        </Typography>
+      <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
+        <Box display="flex" alignItems="center" gap={1}>
+          <EditIcon color={threadData && threadData.currentlyEditing.length > 0 ? "primary" : "disabled"} />
+          <Typography variant="h6" fontWeight="bold" color="text.primary">
+            {threadData && threadData.currentlyEditing.length > 0 ? "Currently Being Edited" : "No Documents Being Edited"}
+          </Typography>
+        </Box>
+        
+        {/* Create Document Button - Only for admins/moderators */}
+        {isAdmin && !checkingPermissions && (
+          <Button
+            variant="contained"
+            size="small"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => setCreateModalOpen(true)}
+            sx={{
+              borderRadius: 20,
+              px: 3,
+              textTransform: "none",
+              fontWeight: "bold",
+              boxShadow: "0 2px 8px rgba(25,118,210,0.3)",
+              "&:hover": {
+                boxShadow: "0 4px 12px rgba(25,118,210,0.4)"
+              }
+            }}
+          >
+            Create Document
+          </Button>
+        )}
       </Box>
     }
     sx={{
@@ -763,7 +966,11 @@ export default function ThreadPage() {
     }}
   />
   <CardContent sx={{ p: 0 }}>
-    {threadData && threadData.currentlyEditing.length > 0 ? (
+    {editingDocsLoading ? (
+      <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress size={24} />
+      </Box>
+    ) : threadData && threadData.currentlyEditing.length > 0 ? (
       <Stack spacing={2} sx={{ p: 2 }}>
         {threadData.currentlyEditing.map((doc) => (
           <Card
@@ -785,23 +992,43 @@ export default function ThreadPage() {
           >
             <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
               <Box display="flex" alignItems="center" gap={2}>
-                {getFileIcon(doc.mime_type)}
+                <EditIcon color="primary" />
                 <Box flexGrow={1}>
                   <Typography variant="h6" fontWeight="bold">
                     {doc.title}
                   </Typography>
-                 
-                  <Typography variant="caption" color="text.secondary">
-                    {doc.size} • Originally by {doc.uploadedBy} • {doc.uploadedAt}
-                  </Typography>
+                  <Box display="flex" alignItems="center" gap={1} sx={{ mt: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Created by {doc.uploadedBy} • {doc.uploadedAt}
+                    </Typography>
+                    {(doc as EditingDocument).userPermission && (
+                      <Chip 
+                        label={(doc as EditingDocument).userPermission!.toUpperCase()} 
+                        size="small"
+                        color={
+                          (doc as EditingDocument).userPermission === 'admin' ? 'error' :
+                          (doc as EditingDocument).userPermission === 'write' ? 'primary' : 'default'
+                        }
+                        sx={{ height: 18, fontSize: '0.7rem' }}
+                      />
+                    )}
+                    {doc.isCurrentlyEditing && doc.editedBy && (
+                      <Chip 
+                        label={`Editing: ${getDisplayName(doc.editedBy)}`}
+                        size="small"
+                        color="warning"
+                        sx={{ height: 18, fontSize: '0.7rem' }}
+                      />
+                    )}
+                  </Box>
                 </Box>
                 <Button 
                   variant="contained" 
                   color="primary"
                   size="small" 
-                  startIcon={<Visibility />}
+                  startIcon={<EditIcon />}
                 >
-                  Join Edit
+                  Open Editor
                 </Button>
               </Box>
             </CardContent>
@@ -820,8 +1047,113 @@ export default function ThreadPage() {
     )}
   </CardContent>
 </Card>
-    </Box>
-    </Box>
     
+    {/* Create Document Modal */}
+    
+    <Dialog 
+      open={createModalOpen} 
+      onClose={handleModalClose}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle 
+        sx={{ 
+          fontWeight: "bold",
+          pb: 1
+        }}
+      >
+        Create New Document
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: "normal" }}>
+          Create a collaborative document for this thread
+        </Typography>
+      </DialogTitle>
+      
+      <DialogContent sx={{ pt: 2 }}>
+        <Stack spacing={3}>
+          <TextField
+            label="Document Title"
+            variant="outlined"
+            fullWidth
+            required
+            value={documentForm.title}
+            onChange={(e) => setDocumentForm(prev => ({ ...prev, title: e.target.value }))}
+            placeholder="e.g., Meeting Notes, Project Plan, Research Document"
+            helperText="Give your document a descriptive title"
+          />
+          
+          <TextField
+            label="Initial Content (Optional)"
+            variant="outlined"
+            fullWidth
+            multiline
+            rows={4}
+            value={documentForm.content}
+            onChange={(e) => setDocumentForm(prev => ({ ...prev, content: e.target.value }))}
+            placeholder="You can add some initial content here, or leave it blank and start editing later..."
+            helperText="You can always edit this content later in the collaborative editor"
+          />
+          
+          <FormControlLabel
+            control={
+              <Switch
+                checked={documentForm.isPublic}
+                onChange={(e) => setDocumentForm(prev => ({ ...prev, isPublic: e.target.checked }))}
+                color="primary"
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2" fontWeight="medium">
+                  Make document public
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Public documents can be viewed by anyone with the link
+                </Typography>
+              </Box>
+            }
+          />
+        </Stack>
+      </DialogContent>
+      
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button 
+          onClick={handleModalClose}
+          color="inherit"
+          sx={{ textTransform: 'none' }}
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleCreateDocument}
+          variant="contained"
+          disabled={!documentForm.title.trim() || createLoading}
+          startIcon={createLoading ? <CircularProgress size={16} /> : <AddIcon />}
+          sx={{ 
+            textTransform: 'none',
+            minWidth: 120
+          }}
+        >
+          {createLoading ? 'Creating...' : 'Create Document'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+
+    {/* Snackbar for notifications */}
+    <Snackbar
+      open={snackbar.open}
+      autoHideDuration={6000}
+      onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+    >
+      <Alert 
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
+        severity={snackbar.severity}
+        sx={{ width: '100%' }}
+      >
+        {snackbar.message}
+      </Alert>
+    </Snackbar>
+    </Box>
+    </Box>
   )
 }

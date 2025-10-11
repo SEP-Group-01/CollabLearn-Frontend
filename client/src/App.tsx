@@ -59,6 +59,7 @@ const App = () => {
           <Route path="/workspace/:workspaceId/threads/:threadId" element={<ThreadPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/documents" element={<ThreadDocumentsPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/documents/:docId" element={<DocumentDetailsPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/editor/:documentId" element={<CollaborativeEditor />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/query" element={<DocumentQuery />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/manage" element={<GroupManagePage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/links" element={<LinksPage />} />
