@@ -38,21 +38,69 @@ const WorkspacesSection: React.FC = () => {
 
   // Fetch top workspaces
   useEffect(() => {
-    const fetchWorkspaces = async () => {
+    const fetchWorkspaces = async (retryCount = 0) => {
       try {
         setLoading(true);
+        setError(null);
+        
+        // Add initial delay to prevent overwhelming the backend
+        if (retryCount === 0) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
         const data = await getTopWorkspaces(10);
         setWorkspaces(data);
-        setError(null);
       } catch (err: any) {
         console.error("Error fetching top workspaces:", err);
-        setError("Failed to load workspaces");
+        
+        // Enhanced retry logic for connection errors and service failures
+        const isConnectionError = 
+          err.isConnectionError || 
+          err.code === 'ERR_NETWORK' || 
+          err.code === 'ECONNRESET' ||
+          err.code === 'ECONNREFUSED' ||
+          err.code === 'ERR_BAD_RESPONSE' ||
+          err.response?.status === 500 ||
+          err.response?.status === 502 ||
+          err.response?.status === 503 ||
+          err.message?.includes('Connection closed') ||
+          err.message?.includes('Network Error') ||
+          err.message?.includes('timeout') ||
+          !err.response;
+        
+        if (isConnectionError && retryCount < 3) {
+          const delay = 1000 * Math.pow(2, retryCount); // Exponential backoff: 1s, 2s, 4s
+          const errorType = err.response?.status === 500 ? 'Backend service connection issue' : 'Network connection error';
+          console.log(`${errorType} detected. Retrying in ${delay}ms... (attempt ${retryCount + 1}/3)`);
+          setTimeout(() => fetchWorkspaces(retryCount + 1), delay);
+          return;
+        }
+        
+        // If not a connection error or max retries reached
+        if (retryCount >= 3) {
+          console.error("Max retry attempts reached. Backend services may be down.");
+          if (err.response?.status === 500) {
+            setError("Backend services are not fully running. Please start the Workspaces Service on port 3003.");
+          } else {
+            setError("Unable to connect to backend. Please check if services are running.");
+          }
+        } else {
+          setError("Failed to load workspaces");
+        }
       } finally {
-        setLoading(false);
+        // Only set loading to false if we're not retrying
+        if (retryCount === 0) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchWorkspaces();
+    // Add a small delay to prevent immediate calls on page refresh
+    const timer = setTimeout(() => {
+      fetchWorkspaces();
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, []);
 
   // Auto-sliding functionality

@@ -130,7 +130,7 @@ export const createForumMessage = async (
 
 export const createReply = async (
   workspaceId: string,
-  messageId: number, 
+  messageId: string, // Changed to string to match UUID
   content: string
 ): Promise<ReplyType> => {
   if (!workspaceId) {
@@ -141,10 +141,11 @@ export const createReply = async (
     const api = createAuthenticatedRequest();
     const authorId = getCurrentUserId(); // Get current user ID
     
-    const response = await api.post(`/workspaces/${workspaceId}/forum/messages`, {
-      content,
+    // Use the dedicated replies endpoint
+    const response = await api.post(`/forum/replies`, {
+      messageId: messageId, // Parent message ID
       authorId,
-      parent_id: messageId.toString(), // Use parent_id to match your database schema
+      content,
     });
     
     // Handle wrapped response format: {success: true, data: {...}}

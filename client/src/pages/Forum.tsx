@@ -98,8 +98,10 @@ export default function WorkspaceForumPage() {
     try {
       setRefreshing(true);
       const messagesData = await getForumMessages(workspaceId);
+      console.log('🔍 Refresh - Raw messages from API:', messagesData);
       // Organize messages and replies
       const organizedMessages = organizeMessagesWithReplies(messagesData);
+      console.log('🔍 Refresh - Organized messages:', organizedMessages);
       setMessages(organizedMessages);
       // Reduce refresh logging
       if (Math.random() < 0.3) { // 30% chance to log
@@ -280,6 +282,32 @@ export default function WorkspaceForumPage() {
   const organizeMessagesWithReplies = (messagesData: unknown[]): MessageType[] => {
     if (!Array.isArray(messagesData)) return [];
 
+    console.log('🔍 organizeMessagesWithReplies received:', messagesData.length, 'messages');
+    console.log('🔍 First message sample:', messagesData[0]);
+
+    // Check if messages already have nested replies (new backend format)
+    const firstMessage = messagesData[0] as Record<string, unknown>;
+    if (firstMessage && firstMessage.replies && Array.isArray(firstMessage.replies)) {
+      console.log('✅ Messages already have nested replies, returning as-is');
+      return messagesData.map(msg => {
+        const msgObj = msg as Record<string, unknown>;
+        return {
+          id: msgObj.id as number | string,
+          content: msgObj.content as string,
+          author: msgObj.author as Author,
+          timestamp: msgObj.timestamp as string,
+          isPinned: (msgObj.isPinned as boolean) || false,
+          likes: 0,
+          isLiked: false,
+          replies: msgObj.replies as ReplyType[] || [],
+          image: msgObj.image as string | undefined
+        };
+      });
+    }
+
+    console.log('⚠️ Using legacy organization logic for flat message structure');
+    // Legacy logic for organizing flat message structure
+
     // Separate parent messages and replies
     const parentMessages: MessageType[] = [];
     const replyMessages: unknown[] = [];
@@ -376,10 +404,21 @@ export default function WorkspaceForumPage() {
           getForumMessages(workspaceId)
         ]);
         
+        console.log('🔍 Raw messages from API:', messagesData);
+        
         setWorkspaceInfo(workspaceData);
         // Organize messages and replies
         const organizedMessages = organizeMessagesWithReplies(messagesData);
+        console.log('🔍 Organized messages:', organizedMessages);
         setMessages(organizedMessages);
+        
+        // Scroll to bottom after messages are loaded
+        setTimeout(() => {
+          const scrollContainer = messagesEndRef.current?.parentElement;
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        }, 200);
       } catch (err) {
         console.error('Error loading forum data:', err);
         
@@ -400,7 +439,21 @@ export default function WorkspaceForumPage() {
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Use a small delay to ensure DOM has updated
+    const scrollToBottom = () => {
+      const scrollContainer = messagesEndRef.current?.parentElement;
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    };
+    
+    // Immediate scroll
+    scrollToBottom();
+    
+    // Delayed scroll to ensure everything is rendered
+    const timeoutId = setTimeout(scrollToBottom, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [messages]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -466,7 +519,8 @@ export default function WorkspaceForumPage() {
 
     try {
       console.log('Sending reply to message:', messageId, 'Content:', replyContent);
-      const newReply = await createReply(workspaceId, Number(messageId), replyContent);
+      // Pass messageId as string (UUID) instead of converting to Number
+      const newReply = await createReply(workspaceId, String(messageId), replyContent);
       console.log('Reply sent successfully:', newReply);
       
       // Clear reply input immediately
@@ -704,7 +758,9 @@ export default function WorkspaceForumPage() {
             flexGrow: 1, 
             overflowY: "auto", 
             bgcolor: "#f8fafc",
-            position: "relative"
+            position: "relative",
+            height: 0, // This forces the flex item to not exceed parent height
+            scrollBehavior: 'smooth'
           }}
         >
           {error ? (
@@ -1222,7 +1278,15 @@ export default function WorkspaceForumPage() {
               </Stack>
             </Box>
           )}
-          <div ref={messagesEndRef} />
+          {/* Scroll anchor - positioned at the very bottom */}
+          <div 
+            ref={messagesEndRef} 
+            style={{ 
+              height: '1px', 
+              visibility: 'hidden',
+              clear: 'both'
+            }} 
+          />
         </Box>
 
         {/* Modern Message Input */}

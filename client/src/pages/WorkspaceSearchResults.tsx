@@ -19,7 +19,7 @@ import {
   Lock as LockIcon,
   Group as GroupIcon 
 } from '@mui/icons-material';
-import { getWoorkspacesBySearchTerm, joinWorkspace, sendJoinRequest } from "../api/workspacesApi";
+import { getWorkspacesBySearchTerm, joinWorkspace, sendJoinRequest } from "../api/workspacesApi";
 import SearchBar from "../components/SearchBar";
 
 interface WorkspaceSearchResult {
@@ -59,7 +59,7 @@ const WorkspaceSearchResults: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const results = await getWoorkspacesBySearchTerm(search.trim());
+        const results = await getWorkspacesBySearchTerm(search.trim());
         setWorkspaces(results);
       } catch (err) {
         console.error("Error fetching workspaces:", err);

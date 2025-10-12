@@ -352,11 +352,6 @@ export default function ThreadPage() {
     }
   }
 
-  const openDocument = (documentId: string) => {
-    // Navigate to the collaborative editor for editing documents
-    navigate(`/workspace/${workspaceId}/threads/${threadId}/editor/${documentId}`)
-  }
-
   const openDocument = (documentId: number | string) => {
     // Check if documentId is valid before navigation
     if (!documentId || documentId === null || documentId === undefined) {
@@ -365,6 +360,8 @@ export default function ThreadPage() {
     }
     
     navigate(`/workspace/${workspaceId}/threads/${threadId}/documents/${documentId}`)
+  }
+
   // Helper functions to format data
   const formatFileSize = (bytes?: number): string => {
     if (!bytes) return "Unknown size"
