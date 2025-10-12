@@ -145,9 +145,39 @@ export class WebSocketCollaborationClient {
           this.handleMessage(message);
         });
 
+        // Listen for direct events (not wrapped in collaboration-event)
+        this.socket.on('user-update', (data) => {
+          console.log('👥 Direct user update received:', data);
+          if (this.onUsersUpdate && data.users) {
+            this.onUsersUpdate(data.users);
+          }
+        });
+
+        this.socket.on('cursor-update', (data) => {
+          console.log('👆 Direct cursor update received:', data);
+          if (this.onCursorUpdate && data.userId !== this.user.id) {
+            this.onCursorUpdate(data.userId, data.data);
+          }
+        });
+
         // Listen for specific events
         this.socket.on('document:joined', (data) => {
           console.log('✅ Joined document successfully:', data);
+          // Send initial awareness update when joining
+          this.sendAwarenessUpdate(true);
+        });
+
+        // Listen for collaborator events
+        this.socket.on('collaborator:joined', (data) => {
+          console.log('👋 Collaborator joined:', data);
+          // Request updated user list
+          this.requestUserUpdate();
+        });
+
+        this.socket.on('collaborator:left', (data) => {
+          console.log('� Collaborator left:', data);
+          // Request updated user list
+          this.requestUserUpdate();
         });
 
         this.socket.on('error', (error) => {
@@ -229,6 +259,20 @@ export class WebSocketCollaborationClient {
   }
 
   /**
+   * Request updated user list from server
+   */
+  requestUserUpdate(): void {
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('collaboration-event', {
+        type: 'user-list-request',
+        documentId: this.documentId,
+        userId: this.user.id,
+        timestamp: Date.now()
+      });
+    }
+  }
+
+  /**
    * Get current connection status
    */
   getConnectionStatus(): 'connecting' | 'connected' | 'disconnected' {
@@ -247,38 +291,61 @@ export class WebSocketCollaborationClient {
   /**
    * Handle incoming messages
    */
-  private handleMessage(message: CollaborationMessage): void {
-    // Don't process messages from self
-    if (message.userId === this.user.id) {
+  private handleMessage(message: CollaborationMessage | any): void {
+    // Handle both collaboration-event format and direct event format
+    const eventType = message.type || message.event;
+    const eventData = message.data || message;
+    const userId = message.userId;
+
+    // Don't process messages from self (except for user-update which includes all users)
+    if (userId === this.user.id && eventType !== 'user-update') {
       return;
     }
 
-    switch (message.type) {
+    console.log('📨 Handling message:', eventType, eventData);
+
+    switch (eventType) {
       case 'content-update':
-        if (message.data?.content && this.onContentUpdate) {
-          this.onContentUpdate(message.data.content, message.userId);
+        if (eventData?.content && this.onContentUpdate) {
+          this.onContentUpdate(eventData.content, userId);
         }
         break;
 
       case 'cursor-update':
-        if (message.data?.cursor && this.onCursorUpdate) {
-          this.onCursorUpdate(message.userId, message.data.cursor);
+        if (eventData?.cursor && this.onCursorUpdate) {
+          this.onCursorUpdate(userId, eventData.cursor);
         }
         break;
 
       case 'user-update':
-        if (message.data?.users && this.onUsersUpdate) {
-          this.onUsersUpdate(message.data.users);
+        if (eventData?.users && this.onUsersUpdate) {
+          console.log('👥 Processing user update:', eventData.users);
+          this.onUsersUpdate(eventData.users);
         }
         break;
 
       case 'awareness-update':
-        // Handle user presence updates
-        console.log('User awareness update:', message.data);
+        // Handle user presence updates - but filter out self
+        if (userId !== this.user.id) {
+          console.log('👁️ User awareness update from other user:', eventData);
+          // This could be used to update user presence status if needed
+        } else {
+          console.log('👁️ Ignoring awareness update from self');
+        }
+        break;
+
+      case 'collaborator:joined':
+        console.log('👋 Collaborator joined via message:', eventData);
+        // This will be handled by the direct event listener
+        break;
+
+      case 'collaborator:left':
+        console.log('👋 Collaborator left via message:', eventData);
+        // This will be handled by the direct event listener
         break;
 
       default:
-        console.log('Unknown message type:', message.type);
+        console.log('❓ Unknown message type:', eventType);
     }
   }
 
