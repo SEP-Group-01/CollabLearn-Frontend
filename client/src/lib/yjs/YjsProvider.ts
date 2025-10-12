@@ -1,11 +1,13 @@
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { getAccessToken } from '../../api/authApi';
+import type { ImageMetadata } from '../imageUtils';
 
 export interface YjsConnection {
   doc: Y.Doc;
   provider: WebsocketProvider;
   text: Y.Text;
+  images: Y.Map<ImageMetadata>; // Store image metadata
   awareness: any;
   disconnect: () => void;
 }
@@ -20,6 +22,13 @@ export interface CollaborationUser {
     anchor: number;
     head: number;
   };
+}
+
+// Image-related event handlers
+export interface ImageEventHandlers {
+  onImageAdded?: (imageMetadata: ImageMetadata) => void;
+  onImageRemoved?: (imageId: string) => void;
+  onImageUpdated?: (imageMetadata: ImageMetadata) => void;
 }
 
 export class YjsCollaborationProvider {
@@ -38,7 +47,8 @@ export class YjsCollaborationProvider {
     user: CollaborationUser,
     onDocumentUpdate?: (content: string) => void,
     onUsersUpdate?: (users: CollaborationUser[]) => void,
-    onConnectionStatusChange?: (status: 'connecting' | 'connected' | 'disconnected') => void
+    onConnectionStatusChange?: (status: 'connecting' | 'connected' | 'disconnected') => void,
+    imageHandlers?: ImageEventHandlers
   ): YjsConnection {
     // Check if already connected to this document
     if (this.connections.has(documentId)) {
@@ -48,6 +58,7 @@ export class YjsCollaborationProvider {
     // Create new Yjs document
     const doc = new Y.Doc();
     const text = doc.getText('content');
+    const images = doc.getMap<ImageMetadata>('images'); // Store image metadata
 
     // Get auth token for WebSocket connection
     const token = getAccessToken();
@@ -130,6 +141,27 @@ export class YjsCollaborationProvider {
       }
     });
 
+    // Handle image metadata updates
+    images.observe((event) => {
+      if (imageHandlers) {
+        event.changes.keys.forEach((change, key) => {
+          if (change.action === 'add' && imageHandlers.onImageAdded) {
+            const imageMetadata = images.get(key);
+            if (imageMetadata) {
+              imageHandlers.onImageAdded(imageMetadata);
+            }
+          } else if (change.action === 'delete' && imageHandlers.onImageRemoved) {
+            imageHandlers.onImageRemoved(key);
+          } else if (change.action === 'update' && imageHandlers.onImageUpdated) {
+            const imageMetadata = images.get(key);
+            if (imageMetadata) {
+              imageHandlers.onImageUpdated(imageMetadata);
+            }
+          }
+        });
+      }
+    });
+
     // Handle provider connection errors
     provider.on('connection-error', (error: any) => {
       console.error('YJS WebSocket connection error:', error);
@@ -141,6 +173,7 @@ export class YjsCollaborationProvider {
       doc,
       provider,
       text,
+      images,
       awareness,
       disconnect: () => {
         provider.disconnect();
@@ -226,6 +259,109 @@ export class YjsCollaborationProvider {
     if (connection.provider.wsconnecting) return 'connecting';
     if (connection.provider.wsconnected) return 'connected';
     return 'disconnected';
+  }
+
+  /**
+   * Add image metadata to the document
+   */
+  addImage(documentId: string, imageMetadata: ImageMetadata): void {
+    const connection = this.connections.get(documentId);
+    if (connection) {
+      connection.images.set(imageMetadata.id, imageMetadata);
+    }
+  }
+
+  /**
+   * Remove image metadata from the document
+   */
+  removeImage(documentId: string, imageId: string): void {
+    const connection = this.connections.get(documentId);
+    if (connection) {
+      connection.images.delete(imageId);
+    }
+  }
+
+  /**
+   * Update image metadata in the document
+   */
+  updateImage(documentId: string, imageMetadata: ImageMetadata): void {
+    const connection = this.connections.get(documentId);
+    if (connection) {
+      connection.images.set(imageMetadata.id, imageMetadata);
+    }
+  }
+
+  /**
+   * Get all images in the document
+   */
+  getImages(documentId: string): ImageMetadata[] {
+    const connection = this.connections.get(documentId);
+    if (!connection) return [];
+    
+    const images: ImageMetadata[] = [];
+    connection.images.forEach((imageMetadata) => {
+      images.push(imageMetadata);
+    });
+    
+    return images;
+  }
+
+  /**
+   * Get a specific image by ID
+   */
+  getImage(documentId: string, imageId: string): ImageMetadata | null {
+    const connection = this.connections.get(documentId);
+    if (!connection) return null;
+    
+    return connection.images.get(imageId) || null;
+  }
+
+  /**
+   * Insert image at specific position in text content
+   */
+  insertImageAtPosition(
+    documentId: string, 
+    imageMetadata: ImageMetadata, 
+    position: number,
+    imageHtml?: string
+  ): void {
+    const connection = this.connections.get(documentId);
+    if (!connection) return;
+    
+    // Add image metadata to shared state
+    connection.images.set(imageMetadata.id, imageMetadata);
+    
+    // Insert image HTML into text content if provided
+    if (imageHtml) {
+      connection.text.insert(position, imageHtml);
+    }
+  }
+
+  /**
+   * Replace image content in the document
+   */
+  replaceImageInContent(
+    documentId: string,
+    oldImageId: string,
+    newImageMetadata: ImageMetadata,
+    newImageHtml: string
+  ): void {
+    const connection = this.connections.get(documentId);
+    if (!connection) return;
+    
+    // Update image metadata
+    connection.images.delete(oldImageId);
+    connection.images.set(newImageMetadata.id, newImageMetadata);
+    
+    // Find and replace in text content
+    const content = connection.text.toString();
+    const oldImagePattern = new RegExp(`<img[^>]*data-yjs-image-id="${oldImageId}"[^>]*>`, 'g');
+    const newContent = content.replace(oldImagePattern, newImageHtml);
+    
+    if (newContent !== content) {
+      connection.text.delete(0, connection.text.length);
+      connection.text.insert(0, newContent);
+    }
   }
 }
 

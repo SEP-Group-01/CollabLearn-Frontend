@@ -282,7 +282,7 @@ function SignUpPageContent() {
                       }}
                     >
                       <Typography sx={{ color: '#166534', fontWeight: 600, fontSize: 14 }}>
-                        ✓ Account created successfully! Welcome aboard!
+                        ✓ Account created successfully! We have sent a verification email to your inbox.
                       </Typography>
                     </Box>
                   </motion.div>

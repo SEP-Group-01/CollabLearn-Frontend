@@ -53,8 +53,10 @@ export const useWebSocketCollaboration = ({
 
   // Handle users updates
   const handleUsersUpdate = useCallback((users: CollaborationUser[]) => {
-    setCollaborators(users);
-  }, []);
+    // Filter out the current user from collaborators list
+    const otherUsers = users.filter(u => u.id !== user.id);
+    setCollaborators(otherUsers);
+  }, [user.id]);
 
   // Handle cursor updates
   const handleCursorUpdate = useCallback((userId: string, cursor: { anchor: number; head: number }) => {
@@ -83,6 +85,14 @@ export const useWebSocketCollaboration = ({
       });
 
       await clientRef.current.connect();
+      
+      // Request initial user list after successful connection
+      setTimeout(() => {
+        if (clientRef.current) {
+          clientRef.current.requestUserUpdate();
+        }
+      }, 500); // Small delay to ensure connection is fully established
+      
     } catch (error) {
       console.error('Failed to connect to collaboration server:', error);
       setConnectionStatus('disconnected');

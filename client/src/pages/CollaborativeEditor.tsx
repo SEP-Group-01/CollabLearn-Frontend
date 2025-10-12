@@ -26,7 +26,16 @@ import {
   ThemeProvider,
   createTheme,
   CssBaseline,
-  CircularProgress
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  LinearProgress,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  Slider
 } from '@mui/material';
 import {
   FormatBold,
@@ -63,13 +72,30 @@ import {
   Code,
   Subscript,
   Superscript,
-  ArrowBack
+  ArrowBack,
+  Upload,
+  Delete,
+  AspectRatio,
+  OpenWith,
+  RotateRight,
+  Crop,
+  TableRows
 } from '@mui/icons-material';
 
 import { useWebSocketCollaboration } from '../lib/websocket/useWebSocketCollaboration';
 import type { CollaborationUser } from '../lib/websocket/WebSocketCollaborationClient';
-import { currentUser, sharedDocuments, fontOptions, fontSizeOptions, textColors, highlightColors } from '../mocks/EditorMocks';
+import { currentUser as mockUser, sharedDocuments, fontOptions, fontSizeOptions, textColors, highlightColors } from '../mocks/EditorMocks';
+import { getUserData } from '../api/authApi';
 import { getDocument, type DocumentResponse } from '../api/editorApi';
+import { uploadImageWithProgress } from '../api/imageApi';
+import type { ImageMetadata } from '../lib/imageUtils';
+import { 
+  createImageElement, 
+  validateImageFile, 
+  generateImageId, 
+  fileToBase64, 
+  extractImagesFromClipboard 
+} from '../lib/imageUtils';
 
 const CollaborativeEditor = () => {
   // URL Parameters
@@ -102,11 +128,45 @@ const CollaborativeEditor = () => {
   const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
   const [highlightMenuAnchor, setHighlightMenuAnchor] = useState<null | HTMLElement>(null);
 
+  // Context menus and dialogs
+  const [imageContextMenu, setImageContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    imageElement: HTMLImageElement;
+    imageMetadata: ImageMetadata | null;
+  } | null>(null);
+  const [tableContextMenu, setTableContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    cellElement: HTMLTableCellElement;
+  } | null>(null);
+  const [imageEditDialog, setImageEditDialog] = useState(false);
+  const [linkDialog, setLinkDialog] = useState(false);
+  const [selectedImageForEdit, setSelectedImageForEdit] = useState<{
+    element: HTMLImageElement;
+    metadata: ImageMetadata | null;
+  } | null>(null);
+  const [selectedLinkData, setSelectedLinkData] = useState<{
+    element: HTMLAnchorElement | null;
+    text: string;
+    url: string;
+    isEdit: boolean;
+  } | null>(null);
+
+  // Image upload states
+  const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
+  const [uploadProgress, setUploadProgress] = useState<Map<string, number>>(new Map());
+  const [dragOver, setDragOver] = useState(false);
+
+  // Get real user data from authentication system
+  const authUserData = getUserData();
+  const currentUser = authUserData || mockUser; // Fallback to mock if not authenticated
+
   // Convert currentUser to CollaborationUser type
   const collaborationUser: CollaborationUser = {
-    id: currentUser.id,
-    name: currentUser.name,
-    avatar: currentUser.avatar,
+    id: currentUser.id?.toString() || 'anonymous-' + Date.now(),
+    name: authUserData ? `${authUserData.first_name} ${authUserData.last_name}`.trim() || authUserData.email : mockUser.name,
+    avatar: authUserData ? `${authUserData.first_name?.charAt(0) || ''}${authUserData.last_name?.charAt(0) || ''}`.toUpperCase() || 'A' : mockUser.avatar,
     color: '#4caf50', // Default color
     isActive: true
   };
@@ -118,10 +178,8 @@ const CollaborativeEditor = () => {
     connectionStatus,
     isConnected,
     connect,
-    disconnect,
     sendContentUpdate,
-    sendCursorUpdate,
-    sendAwarenessUpdate
+    sendCursorUpdate
   } = useWebSocketCollaboration({
     documentId: documentId || 'doc-fallback', // Use documentId from URL
     user: collaborationUser,
@@ -133,7 +191,6 @@ const CollaborativeEditor = () => {
   // Refs
   const editorRef = useRef<HTMLDivElement>(null);
   const savedSelectionRef = useRef<Range | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const lastContentRef = useRef('');
 
   // Create Material-UI theme
@@ -151,6 +208,417 @@ const CollaborativeEditor = () => {
 
   // Derived state for save status
   const saveStatus = isConnected ? 'saved' : connectionStatus === 'connecting' ? 'saving' : 'local';
+
+  // Helper function to extract image metadata from element
+  const extractImageMetadataFromElement = (imgElement: HTMLImageElement): ImageMetadata | null => {
+    try {
+      const src = imgElement.src;
+      const alt = imgElement.alt;
+      const width = imgElement.naturalWidth;
+      const height = imgElement.naturalHeight;
+      
+      return {
+        id: Date.now().toString(), // Fallback ID
+        url: src,
+        firebasePath: '', // Unknown
+        originalName: alt || 'image.png',
+        mimeType: 'image/png', // Default
+        size: 0, // Unknown
+        width,
+        height,
+        documentId: documentId || '',
+        workspaceId: workspaceId || '',
+        threadId: threadId || '',
+        uploadedAt: new Date(),
+        uploadedBy: collaborationUser.id,
+        position: { x: 0, y: 0, index: 0 }
+      };
+    } catch (error) {
+      console.error('Error extracting image metadata:', error);
+      return null;
+    }
+  };
+
+  // Image context menu handler
+  const handleImageContextMenu = (e: MouseEvent, img: HTMLImageElement, metadata: ImageMetadata) => {
+    e.preventDefault();
+    console.log('🖼️ Image right-clicked:', { img, metadata });
+    setImageContextMenu({
+      mouseX: e.clientX - 2,
+      mouseY: e.clientY - 4,
+      imageElement: img,
+      imageMetadata: metadata
+    });
+  };
+
+  // Render collaborator cursors
+  const renderCollaboratorCursors = useCallback(() => {
+    if (!editorRef.current) return;
+    
+    // Remove existing cursors
+    const existingCursors = editorRef.current.querySelectorAll('.collaborator-cursor, .collaborator-selection');
+    existingCursors.forEach(cursor => cursor.remove());
+    
+    // Render cursors for each collaborator
+    collaborators.forEach((collaborator, index) => {
+      if (collaborator.cursor && collaborator.id !== collaborationUser.id) {
+        console.log('🎯 Rendering cursor for:', collaborator.name, 'at anchor:', collaborator.cursor.anchor);
+        try {
+          const cursorPosition = createCursorAtOffset(editorRef.current!, collaborator.cursor.anchor);
+          
+          if (cursorPosition) {
+            console.log('✅ Cursor position calculated:', cursorPosition, 'for user:', collaborator.name);
+            
+            // Create cursor element
+            const cursorElement = document.createElement('div');
+            cursorElement.className = 'collaborator-cursor';
+            cursorElement.style.position = 'absolute';
+            cursorElement.style.left = `${cursorPosition.x}px`;
+            cursorElement.style.top = `${cursorPosition.y}px`;
+            cursorElement.style.width = '3px'; // Made slightly wider for visibility
+            cursorElement.style.height = '22px'; // Made slightly taller
+            cursorElement.style.backgroundColor = getCollaboratorRingColor(collaborator.id);
+            cursorElement.style.pointerEvents = 'none';
+            cursorElement.style.zIndex = '1000';
+            cursorElement.style.animation = 'blink 1s infinite';
+            cursorElement.style.borderRadius = '1px';
+            cursorElement.style.boxShadow = '0 0 3px rgba(0,0,0,0.3)'; // Add shadow for visibility
+            
+            // Add debugging info as data attribute
+            cursorElement.setAttribute('data-user', collaborator.name);
+            cursorElement.setAttribute('data-anchor', collaborator.cursor.anchor.toString());
+            cursorElement.setAttribute('data-position', `${cursorPosition.x},${cursorPosition.y}`);
+            
+            // Add blinking animation
+            const style = document.createElement('style');
+            style.textContent = `
+              @keyframes blink {
+                0%, 50% { opacity: 1; }
+                51%, 100% { opacity: 0.3; }
+              }
+            `;
+            if (!document.head.querySelector('[data-cursor-animation]')) {
+              style.setAttribute('data-cursor-animation', '');
+              document.head.appendChild(style);
+            }
+            
+            // Create cursor label
+            const labelElement = document.createElement('div');
+            labelElement.className = 'collaborator-cursor-label';
+            labelElement.textContent = collaborator.name; // Remove coordinate debugging
+            labelElement.style.position = 'absolute';
+            labelElement.style.top = '-28px';
+            labelElement.style.left = '0';
+            labelElement.style.backgroundColor = getCollaboratorRingColor(collaborator.id);
+            labelElement.style.color = 'white';
+            labelElement.style.padding = '2px 6px';
+            labelElement.style.borderRadius = '3px';
+            labelElement.style.fontSize = '11px';
+            labelElement.style.fontWeight = '500';
+            labelElement.style.whiteSpace = 'nowrap';
+            labelElement.style.pointerEvents = 'none';
+            labelElement.style.opacity = '0.9';
+            labelElement.style.boxShadow = '0 1px 3px rgba(0,0,0,0.2)';
+            cursorElement.appendChild(labelElement);
+            
+            editorRef.current!.appendChild(cursorElement);
+            
+            console.log('✅ Cursor rendered with enhanced debugging for user:', collaborator.name);
+          } else {
+            console.warn('❌ Could not calculate cursor position for user:', collaborator.name);
+          }
+        } catch (error) {
+          console.warn('Error rendering collaborator cursor:', error);
+        }
+      }
+    });
+  }, [collaborators, collaborationUser.id]);
+
+  // Helper function to create cursor at specific text offset
+  const createCursorAtOffset = (editor: Element, offset: number): { x: number; y: number } | null => {
+    try {
+      // Get all text content as a single string to validate offset
+      const allTextContent = editor.textContent || '';
+      console.log('📏 Total text length:', allTextContent.length, 'Target offset:', offset, 'Zoom level:', zoomLevel);
+      
+      if (offset > allTextContent.length) {
+        console.warn('⚠️ Offset', offset, 'exceeds total text length', allTextContent.length);
+        // Clamp to end of content
+        offset = allTextContent.length;
+      }
+      
+      // Special case: if offset is 0, position at the very beginning
+      if (offset === 0) {
+        const firstChild = editor.firstChild;
+        if (firstChild) {
+          const range = document.createRange();
+          if (firstChild.nodeType === Node.TEXT_NODE) {
+            range.setStart(firstChild, 0);
+          } else {
+            range.setStartBefore(firstChild);
+          }
+          range.collapse(true);
+          
+          const rect = range.getBoundingClientRect();
+          const editorRect = editor.getBoundingClientRect();
+          
+          // Get the Paper element (editor's parent) which has the transform
+          const paperElement = editor.parentElement;
+          const paperRect = paperElement ? paperElement.getBoundingClientRect() : editorRect;
+          
+          console.log('📐 Rects:', { 
+            range: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+            editor: { left: editorRect.left, top: editorRect.top, width: editorRect.width, height: editorRect.height },
+            paper: { left: paperRect.left, top: paperRect.top, width: paperRect.width, height: paperRect.height }
+          });
+          
+          // Position relative to the editor element (the contentEditable Box)
+          let x = rect.left - editorRect.left;
+          let y = rect.top - editorRect.top;
+          
+          // Apply offset compensation for cursor positioning issue
+          // Based on user feedback: cursors appear 5 letters left and 1.5 lines above
+          
+          // Get computed styles to calculate more accurate character width and line height
+          const editorStyles = window.getComputedStyle(editor as HTMLElement);
+          const fontSize = parseFloat(editorStyles.fontSize) || 14;
+          const lineHeight = parseFloat(editorStyles.lineHeight) || fontSize * 1.5;
+          
+          // Estimate character width based on font size
+          const charWidth = fontSize * 0.6; // More accurate character width estimation
+          
+          // Compensate for the offset: move 5 characters right and 1.5 lines down
+          const xOffset = 5 * charWidth;
+          const yOffset = 1.5 * lineHeight;
+          x += xOffset; // Move right by 5 character widths
+          y += yOffset; // Move down by 1.5 line heights
+          
+          console.log('📐 Cursor at start (with offset compensation):', { 
+            fontSize, 
+            lineHeight, 
+            charWidth, 
+            xOffset, 
+            yOffset,
+            finalPos: { x, y }
+          });
+          return { x, y };
+        }
+      }
+      
+      // Create a tree walker to traverse all text nodes
+      const walker = document.createTreeWalker(
+        editor,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode: (node) => {
+            // Accept all text nodes, including empty ones for accurate positioning
+            return NodeFilter.FILTER_ACCEPT;
+          }
+        }
+      );
+      
+      let currentOffset = 0;
+      let targetNode: Text | null = null;
+      let targetOffsetInNode = 0;
+      
+      // Find the exact text node and offset
+      let node;
+      while (node = walker.nextNode()) {
+        const textNode = node as Text;
+        const nodeLength = textNode.textContent?.length || 0;
+        
+        console.log('📍 Text node:', JSON.stringify(textNode.textContent?.slice(0, 20)), 'Length:', nodeLength, 'Current offset:', currentOffset);
+        
+        if (currentOffset + nodeLength >= offset) {
+          targetNode = textNode;
+          targetOffsetInNode = offset - currentOffset;
+          console.log('🎯 Found target node at offset:', targetOffsetInNode, 'in node:', JSON.stringify(textNode.textContent?.slice(0, 20)));
+          break;
+        }
+        currentOffset += nodeLength;
+      }
+      
+      if (!targetNode) {
+        console.warn('❌ Could not find target text node for offset:', offset);
+        // Fallback: position at end of last text node
+        const lastWalker = document.createTreeWalker(
+          editor,
+          NodeFilter.SHOW_TEXT,
+          null
+        );
+        let lastNode: Text | null = null;
+        while (lastWalker.nextNode()) {
+          lastNode = lastWalker.currentNode as Text;
+        }
+        if (lastNode) {
+          targetNode = lastNode;
+          targetOffsetInNode = lastNode.textContent?.length || 0;
+        } else {
+          return null;
+        }
+      }
+      
+      // Create a range at the target position
+      const range = document.createRange();
+      range.setStart(targetNode, Math.min(targetOffsetInNode, targetNode.textContent?.length || 0));
+      range.collapse(true);
+      
+      // Get the bounding rectangle of the range
+      const rect = range.getBoundingClientRect();
+      const editorRect = editor.getBoundingClientRect();
+      
+      // Account for Material-UI Box padding structure:
+      // 1. Outer Box has p: 3 (24px padding)
+      // 2. Paper has p: 4 (32px padding) 
+      // 3. Paper may have zoom transform
+      
+      // Calculate base position relative to editor
+      let x = rect.left - editorRect.left;
+      let y = rect.top - editorRect.top;
+      
+      // Apply offset compensation for cursor positioning issue
+      // Based on user feedback: cursors appear 5 letters left and 1.5 lines above
+      // We need to compensate by moving right and down
+      
+      // Get computed styles to calculate more accurate character width and line height
+      const editorStyles = window.getComputedStyle(editor as HTMLElement);
+      const fontSize = parseFloat(editorStyles.fontSize) || 14;
+      const lineHeight = parseFloat(editorStyles.lineHeight) || fontSize * 1.5;
+      
+      // Estimate character width based on font size (typically 0.5-0.6 times font size for monospace-like)
+      const charWidth = fontSize * 0.6; // More accurate character width estimation
+      
+      // Compensate for the offset: move 4 characters right and 1 line down
+      const xOffset = 4 * charWidth;
+      const yOffset = 1.4 * lineHeight;
+      x += xOffset; // Move right by 5 character widths
+      y += yOffset; // Move down by 1.5 line heights
+      
+      console.log('📐 Offset compensation applied:', { 
+        fontSize, 
+        lineHeight, 
+        charWidth, 
+        xOffset, 
+        yOffset,
+        originalPos: { x: x - xOffset, y: y - yOffset },
+        adjustedPos: { x, y }
+      });
+      
+      // Get the Paper element (editor's parent) to check for transforms
+      const paperElement = editor.parentElement;
+      if (paperElement) {
+        const paperStyles = window.getComputedStyle(paperElement);
+        const transform = paperStyles.transform;
+        
+        // If there's a scale transform, we need to account for it
+        if (transform && transform !== 'none') {
+          const scaleMatch = transform.match(/scale\(([^)]+)\)/);
+          if (scaleMatch) {
+            const scale = parseFloat(scaleMatch[1]);
+            console.log('📐 Detected zoom scale:', scale);
+            // Apply zoom compensation to the offset adjustments
+            x = (x * scale);
+            y = (y * scale);
+          }
+        }
+      }
+      
+      console.log('📐 Final cursor position (with offset compensation):', { x, y }, 'for zoom level:', zoomLevel + '%');
+      
+      return { x, y };
+    } catch (error) {
+      console.error('❌ Error calculating cursor position:', error);
+      return null;
+    }
+  };
+
+  // Helper function to get all text nodes
+  const getTextNodes = (element: Element): Text[] => {
+    const textNodes: Text[] = [];
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+    
+    let node;
+    while (node = walker.nextNode()) {
+      textNodes.push(node as Text);
+    }
+    
+    return textNodes;
+  };
+
+  // Initialize context menu handlers for all elements in the editor
+  const initializeContextMenuHandlers = useCallback(() => {
+    if (!editorRef.current) return;
+    
+    console.log('🔧 Initializing context menu handlers...');
+    
+    // Remove existing listeners first to prevent duplicates
+    const images = editorRef.current.querySelectorAll('img');
+    const tables = editorRef.current.querySelectorAll('table');
+    
+    // Add context menu listeners to all images
+    images.forEach((img) => {
+      // Remove existing listener if any
+      const element = img as any;
+      if (element.__contextMenuHandler) {
+        img.removeEventListener('contextmenu', element.__contextMenuHandler);
+      }
+      
+      // Create new handler
+      const contextMenuHandler = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🖼️ Image context menu triggered via handler');
+        const mouseEvent = e as MouseEvent;
+        const imgElement = e.target as HTMLImageElement;
+        const metadata = extractImageMetadataFromElement(imgElement);
+        if (metadata) {
+          handleImageContextMenu(mouseEvent, imgElement, metadata);
+        }
+      };
+      
+      // Store handler reference for removal later
+      element.__contextMenuHandler = contextMenuHandler;
+      img.addEventListener('contextmenu', contextMenuHandler);
+    });
+    
+    // Add context menu listeners to all tables
+    tables.forEach((table) => {
+      // Remove existing listener if any
+      const element = table as any;
+      if (element.__contextMenuHandler) {
+        table.removeEventListener('contextmenu', element.__contextMenuHandler);
+      }
+      
+      // Create new handler
+      const contextMenuHandler = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('📊 Table context menu triggered via handler');
+        const mouseEvent = e as MouseEvent;
+        const target = e.target as HTMLElement;
+        const cell = target.closest('td, th') as HTMLTableCellElement;
+        
+        if (cell) {
+          console.log('📊 Table context menu opened for cell:', cell);
+          setTableContextMenu({
+            mouseX: mouseEvent.clientX - 2,
+            mouseY: mouseEvent.clientY - 4,
+            cellElement: cell
+          });
+        }
+      };
+      
+      // Store handler reference for removal later
+      element.__contextMenuHandler = contextMenuHandler;
+      table.addEventListener('contextmenu', contextMenuHandler);
+    });
+    
+    console.log(`🔧 Initialized context menus for ${images.length} images and ${tables.length} tables`);
+  }, []);
 
   // Load document from API when component mounts
   useEffect(() => {
@@ -211,6 +679,10 @@ const CollaborativeEditor = () => {
         // Set the actual document content
         editorRef.current.innerHTML = editorContent;
         lastContentRef.current = editorContent;
+        // Initialize context menus for loaded content
+        setTimeout(() => {
+          initializeContextMenuHandlers();
+        }, 100);
       } else if (documentLoading) {
         // Show loading placeholder
         editorRef.current.innerHTML = `
@@ -225,7 +697,29 @@ const CollaborativeEditor = () => {
         `;
       }
     }
-  }, [editorContent, documentLoading, documentError]);
+  }, [editorContent, documentLoading, documentError, initializeContextMenuHandlers]);
+
+  // Render collaborator cursors when collaborators change
+  useEffect(() => {
+    if (collaborators.length > 0) {
+      console.log('👥 Rendering cursors for collaborators:', collaborators.map(c => ({ id: c.id, name: c.name, cursor: c.cursor })));
+      renderCollaboratorCursors();
+    }
+  }, [collaborators, renderCollaboratorCursors]);
+
+  // Re-render cursors when editor scrolls
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const handleScroll = () => {
+      console.log('📜 Editor scrolled, re-rendering cursors');
+      renderCollaboratorCursors();
+    };
+
+    editor.addEventListener('scroll', handleScroll);
+    return () => editor.removeEventListener('scroll', handleScroll);
+  }, [renderCollaboratorCursors]);
 
   // Update word count
   useEffect(() => {
@@ -242,12 +736,17 @@ const CollaborativeEditor = () => {
 
     const newContent = editorRef.current.innerHTML;
     
-    // Only send update if content actually changed
-    if (newContent !== lastContentRef.current) {
+    // Only send update if content actually changed and is different from collaboration content
+    if (newContent !== lastContentRef.current && newContent !== collaborationContent) {
+      console.log('📝 Sending content update:', { 
+        newLength: newContent.length, 
+        lastLength: lastContentRef.current.length,
+        collaborationLength: collaborationContent.length 
+      });
       lastContentRef.current = newContent;
       sendContentUpdate(newContent);
     }
-  }, [sendContentUpdate]);
+  }, [sendContentUpdate, collaborationContent]);
 
   // Handle cursor/selection changes
   const handleSelectionChange = useCallback(() => {
@@ -255,8 +754,11 @@ const CollaborativeEditor = () => {
     if (selection && selection.rangeCount > 0 && editorRef.current) {
       const range = selection.getRangeAt(0);
       if (editorRef.current.contains(range.commonAncestorContainer)) {
-        const anchor = range.startOffset;
-        const head = range.endOffset;
+        // Calculate global text positions
+        const anchor = getGlobalTextOffset(editorRef.current, range.startContainer, range.startOffset);
+        const head = getGlobalTextOffset(editorRef.current, range.endContainer, range.endOffset);
+        
+        console.log('📍 Sending cursor update:', { anchor, head });
         sendCursorUpdate({ anchor, head });
         
         // Save selection for later use
@@ -265,13 +767,82 @@ const CollaborativeEditor = () => {
     }
   }, [sendCursorUpdate]);
 
+  // Helper function to calculate global text offset
+  const getGlobalTextOffset = (root: Element, targetNode: Node, targetOffset: number): number => {
+    console.log('🔍 Calculating global offset for target node:', targetNode, 'offset:', targetOffset);
+    
+    // Create a tree walker to traverse all text nodes in the same order as createCursorAtOffset
+    const walker = document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: (node) => {
+          // Accept all text nodes, including empty ones for accurate positioning
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
+    );
+    
+    let globalOffset = 0;
+    
+    let node;
+    while (node = walker.nextNode()) {
+      const textNode = node as Text;
+      
+      if (textNode === targetNode) {
+        const result = globalOffset + targetOffset;
+        console.log('✅ Found target node, global offset:', result);
+        return result;
+      }
+      
+      globalOffset += textNode.textContent?.length || 0;
+    }
+    
+    console.warn('❌ Target node not found in tree walk');
+    return globalOffset;
+  };
+
   // Update editor content when collaboration content changes
   useEffect(() => {
     if (editorRef.current && collaborationContent !== lastContentRef.current) {
+      console.log('🔄 Updating editor content from collaboration:', { 
+        newContent: collaborationContent.length, 
+        lastContent: lastContentRef.current.length 
+      });
+      
+      // Store current cursor position
+      const selection = window.getSelection();
+      let cursorPosition = 0;
+      if (selection && selection.rangeCount > 0 && editorRef.current.contains(selection.anchorNode)) {
+        const range = selection.getRangeAt(0);
+        cursorPosition = range.startOffset;
+      }
+      
+      // Update content
       editorRef.current.innerHTML = collaborationContent;
       lastContentRef.current = collaborationContent;
+      
+      // Restore cursor position
+      try {
+        if (selection && editorRef.current.firstChild) {
+          const range = document.createRange();
+          const textNode = editorRef.current.firstChild;
+          const maxOffset = textNode.textContent?.length || 0;
+          range.setStart(textNode, Math.min(cursorPosition, maxOffset));
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      } catch (error) {
+        console.warn('Could not restore cursor position:', error);
+      }
+      
+      // Initialize context menu handlers for new elements
+      setTimeout(() => {
+        initializeContextMenuHandlers();
+      }, 100);
     }
-  }, [collaborationContent]);
+  }, [collaborationContent, initializeContextMenuHandlers]);
 
   // Handle WebSocket messages
   // (Removed - now handled by WebSocket collaboration hook)
@@ -470,44 +1041,57 @@ const CollaborativeEditor = () => {
     }
   };
 
-  // Special function for inline code formatting
+  // Special function for inline code formatting with toggle
   const applyInlineCode = () => {
     try {
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
-        const selectedText = range.toString();
         
-        if (selectedText) {
-          // Wrap selected text in code tags
-          const codeElement = document.createElement('code');
-          codeElement.style.backgroundColor = '#f1f2f6';
-          codeElement.style.padding = '2px 6px';
-          codeElement.style.borderRadius = '3px';
-          codeElement.style.fontFamily = '"Courier New", monospace';
-          codeElement.textContent = selectedText;
-          
-          range.deleteContents();
-          range.insertNode(codeElement);
-          
-          // Clear selection
-          selection.removeAllRanges();
+        // Check if we're inside a code element
+        const parentCode = range.commonAncestorContainer.parentElement?.closest('code');
+        
+        if (parentCode) {
+          // Remove code formatting
+          const text = parentCode.textContent || '';
+          const textNode = document.createTextNode(text);
+          parentCode.parentNode?.replaceChild(textNode, parentCode);
+          showNotification('Code formatting removed', 'info');
         } else {
-          // No selection, insert empty code tags for user to type into
-          const codeElement = document.createElement('code');
-          codeElement.style.backgroundColor = '#f1f2f6';
-          codeElement.style.padding = '2px 6px';
-          codeElement.style.borderRadius = '3px';
-          codeElement.style.fontFamily = '"Courier New", monospace';
-          codeElement.textContent = 'code';
+          const selectedText = range.toString();
           
-          range.insertNode(codeElement);
-          
-          // Select the text inside for easy replacement
-          const newRange = document.createRange();
-          newRange.selectNodeContents(codeElement);
-          selection.removeAllRanges();
-          selection.addRange(newRange);
+          if (selectedText) {
+            // Wrap selected text in code tags
+            const codeElement = document.createElement('code');
+            codeElement.style.backgroundColor = '#f1f2f6';
+            codeElement.style.padding = '2px 6px';
+            codeElement.style.borderRadius = '3px';
+            codeElement.style.fontFamily = '"Courier New", monospace';
+            codeElement.textContent = selectedText;
+            
+            range.deleteContents();
+            range.insertNode(codeElement);
+            
+            // Clear selection
+            selection.removeAllRanges();
+            showNotification('Code formatting applied', 'info');
+          } else {
+            // No selection, insert empty code tags for user to type into
+            const codeElement = document.createElement('code');
+            codeElement.style.backgroundColor = '#f1f2f6';
+            codeElement.style.padding = '2px 6px';
+            codeElement.style.borderRadius = '3px';
+            codeElement.style.fontFamily = '"Courier New", monospace';
+            codeElement.textContent = 'code';
+            
+            range.insertNode(codeElement);
+            
+            // Select the text inside for easy replacement
+            const newRange = document.createRange();
+            newRange.selectNodeContents(codeElement);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+          }
         }
         
         handleEditorChange();
@@ -515,6 +1099,30 @@ const CollaborativeEditor = () => {
     } catch (error) {
       console.error('Error applying inline code:', error);
     }
+  };
+
+  // Toggle blockquote formatting
+  const toggleBlockquote = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const parentBlockquote = range.commonAncestorContainer.parentElement?.closest('blockquote');
+    
+    if (parentBlockquote) {
+      // Remove blockquote
+      const content = parentBlockquote.innerHTML;
+      const div = document.createElement('div');
+      div.innerHTML = content;
+      parentBlockquote.parentNode?.replaceChild(div, parentBlockquote);
+      showNotification('Blockquote removed', 'info');
+    } else {
+      // Apply blockquote
+      applyFormat('formatBlock', 'blockquote');
+      showNotification('Blockquote applied', 'info');
+    }
+    
+    handleEditorChange();
   };
 
   const insertTable = (rows: number, cols: number) => {
@@ -536,31 +1144,429 @@ const CollaborativeEditor = () => {
     tableHTML += '</table>';
     
     document.execCommand('insertHTML', false, tableHTML);
+    
+    // Initialize context menu handlers for new elements
+    setTimeout(() => {
+      initializeContextMenuHandlers();
+    }, 100);
+    
     handleEditorChange();
   };
 
-  const insertImage = () => {
-    saveSelection();
-    const url = prompt('Enter image URL:');
-    if (url) {
-      restoreSelection();
-      const img = `<img src="${url}" style="max-width: 100%; height: auto; margin: 10px 0;" alt="Inserted image">`;
-      document.execCommand('insertHTML', false, img);
-      handleEditorChange();
+  // Table manipulation functions
+  const handleTableAction = (action: 'addRowBefore' | 'addRowAfter' | 'removeRow' | 'addColBefore' | 'addColAfter' | 'removeCol') => {
+    if (!tableContextMenu) return;
+    
+    const cell = tableContextMenu.cellElement;
+    const row = cell.parentElement as HTMLTableRowElement;
+    const table = row.parentElement as HTMLTableElement;
+    const rowIndex = Array.from(table.rows).indexOf(row);
+    const colIndex = Array.from(row.cells).indexOf(cell);
+    
+    switch (action) {
+      case 'addRowBefore':
+        insertTableRow(table, rowIndex, false);
+        break;
+      case 'addRowAfter':
+        insertTableRow(table, rowIndex, true);
+        break;
+      case 'removeRow':
+        if (table.rows.length > 1) {
+          table.deleteRow(rowIndex);
+        }
+        break;
+      case 'addColBefore':
+        insertTableColumn(table, colIndex, false);
+        break;
+      case 'addColAfter':
+        insertTableColumn(table, colIndex, true);
+        break;
+      case 'removeCol':
+        if (table.rows[0].cells.length > 1) {
+          removeTableColumn(table, colIndex);
+        }
+        break;
     }
+    
+    setTableContextMenu(null);
+    handleEditorChange();
+    showNotification(`Table ${action.replace(/([A-Z])/g, ' $1').toLowerCase()}`, 'success');
+  };
+
+  const insertTableRow = (table: HTMLTableElement, index: number, after: boolean) => {
+    const newRow = table.insertRow(after ? index + 1 : index);
+    const cellCount = table.rows[0].cells.length;
+    
+    for (let i = 0; i < cellCount; i++) {
+      const cell = newRow.insertCell();
+      cell.style.padding = '8px';
+      cell.style.border = '1px solid #ddd';
+      cell.textContent = 'Cell';
+    }
+  };
+
+  const insertTableColumn = (table: HTMLTableElement, index: number, after: boolean) => {
+    const colIndex = after ? index + 1 : index;
+    
+    Array.from(table.rows).forEach((row, rowIndex) => {
+      const cell = row.insertCell(colIndex);
+      cell.style.padding = '8px';
+      cell.style.border = '1px solid #ddd';
+      cell.textContent = rowIndex === 0 ? 'Header' : 'Cell';
+      if (rowIndex === 0) {
+        cell.style.backgroundColor = '#f0f0f0';
+      }
+    });
+  };
+
+  const removeTableColumn = (table: HTMLTableElement, index: number) => {
+    Array.from(table.rows).forEach(row => {
+      if (row.cells[index]) {
+        row.deleteCell(index);
+      }
+    });
+  };
+
+  // Image handling functions
+  const handleImageUpload = async (files: File[]) => {
+    console.log('🖼️ [Editor] Starting image upload for files:', files.map(f => ({ name: f.name, size: f.size, type: f.type })));
+    
+    if (!workspaceId || !threadId || !documentId) {
+      console.error('❌ [Editor] Missing required IDs:', { workspaceId, threadId, documentId });
+      showNotification('Missing workspace, thread, or document information', 'error');
+      return;
+    }
+
+    for (const file of files) {
+      console.log('🖼️ [Editor] Processing file:', file.name);
+      
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        console.error('❌ [Editor] File validation failed:', validation.error);
+        showNotification(validation.error || 'Invalid image file', 'error');
+        continue;
+      }
+
+      const imageId = generateImageId();
+      console.log('🖼️ [Editor] Generated image ID:', imageId);
+      
+      setUploadingImages(prev => new Set(prev).add(imageId));
+      setUploadProgress(prev => new Map(prev).set(imageId, 0));
+
+      try {
+        // Get cursor position for insertion
+        const selection = window.getSelection();
+        let insertPosition = 0;
+        if (selection && selection.rangeCount > 0 && editorRef.current) {
+          const range = selection.getRangeAt(0);
+          if (editorRef.current.contains(range.commonAncestorContainer)) {
+            insertPosition = range.startOffset;
+          }
+        }
+
+        console.log('🖼️ [Editor] Insert position:', insertPosition);
+
+        // Create preview image while uploading
+        const previewUrl = await fileToBase64(file);
+        const previewImg = `<img src="${previewUrl}" style="max-width: 100%; height: auto; margin: 10px 0; opacity: 0.7; border: 2px dashed #ccc;" alt="Uploading..." data-uploading-id="${imageId}">`;
+        
+        // Insert preview image at cursor position
+        if (selection && selection.rangeCount > 0) {
+          document.execCommand('insertHTML', false, previewImg);
+          handleEditorChange();
+        }
+
+        console.log('🖼️ [Editor] Starting upload with uploadImageWithProgress...');
+
+        // Upload image to Firebase
+        const result = await uploadImageWithProgress({
+          file,
+          documentId,
+          workspaceId,
+          threadId,
+          position: insertPosition,
+          onProgress: (progress) => {
+            console.log('📊 [Editor] Upload progress:', progress + '%');
+            setUploadProgress(prev => new Map(prev).set(imageId, progress));
+          }
+        });
+
+        console.log('🖼️ [Editor] Upload result:', result);
+
+        if (result.success && result.imageMetadata) {
+          console.log('✅ [Editor] Upload successful, replacing preview image');
+          console.log('🖼️ [Editor] Image metadata:', result.imageMetadata);
+          
+          // Replace preview with actual image
+          const actualImgWrapper = createImageElement(result.imageMetadata, {
+            maxWidth: 800,
+            className: 'editor-image',
+            onContextMenu: (e, img, metadata) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🖼️ Image context menu from createImageElement:', { img, metadata });
+              handleImageContextMenu(e, img, metadata);
+            }
+          });
+
+          console.log('🖼️ [Editor] Created image wrapper element:', actualImgWrapper);
+          const img = actualImgWrapper.querySelector('img');
+          if (img) {
+            console.log('🖼️ [Editor] Image src:', img.src);
+            console.log('🖼️ [Editor] Image alt:', img.alt);
+          }
+
+          // Find and replace the preview image
+          if (editorRef.current) {
+            const previewElement = editorRef.current.querySelector(`[data-uploading-id="${imageId}"]`);
+            console.log('🖼️ [Editor] Preview element found:', previewElement);
+            if (previewElement) {
+              previewElement.replaceWith(actualImgWrapper);
+              console.log('🖼️ [Editor] Preview replaced with actual image');
+              handleEditorChange();
+              // Re-initialize context menus for the new image
+              setTimeout(() => {
+                initializeContextMenuHandlers();
+              }, 100);
+            } else {
+              console.log('⚠️ [Editor] No preview element found, appending image');
+              editorRef.current.appendChild(actualImgWrapper);
+              handleEditorChange();
+              // Re-initialize context menus for the new image
+              setTimeout(() => {
+                initializeContextMenuHandlers();
+              }, 100);
+            }
+          }
+
+          // Update document images state
+          showNotification('Image uploaded successfully', 'success');
+        } else {
+          console.error('❌ [Editor] Upload failed:', result.error);
+          
+          // Remove preview image on failure
+          if (editorRef.current) {
+            const previewElement = editorRef.current.querySelector(`[data-uploading-id="${imageId}"]`);
+            if (previewElement) {
+              previewElement.remove();
+              handleEditorChange();
+            }
+          }
+          showNotification(result.error || 'Failed to upload image', 'error');
+        }
+      } catch (error: any) {
+        console.error('❌ [Editor] Image upload error:', error);
+        // Remove preview image on error
+        if (editorRef.current) {
+          const previewElement = editorRef.current.querySelector(`[data-uploading-id="${imageId}"]`);
+          if (previewElement) {
+            previewElement.remove();
+            handleEditorChange();
+          }
+        }
+        showNotification(`Upload failed: ${error.message}`, 'error');
+      } finally {
+        setUploadingImages(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(imageId);
+          return newSet;
+        });
+        setUploadProgress(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(imageId);
+          return newMap;
+        });
+      }
+    }
+  };
+
+  // Handle paste events for images
+  const handlePaste = useCallback(async (e: ClipboardEvent) => {
+    if (!e.clipboardData) return;
+
+    const images = await extractImagesFromClipboard(e.clipboardData);
+    if (images.length > 0) {
+      e.preventDefault();
+      handleImageUpload(images);
+    }
+  }, [workspaceId, threadId, documentId]);
+
+  // Handle drag and drop for images
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files).filter(file => 
+      file.type.startsWith('image/')
+    );
+
+    if (files.length > 0) {
+      handleImageUpload(files);
+    }
+  };
+
+  // Image editing functions
+  const handleImageEdit = (action: 'resize' | 'move' | 'rotate' | 'crop' | 'delete' | 'alignLeft' | 'alignCenter' | 'alignRight') => {
+    if (!imageContextMenu) return;
+    
+    const { imageElement, imageMetadata } = imageContextMenu;
+    
+    switch (action) {
+      case 'delete':
+        handleImageDelete(imageElement);
+        break;
+      case 'alignLeft':
+        handleImageAlignment(imageElement, 'left');
+        break;
+      case 'alignCenter':
+        handleImageAlignment(imageElement, 'center');
+        break;
+      case 'alignRight':
+        handleImageAlignment(imageElement, 'right');
+        break;
+      case 'resize':
+      case 'move':
+      case 'rotate':
+      case 'crop':
+        setSelectedImageForEdit({ element: imageElement, metadata: imageMetadata });
+        setImageEditDialog(true);
+        break;
+    }
+    
+    setImageContextMenu(null);
+  };
+
+  const handleImageAlignment = (imgElement: HTMLImageElement, alignment: 'left' | 'center' | 'right') => {
+    const wrapper = imgElement.closest('.editor-image-wrapper') as HTMLElement;
+    const targetElement = wrapper || imgElement;
+    
+    // Reset previous alignment styles
+    targetElement.style.float = '';
+    targetElement.style.margin = '';
+    targetElement.style.display = '';
+    
+    switch (alignment) {
+      case 'left':
+        targetElement.style.float = 'left';
+        targetElement.style.margin = '10px 20px 10px 0';
+        break;
+      case 'center':
+        targetElement.style.display = 'block';
+        targetElement.style.margin = '10px auto';
+        break;
+      case 'right':
+        targetElement.style.float = 'right';
+        targetElement.style.margin = '10px 0 10px 20px';
+        break;
+    }
+    
+    handleEditorChange();
+    showNotification(`Image aligned ${alignment}`, 'success');
+  };
+
+  const handleImageDelete = (imgElement: HTMLImageElement) => {
+    const wrapper = imgElement.closest('.editor-image-wrapper');
+    if (wrapper) {
+      wrapper.remove();
+    } else {
+      imgElement.remove();
+    }
+    handleEditorChange();
+    showNotification('Image deleted', 'success');
+  };
+
+  // Insert image from file picker
+  const insertImage = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.style.display = 'none';
+    
+    input.onchange = (e) => {
+      const files = Array.from((e.target as HTMLInputElement).files || []);
+      if (files.length > 0) {
+        handleImageUpload(files);
+      }
+    };
+    
+    document.body.appendChild(input);
+    input.click();
+    document.body.removeChild(input);
   };
 
   const insertLink = () => {
     saveSelection();
-    const selectedText = window.getSelection()?.toString() || '';
-    const url = prompt('Enter URL:');
-    if (url) {
-      restoreSelection();
-      const text = selectedText || url;
-      const link = `<a href="${url}" target="_blank">${text}</a>`;
-      document.execCommand('insertHTML', false, link);
-      handleEditorChange();
+    const selection = window.getSelection();
+    const selectedText = selection?.toString() || '';
+    
+    // Check if we're editing an existing link
+    const parentElement = selection?.anchorNode?.parentElement;
+    const existingLink = parentElement?.closest('a') as HTMLAnchorElement;
+    
+    if (existingLink) {
+      // Editing existing link
+      setSelectedLinkData({
+        element: existingLink,
+        text: existingLink.textContent || '',
+        url: existingLink.href || '',
+        isEdit: true
+      });
+    } else {
+      // Creating new link
+      setSelectedLinkData({
+        element: null,
+        text: selectedText,
+        url: '',
+        isEdit: false
+      });
     }
+    
+    setLinkDialog(true);
+  };
+
+  const handleLinkSave = (url: string, text: string) => {
+    if (!selectedLinkData) return;
+    
+    if (selectedLinkData.isEdit && selectedLinkData.element) {
+      // Update existing link
+      selectedLinkData.element.href = url;
+      selectedLinkData.element.textContent = text;
+    } else {
+      // Create new link
+      restoreSelection();
+      const linkHtml = `<a href="${url}" target="_blank">${text || url}</a>`;
+      document.execCommand('insertHTML', false, linkHtml);
+    }
+    
+    handleEditorChange();
+    setLinkDialog(false);
+    setSelectedLinkData(null);
+    showNotification(selectedLinkData.isEdit ? 'Link updated' : 'Link inserted', 'success');
+  };
+
+  const handleLinkRemove = () => {
+    if (!selectedLinkData?.element) return;
+    
+    const link = selectedLinkData.element;
+    const text = link.textContent || '';
+    const textNode = document.createTextNode(text);
+    link.parentNode?.replaceChild(textNode, link);
+    
+    handleEditorChange();
+    setLinkDialog(false);
+    setSelectedLinkData(null);
+    showNotification('Link removed', 'success');
   };
 
   const toggleFullscreen = () => {
@@ -620,14 +1626,37 @@ const CollaborativeEditor = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Paste event listener for images and context menu initialization
+  useEffect(() => {
+    const editorElement = editorRef.current;
+    if (editorElement) {
+      const pasteHandler = (e: Event) => {
+        if (e instanceof ClipboardEvent) {
+          handlePaste(e);
+        }
+      };
+      
+      editorElement.addEventListener('paste', pasteHandler);
+      
+      // Initialize context menu handlers when component mounts
+      setTimeout(() => {
+        initializeContextMenuHandlers();
+      }, 500);
+      
+      return () => {
+        editorElement.removeEventListener('paste', pasteHandler);
+      };
+    }
+  }, [handlePaste, initializeContextMenuHandlers]);
+
   // Show notification
   const showNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
   };
 
-  // Get unique color for each collaborator
-  const getCollaboratorRingColor = (index: number) => {
+  // Get unique color for each collaborator based on their user ID
+  const getCollaboratorRingColor = (userId: string) => {
     const colors = [
       '#4caf50', // Green
       '#2196f3', // Blue
@@ -640,12 +1669,95 @@ const CollaborativeEditor = () => {
       '#e91e63', // Pink
       '#607d8b', // Blue Grey
     ];
-    return colors[index % colors.length];
+    
+    // Generate a consistent index based on user ID
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) {
+      const char = userId.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    return colors[Math.abs(hash) % colors.length];
   };
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      
+      {/* Image Styles */}
+      <style>{`
+        .editor-image-wrapper {
+          position: relative;
+          display: inline-block;
+          margin: 10px 0;
+        }
+        
+        .editor-image-wrapper img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 8px;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+          transition: all 0.2s ease;
+        }
+        
+        .editor-image-wrapper:hover img {
+          box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        }
+        
+        .resize-handle {
+          position: absolute;
+          width: 10px;
+          height: 10px;
+          background-color: #4caf50;
+          border: 2px solid white;
+          border-radius: 50%;
+          opacity: 0;
+          transition: opacity 0.2s ease;
+          z-index: 10;
+        }
+        
+        .editor-image-wrapper:hover .resize-handle {
+          opacity: 1;
+        }
+        
+        .resize-nw { top: -5px; left: -5px; cursor: nw-resize; }
+        .resize-ne { top: -5px; right: -5px; cursor: ne-resize; }
+        .resize-sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+        .resize-se { bottom: -5px; right: -5px; cursor: se-resize; }
+        
+        .editor-content img {
+          transition: all 0.2s ease;
+          border: 2px solid transparent;
+        }
+        
+        .editor-content img:hover {
+          border-color: #4caf50;
+          transform: scale(1.01);
+        }
+        
+        .editor-content img.selected {
+          border-color: #4caf50;
+          box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+        }
+        
+        /* Collaborator cursor styles - Remove old CSS-based cursors */
+        .collaborator-cursor {
+          /* These styles are now applied via JavaScript for better control */
+        }
+        
+        .collaborator-cursor-label {
+          /* These styles are now applied via JavaScript for better control */
+        }
+        
+        .collaborator-selection {
+          background-color: currentColor;
+          opacity: 0.2;
+          pointer-events: none;
+          position: absolute;
+          z-index: 999;
+        }
+      `}</style>
       
       {/* Loading State */}
       {documentLoading && (
@@ -765,7 +1877,7 @@ const CollaborativeEditor = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <People />
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Tooltip title={`${currentUser.name} (You)`}>
+                    <Tooltip title={`${collaborationUser.name} (You)`}>
                       <Avatar 
                         sx={{ 
                           width: 32, 
@@ -773,29 +1885,34 @@ const CollaborativeEditor = () => {
                           bgcolor: 'lightgray',
                           color: 'darkgray',
                           fontSize: '0.7rem',
-                          border: '2px solid #4caf50'
+                          border: `2px solid ${getCollaboratorRingColor(collaborationUser.id)}`
                         }}
                       >
-                        {currentUser.avatar}
+                        {collaborationUser.avatar}
                       </Avatar>
                     </Tooltip>
-                    {collaborators.map((user, index) => (
-                      <Tooltip key={user.id} title={user.name}>
-                        <Avatar
-                          sx={{
-                            width: 32,
-                            height: 32,
-                            bgcolor: 'lightgray',
-                            color: 'darkgray',
-                            fontSize: '0.7rem',
-                            border: user.isActive ? `2px solid ${getCollaboratorRingColor(index)}` : '2px solid transparent',
-                            transition: 'border-color 0.2s ease',
-                          }}
-                        >
-                          {user.avatar}
-                        </Avatar>
-                      </Tooltip>
-                    ))}
+                    {collaborators.map((user) => {
+                      const ringColor = getCollaboratorRingColor(user.id);
+                      console.log('👤 Rendering avatar for user:', user.name, 'ID:', user.id, 'isActive:', user.isActive, 'Color:', ringColor);
+                      return (
+                        <Tooltip key={user.id} title={user.name}>
+                          <Avatar
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              bgcolor: 'lightgray',
+                              color: 'darkgray',
+                              fontSize: '0.7rem',
+                              border: `2px solid ${ringColor}`, // Always show color ring, remove isActive condition
+                              transition: 'border-color 0.2s ease',
+                              opacity: user.isActive ? 1 : 0.7, // Use opacity instead of border for inactive users
+                            }}
+                          >
+                            {user.avatar}
+                          </Avatar>
+                        </Tooltip>
+                      );
+                    })}
                   </Box>
                 </Box>
 
@@ -981,7 +2098,7 @@ const CollaborativeEditor = () => {
               {/* Text Format Tools */}
               <ButtonGroup size="small" variant="outlined">
                 <Tooltip title="Blockquote">
-                  <IconButton onClick={() => applyFormat('formatBlock', 'blockquote')}>
+                  <IconButton onClick={toggleBlockquote}>
                     <FormatQuote />
                   </IconButton>
                 </Tooltip>
@@ -1054,6 +2171,9 @@ const CollaborativeEditor = () => {
                         saveSelection();
                         handleSelectionChange();
                       }}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
                       sx={{
                         outline: 'none',
                         lineHeight: 1.6,
@@ -1061,6 +2181,11 @@ const CollaborativeEditor = () => {
                         fontFamily: fontFamily,
                         fontSize: `${fontSize}px`,
                         color: textColor,
+                        ...(dragOver && {
+                          backgroundColor: 'action.hover',
+                          border: '2px dashed',
+                          borderColor: 'primary.main',
+                        }),
                         '& h1, & h2, & h3, & h4, & h5, & h6': {
                           color: 'primary.main',
                           marginTop: 3,
@@ -1096,51 +2221,20 @@ const CollaborativeEditor = () => {
                             fontWeight: 'bold',
                           },
                         },
+                        '& .editor-image': {
+                          cursor: 'pointer',
+                          borderRadius: '4px',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                          transition: 'transform 0.2s ease',
+                          '&:hover': {
+                            transform: 'scale(1.02)',
+                          },
+                        },
                       }}
                       // Don't use dangerouslySetInnerHTML - we'll set content via useEffect
                     />
 
-                    {/* Collaborative Cursors */}
-                    {collaborators.filter(user => user.cursor).map((user, index) => {
-                      const cursorColor = getCollaboratorRingColor(collaborators.indexOf(user));
-                      return (
-                        <Box
-                          key={user.id}
-                          sx={{
-                            position: 'absolute',
-                            top: `${100 + index * 40}px`,
-                            left: `${200 + index * 50}px`,
-                            pointerEvents: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            zIndex: 10,
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              width: 2,
-                              height: 20,
-                              bgcolor: cursorColor,
-                              animation: 'blink 1s infinite',
-                              '@keyframes blink': {
-                                '0%, 50%': { opacity: 1 },
-                                '51%, 100%': { opacity: 0 },
-                              },
-                            }}
-                          />
-                          <Chip
-                            label={user.name}
-                            size="small"
-                            sx={{
-                              ml: 0.5,
-                              bgcolor: cursorColor,
-                              color: 'white',
-                              fontSize: '0.75rem',
-                            }}
-                          />
-                        </Box>
-                      );
-                    })}
+                    {/* Collaborative cursors are now rendered dynamically via JavaScript in renderCollaboratorCursors */}
                   </Paper>
                 </Box>
               </Box>
@@ -1610,6 +2704,339 @@ const CollaborativeEditor = () => {
           </Box>
         </Popover>
 
+        {/* Upload Progress Indicators */}
+        {uploadingImages.size > 0 && (
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 80,
+              right: 20,
+              zIndex: 1300,
+              maxWidth: 350,
+            }}
+          >
+            {Array.from(uploadingImages).map((imageId) => {
+              const progress = uploadProgress.get(imageId) || 0;
+              return (
+                <Card key={imageId} sx={{ mb: 1, p: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Upload />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2">Uploading image...</Typography>
+                      <LinearProgress variant="determinate" value={progress} sx={{ mt: 1 }} />
+                      <Typography variant="caption" color="text.secondary">
+                        {Math.round(progress)}%
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Card>
+              );
+            })}
+          </Box>
+        )}
+
+        {/* Drag Overlay */}
+        {dragOver && (
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(25, 118, 210, 0.1)',
+              border: '3px dashed',
+              borderColor: 'primary.main',
+              zIndex: 1200,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+            }}
+          >
+            <Paper
+              elevation={8}
+              sx={{
+                p: 4,
+                textAlign: 'center',
+                backgroundColor: 'background.paper',
+                borderRadius: 2,
+              }}
+            >
+              <Upload sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+              <Typography variant="h6" color="primary">
+                Drop images here to upload
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Release to upload to the document
+              </Typography>
+            </Paper>
+          </Box>
+        )}
+
+        {/* Image Context Menu */}
+        <Menu
+          open={imageContextMenu !== null}
+          onClose={() => setImageContextMenu(null)}
+          anchorReference="anchorPosition"
+          anchorPosition={
+            imageContextMenu !== null
+              ? { top: imageContextMenu.mouseY, left: imageContextMenu.mouseX }
+              : undefined
+          }
+        >
+          <MenuItem onClick={() => handleImageEdit('resize')}>
+            <ListItemIcon>
+              <AspectRatio fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Resize</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => handleImageEdit('move')}>
+            <ListItemIcon>
+              <OpenWith fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Move</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => handleImageEdit('rotate')}>
+            <ListItemIcon>
+              <RotateRight fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Rotate</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => handleImageEdit('crop')}>
+            <ListItemIcon>
+              <Crop fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Crop</ListItemText>
+          </MenuItem>
+          <Divider />
+          <MenuItem onClick={() => handleImageEdit('alignLeft')}>
+            <ListItemIcon>
+              <FormatAlignLeft fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Align Left</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => handleImageEdit('alignCenter')}>
+            <ListItemIcon>
+              <FormatAlignCenter fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Align Center</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => handleImageEdit('alignRight')}>
+            <ListItemIcon>
+              <FormatAlignRight fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Align Right</ListItemText>
+          </MenuItem>
+          <Divider />
+          <MenuItem onClick={() => handleImageEdit('delete')} sx={{ color: 'error.main' }}>
+            <ListItemIcon>
+              <Delete fontSize="small" color="error" />
+            </ListItemIcon>
+            <ListItemText>Delete</ListItemText>
+          </MenuItem>
+        </Menu>
+
+        {/* Table Context Menu */}
+        <Menu
+          open={tableContextMenu !== null}
+          onClose={() => setTableContextMenu(null)}
+          anchorReference="anchorPosition"
+          anchorPosition={
+            tableContextMenu !== null
+              ? { top: tableContextMenu.mouseY, left: tableContextMenu.mouseX }
+              : undefined
+          }
+        >
+          <MenuItem onClick={() => handleTableAction('addRowBefore')}>
+            <ListItemIcon>
+              <TableRows fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Add Row Before</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => handleTableAction('addRowAfter')}>
+            <ListItemIcon>
+              <TableRows fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Add Row After</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => handleTableAction('removeRow')} sx={{ color: 'error.main' }}>
+            <ListItemIcon>
+              <Delete fontSize="small" color="error" />
+            </ListItemIcon>
+            <ListItemText>Remove Row</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => handleTableAction('addColBefore')}>
+            <ListItemIcon>
+              <TableChart fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Add Column Before</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => handleTableAction('addColAfter')}>
+            <ListItemIcon>
+              <TableChart fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Add Column After</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => handleTableAction('removeCol')} sx={{ color: 'error.main' }}>
+            <ListItemIcon>
+              <Delete fontSize="small" color="error" />
+            </ListItemIcon>
+            <ListItemText>Remove Column</ListItemText>
+          </MenuItem>
+        </Menu>
+
+        {/* Image Edit Dialog */}
+        <Dialog open={imageEditDialog} onClose={() => setImageEditDialog(false)} maxWidth="md" fullWidth>
+          <DialogTitle>Edit Image</DialogTitle>
+          <DialogContent>
+            {selectedImageForEdit && (
+              <Box sx={{ p: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  {selectedImageForEdit.metadata?.originalName || 'Image'}
+                </Typography>
+                
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" gutterBottom>Resize</Typography>
+                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <TextField
+                      label="Width (px)"
+                      type="number"
+                      size="small"
+                      defaultValue={selectedImageForEdit.element.offsetWidth}
+                      onChange={(e) => {
+                        const width = parseInt(e.target.value);
+                        if (width > 0) {
+                          selectedImageForEdit.element.style.width = `${width}px`;
+                        }
+                      }}
+                    />
+                    <TextField
+                      label="Height (px)"
+                      type="number"
+                      size="small"
+                      defaultValue={selectedImageForEdit.element.offsetHeight}
+                      onChange={(e) => {
+                        const height = parseInt(e.target.value);
+                        if (height > 0) {
+                          selectedImageForEdit.element.style.height = `${height}px`;
+                        }
+                      }}
+                    />
+                  </Box>
+                </Box>
+
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" gutterBottom>Rotation</Typography>
+                  <Slider
+                    defaultValue={0}
+                    min={-180}
+                    max={180}
+                    step={15}
+                    marks
+                    valueLabelDisplay="auto"
+                    onChange={(_, value) => {
+                      selectedImageForEdit.element.style.transform = `rotate(${value}deg)`;
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" gutterBottom>Position</Typography>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <TextField
+                      label="X Position (px)"
+                      type="number"
+                      size="small"
+                      onChange={(e) => {
+                        const wrapper = selectedImageForEdit.element.closest('.editor-image-wrapper') as HTMLElement;
+                        if (wrapper) {
+                          wrapper.style.position = 'relative';
+                          wrapper.style.left = `${e.target.value}px`;
+                        }
+                      }}
+                    />
+                    <TextField
+                      label="Y Position (px)"
+                      type="number"
+                      size="small"
+                      onChange={(e) => {
+                        const wrapper = selectedImageForEdit.element.closest('.editor-image-wrapper') as HTMLElement;
+                        if (wrapper) {
+                          wrapper.style.position = 'relative';
+                          wrapper.style.top = `${e.target.value}px`;
+                        }
+                      }}
+                    />
+                  </Box>
+                </Box>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setImageEditDialog(false)}>Cancel</Button>
+            <Button onClick={() => {
+              handleEditorChange();
+              setImageEditDialog(false);
+              setSelectedImageForEdit(null);
+              showNotification('Image updated', 'success');
+            }} variant="contained">Apply</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Link Dialog */}
+        <Dialog open={linkDialog} onClose={() => setLinkDialog(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            {selectedLinkData?.isEdit ? 'Edit Link' : 'Insert Link'}
+          </DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+              <TextField
+                label="Link Text"
+                fullWidth
+                defaultValue={selectedLinkData?.text || ''}
+                onChange={(e) => {
+                  if (selectedLinkData) {
+                    setSelectedLinkData({
+                      ...selectedLinkData,
+                      text: e.target.value
+                    });
+                  }
+                }}
+              />
+              <TextField
+                label="URL"
+                fullWidth
+                placeholder="https://example.com"
+                defaultValue={selectedLinkData?.url || ''}
+                onChange={(e) => {
+                  if (selectedLinkData) {
+                    setSelectedLinkData({
+                      ...selectedLinkData,
+                      url: e.target.value
+                    });
+                  }
+                }}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            {selectedLinkData?.isEdit && (
+              <Button onClick={handleLinkRemove} color="error">
+                Remove Link
+              </Button>
+            )}
+            <Button onClick={() => setLinkDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={() => selectedLinkData && handleLinkSave(selectedLinkData.url, selectedLinkData.text)}
+              variant="contained"
+              disabled={!selectedLinkData?.url}
+            >
+              {selectedLinkData?.isEdit ? 'Update' : 'Insert'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         {/* Notifications */}
         {notification && (
           <Snackbar
@@ -1627,27 +3054,6 @@ const CollaborativeEditor = () => {
             </Alert>
           </Snackbar>
         )}
-
-        {/* Hidden file input for image uploads */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = (event) => {
-                const imageUrl = event.target?.result as string;
-                const img = `<img src="${imageUrl}" style="max-width: 100%; height: auto; margin: 10px 0;" alt="Uploaded image">`;
-                document.execCommand('insertHTML', false, img);
-                handleEditorChange();
-              };
-              reader.readAsDataURL(file);
-            }
-          }}
-        />
       </Box>
       )}
     </ThemeProvider>
