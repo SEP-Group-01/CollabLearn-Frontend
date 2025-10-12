@@ -4,91 +4,218 @@ import type {
   Workspace, 
   WorkspaceFormData
 } from "../types/WorkspaceInterfaces";
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-export const createWorkspace = async (workspaceData: Partial<WorkspaceFormData> | FormData) => {
+// Create axios instance with auth header
+const createAuthenticatedRequest = () => {
   const token = getAccessToken();
   
-  // Check if workspaceData is FormData (for image uploads)
-  const isFormData = workspaceData instanceof FormData;
+  // Since VITE_API_URL already includes /api, use it directly
+  const baseURL = API_URL;
   
-  const headers: any = {
-    Authorization: `Bearer ${token}`,
-  };
-  
-  // Don't set Content-Type for FormData, let axios handle it
-  if (!isFormData) {
-    headers['Content-Type'] = 'application/json';
-  }
-
-  // Debug logging for FormData
-  if (isFormData) {
-    console.log("Creating workspace with FormData:");
-    for (let [key, value] of (workspaceData as FormData).entries()) {
-      console.log(`${key}:`, value);
-    }
-  } else {
-    console.log("Creating workspace with JSON data:", workspaceData);
-  }
-  console.log("Headers:", headers);
-  
-  const response = await axios.post(`${API_URL}/workspaces/create`, workspaceData, {
-    headers,
+  const instance = axios.create({
+    baseURL: baseURL,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
   });
-  return response.data;
+  
+  return instance;
+};
+
+// Get all workspaces
+export const getAllWorkspaces = async (): Promise<Workspace[]> => {
+  try {
+    const api = createAuthenticatedRequest();
+    const response = await api.get('/workspaces');
+    
+    if (response.data && response.data.success === true && response.data.data) {
+      return response.data.data;
+    }
+    
+    // Handle different response formats
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    
+    console.warn('Unexpected getAllWorkspaces response format:', response.data);
+    return [];
+  } catch (error) {
+    console.error('Error fetching all workspaces:', error);
+    if ((error as any).response?.status === 401) {
+      throw new Error('Authentication required');
+    }
+    throw new Error((error as any).response?.data?.message || (error as any).message || 'Failed to fetch workspaces');
+  }
+};
+
+// Search workspaces
+export const searchWorkspaces = async (searchTerm: string): Promise<Workspace[]> => {
+  if (!searchTerm.trim()) {
+    return getAllWorkspaces();
+  }
+  
+  try {
+    const api = createAuthenticatedRequest();
+    const response = await api.get(`/workspaces/search?q=${encodeURIComponent(searchTerm)}`);
+    
+    if (response.data && response.data.success === true && response.data.data) {
+      return response.data.data;
+    }
+    
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    
+    console.warn('Unexpected searchWorkspaces response format:', response.data);
+    return [];
+  } catch (error) {
+    console.error('Error searching workspaces:', error);
+    if ((error as any).response?.status === 401) {
+      throw new Error('Authentication required');
+    }
+    throw new Error((error as any).response?.data?.message || (error as any).message || 'Failed to search workspaces');
+  }
+};
+
+// Get user's workspaces
+export const getUserWorkspaces = async (): Promise<Workspace[]> => {
+  try {
+    const api = createAuthenticatedRequest();
+    const response = await api.get('/workspaces/my');
+    
+    if (response.data && response.data.success === true && response.data.data) {
+      return response.data.data;
+    }
+    
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    
+    console.warn('Unexpected getUserWorkspaces response format:', response.data);
+    return [];
+  } catch (error) {
+    console.error('Error fetching user workspaces:', error);
+    if ((error as any).response?.status === 401) {
+      throw new Error('Authentication required');
+    }
+    throw new Error((error as any).response?.data?.message || (error as any).message || 'Failed to fetch user workspaces');
+  }
+};
+
+export const createWorkspace = async (workspaceData: Partial<WorkspaceFormData> | FormData) => {
+  try {
+    const token = getAccessToken();
+    
+    // Check if workspaceData is FormData (for image uploads)
+    const isFormData = workspaceData instanceof FormData;
+    
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+    };
+    
+    // Don't set Content-Type for FormData, let axios handle it
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    // Debug logging
+    if (isFormData) {
+      console.log("Creating workspace with FormData:");
+      for (const [key, value] of (workspaceData as FormData).entries()) {
+        console.log(`${key}:`, value);
+      }
+    } else {
+      console.log("Creating workspace with JSON data:", workspaceData);
+    }
+    console.log("Headers:", headers);
+    
+    const response = await axios.post(`${API_URL}/workspaces/create`, workspaceData, {
+      headers,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating workspace:', error);
+    throw error;
+  }
 };
 
 export const getTopWorkspaces = async (limit: number = 10) => {
-  const token = getAccessToken();
-  
-  const headers: any = {};
-  
-  // Include token if available (for user role information)
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-  
-  const response = await axios.get(`${API_URL}/workspaces/top?limit=${limit}`, {
-    headers,
-  });
-  console.log('Top workspaces results:', response.data);
-  return response.data;
-};
-
-export const getWoorkspacesBySearchTerm = async (searchTerm: string) => {
-    const token = getAccessToken();
+  try {
+    const api = createAuthenticatedRequest();
+    const response = await api.get(`/workspaces/top?limit=${limit}`);
     
-    const headers: any = {};
+    console.log('Top workspaces results:', response.data);
     
-    // Include token if available
-    if (token) {
-        headers.Authorization = `Bearer ${token}`;
+    // Handle different response formats
+    if (response.data && response.data.success === true && response.data.data) {
+      return response.data.data;
     }
     
-    const response = await axios.get(`${API_URL}/workspaces/search/${searchTerm}`, {
-        headers,
-    });
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    
+    console.warn('Unexpected getTopWorkspaces response format:', response.data);
+    return [];
+  } catch (error: any) {
+    console.error('Error fetching top workspaces:', error);
+    
+    // Enhanced error detection for connection issues
+    const isConnectionError = 
+      error.code === 'ERR_NETWORK' || 
+      error.code === 'ECONNRESET' ||
+      error.code === 'ECONNREFUSED' ||
+      error.message?.includes('Connection closed') ||
+      error.message?.includes('Network Error') ||
+      error.message?.includes('timeout') ||
+      !error.response; // No response usually means connection issue
+    
+    if (isConnectionError) {
+      console.warn('Backend connection issue detected:', error.code || error.message);
+      // Mark this as a connection error for retry logic
+      error.isConnectionError = true;
+    }
+    
+    throw error;
+  }
+};
+
+export const getWorkspacesBySearchTerm = async (searchTerm: string) => {
+  try {
+    const api = createAuthenticatedRequest();
+    const response = await api.get(`/workspaces/search/${searchTerm}`);
+    
     console.log('Workspace search results:', response.data);
-    return response.data;
+    
+    // Handle different response formats
+    if (response.data && response.data.success === true && response.data.data) {
+      return response.data.data;
+    }
+    
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    
+    console.warn('Unexpected search response format:', response.data);
+    return [];
+  } catch (error) {
+    console.error('Error searching workspaces:', error);
+    throw error;
+  }
 };
 
 export const joinWorkspace = async (workspaceId: string) => {
-    const token = getAccessToken();
-    const response = await axios.post(`${API_URL}/workspaces/join`, { workspaceId }, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
+    const api = createAuthenticatedRequest();
+    const response = await api.post('/workspaces/join', { workspaceId });
     return response.data;
 };
 
 export const leaveWorkspace = async (workspaceId: string) => {
-    const token = getAccessToken();
-    const response = await axios.post(`${API_URL}/workspaces/leave`, { workspaceId }, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
+    const api = createAuthenticatedRequest();
+    const response = await api.post('/workspaces/leave', { workspaceId });
     return response.data;
 };
 

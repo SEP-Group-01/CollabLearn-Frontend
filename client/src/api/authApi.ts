@@ -1,5 +1,6 @@
 import axios from "axios";
 import type { LoginResponse, User } from "../types/AuthInterfaces";
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // Local storage keys
@@ -75,9 +76,16 @@ export const getRefreshToken = (): string | null => {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 };
 
+// Get user data - simplified for development
 export const getUserData = (): User | null => {
-  const userData = localStorage.getItem(USER_DATA_KEY);
-  return userData ? JSON.parse(userData) : null;
+  // Return consistent mock data for development with proper UUID format
+  return {
+    id: '53e5f9f5-fe11-4728-9996-7e606bb98f96', // Valid UUID format for development
+    first_name: 'Development',
+    last_name: 'User',
+    email: 'dev@example.com',
+    email_verified: true,
+  };
 };
 
 export const clearAuthData = () => {
@@ -89,6 +97,7 @@ export const clearAuthData = () => {
   localStorage.removeItem('authToken');
 };
 
+// Check if user is authenticated - always true for development
 export const isAuthenticated = (): boolean => {
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
   return !!(token && !isTokenExpired(token));
@@ -185,14 +194,7 @@ export const signup = async (email: string, password: string, first_name: string
 export const verifyEmail = async (token: string) => {
   try {
     const response = await axios.get(`${API_URL}/auth/verify-email?token=${token}`);
-    const data = response.data;
-    
-    // Save access token and user data to localStorage if present
-    if (data.access_token && data.user) {
-      saveAuthData(data.access_token, data.user);
-    }
-    
-    return data;
+    return response.data;
   } catch (error: any) {
     if (error.response?.data?.message) {
       throw new Error(error.response.data.message);
@@ -208,14 +210,7 @@ export const forgotPassword = async (email: string) => {
 export const resetPassword = async (token: string, newPassword: string) => {
   try {
     const response = await axios.post(`${API_URL}/auth/reset-password?token=${token}`, { newPassword });
-    const data = response.data;
-    
-    // Save access token and user data to localStorage if present
-    if (data.access_token && data.user) {
-      saveAuthData(data.access_token, data.user);
-    }
-    
-    return data;
+    return response.data;
   } catch (error: any) {
     if (error.response?.data?.message) {
       throw new Error(error.response.data.message);

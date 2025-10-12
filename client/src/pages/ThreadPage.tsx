@@ -352,9 +352,14 @@ export default function ThreadPage() {
     }
   }
 
-  const openDocument = (documentId: string) => {
-    // Navigate to the collaborative editor for editing documents
-    navigate(`/workspace/${workspaceId}/threads/${threadId}/editor/${documentId}`)
+  const openDocument = (documentId: number | string) => {
+    // Check if documentId is valid before navigation
+    if (!documentId || documentId === null || documentId === undefined) {
+      console.error('❌ Invalid document ID for navigation:', documentId);
+      return;
+    }
+    
+    navigate(`/workspace/${workspaceId}/threads/${threadId}/documents/${documentId}`)
   }
 
   // Helper functions to format data
@@ -957,7 +962,14 @@ export default function ThreadPage() {
                 borderColor: "primary.main"
               },
             }}
-            onClick={() => openDocument(doc.id)}
+            onClick={() => {
+              // Ensure doc.id exists and is valid before navigation
+              if (doc.id && doc.id !== null && doc.id !== undefined) {
+                openDocument(doc.id);
+              } else {
+                console.error('❌ Document has invalid ID:', doc);
+              }
+            }}
           >
             <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
               <Box display="flex" alignItems="center" gap={2}>
