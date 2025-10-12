@@ -141,9 +141,37 @@ export const createWorkspace = async (workspaceData: Partial<WorkspaceFormData> 
   return response.data;
 };
 
+export const getTopWorkspaces = async (limit: number = 10) => {
+  const token = getAccessToken();
+  
+  const headers: any = {};
+  
+  // Include token if available (for user role information)
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  const response = await axios.get(`${API_URL}/workspaces/top?limit=${limit}`, {
+    headers,
+  });
+  console.log('Top workspaces results:', response.data);
+  return response.data;
+};
+
 export const getWoorkspacesBySearchTerm = async (searchTerm: string) => {
-    const api = createAuthenticatedRequest();
-    const response = await api.get(`/workspaces/search/${searchTerm}`);
+    const token = getAccessToken();
+    
+    const headers: any = {};
+    
+    // Include token if available
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+    
+    const response = await axios.get(`${API_URL}/workspaces/search/${searchTerm}`, {
+        headers,
+    });
+    console.log('Workspace search results:', response.data);
     return response.data;
 };
 
@@ -274,6 +302,83 @@ export const createThreadInWorkspace = async (workspaceId: string, threadData: {
     return response.data;
 };
 
+// Update workspace details (title, description, image, join policy)
+export const updateWorkspace = async (workspaceId: string, workspaceData: FormData | Partial<Workspace>) => {
+    const token = getAccessToken();
+    
+    // Check if workspaceData is FormData (for image uploads)
+    const isFormData = workspaceData instanceof FormData;
+    
+    const headers: any = {
+        Authorization: `Bearer ${token}`,
+    };
+    
+    // Don't set Content-Type for FormData, let axios handle it
+    if (!isFormData) {
+        headers['Content-Type'] = 'application/json';
+    }
+
+    // Debug logging for FormData
+    if (isFormData) {
+        console.log("Updating workspace with FormData:");
+        for (let [key, value] of (workspaceData as FormData).entries()) {
+            console.log(`${key}:`, value);
+        }
+    } else {
+        console.log("Updating workspace with JSON data:", workspaceData);
+    }
+    
+    const response = await axios.put(`${API_URL}/workspaces/${workspaceId}`, workspaceData, {
+        headers,
+    });
+    return response.data;
+};
+
+// Get workspace members and their roles
+export const getWorkspaceMembers = async (workspaceId: string) => {
+    const token = getAccessToken();
+    const response = await axios.get(`${API_URL}/workspaces/${workspaceId}/members`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    console.log(response.data);
+    return response.data;
+};
+
+// Remove a member from the workspace
+export const removeMember = async (workspaceId: string, memberId: string) => {
+    const token = getAccessToken();
+    const response = await axios.delete(`${API_URL}/workspaces/${workspaceId}/members/${memberId}`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+// Promote a member to admin
+export const promoteToAdmin = async (workspaceId: string, memberId: string) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/${workspaceId}/members/${memberId}/promote`, {}, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+// Remove admin role from a member
+export const removeAdminRole = async (workspaceId: string, memberId: string) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/${workspaceId}/members/${memberId}/demote`, {}, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
 // Get workspace data by ID - now returns workspace with role included
 export const getWorkspace = async (workspaceId: string): Promise<Workspace> => {
     const token = getAccessToken();
@@ -283,5 +388,38 @@ export const getWorkspace = async (workspaceId: string): Promise<Workspace> => {
         },
     });
     console.log(response.data);
+    return response.data;
+};
+
+// Get join requests for a workspace (admin only)
+export const getWorkspaceJoinRequests = async (workspaceId: string) => {
+    const token = getAccessToken();
+    const response = await axios.get(`${API_URL}/workspaces/${workspaceId}/join-requests`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+// Approve a join request (admin only)
+export const approveJoinRequest = async (workspaceId: string, requestId: string) => {
+    const token = getAccessToken();
+    const response = await axios.post(`${API_URL}/workspaces/${workspaceId}/join-requests/${requestId}/approve`, {}, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    return response.data;
+};
+
+// Reject/Delete a join request (admin only)
+export const rejectJoinRequest = async (workspaceId: string, requestId: string) => {
+    const token = getAccessToken();
+    const response = await axios.delete(`${API_URL}/workspaces/${workspaceId}/join-requests/${requestId}`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
     return response.data;
 };
