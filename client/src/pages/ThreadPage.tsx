@@ -362,6 +362,16 @@ export default function ThreadPage() {
     navigate(`/workspace/${workspaceId}/threads/${threadId}/documents/${documentId}`)
   }
 
+  const openDocumentInEditor = (documentId: number | string) => {
+    // Check if documentId is valid before navigation
+    if (!documentId || documentId === null || documentId === undefined) {
+      console.error('❌ Invalid document ID for navigation:', documentId);
+      return;
+    }
+
+    navigate(`/workspace/${workspaceId}/threads/${threadId}/editor/${documentId}`)
+  }
+
   // Helper functions to format data
   const formatFileSize = (bytes?: number): string => {
     if (!bytes) return "Unknown size"
@@ -965,7 +975,7 @@ export default function ThreadPage() {
             onClick={() => {
               // Ensure doc.id exists and is valid before navigation
               if (doc.id && doc.id !== null && doc.id !== undefined) {
-                openDocument(doc.id);
+                openDocumentInEditor(doc.id);
               } else {
                 console.error('❌ Document has invalid ID:', doc);
               }

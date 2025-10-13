@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { getAccessToken } from './authApi';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
 export interface CreateDocumentData {
   title: string;

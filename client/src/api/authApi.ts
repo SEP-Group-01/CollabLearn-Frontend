@@ -76,16 +76,40 @@ export const getRefreshToken = (): string | null => {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 };
 
-// Get user data - simplified for development
-export const getUserData = (): User | null => {
-  // Return consistent mock data for development with proper UUID format
-  return {
-    id: '53e5f9f5-fe11-4728-9996-7e606bb98f96', // Valid UUID format for development
-    first_name: 'Development',
-    last_name: 'User',
-    email: 'dev@example.com',
-    email_verified: true,
-  };
+// Get user data - gets real user data from API
+export const getUserData = async (): Promise<User | null> => {
+  try {
+    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    if (!token) {
+      return null;
+    }
+
+    const response = await axios.get(`${API_URL}/auth/user`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const userData = response.data.user;
+    
+    // Convert to expected User format
+    return {
+      id: userData.id,
+      first_name: userData.first_name,
+      last_name: userData.last_name,
+      email: userData.email,
+      email_verified: userData.email_verified,
+      image_url: userData.image_url,
+      stats: userData.stats,
+    };
+  } catch (error: any) {
+    console.error('Failed to get user data:', error);
+    if (error.response?.status === 401) {
+      // Token is invalid, clear auth data
+      clearAuthData();
+    }
+    return null;
+  }
 };
 
 export const clearAuthData = () => {
@@ -221,4 +245,32 @@ export const resetPassword = async (token: string, newPassword: string) => {
 
 export const logout = () => {
   clearAuthData();
+};
+
+export const editUser = async (userData: {
+  first_name?: string;
+  last_name?: string;
+  image_file?: string; // base64 encoded image data URL
+  remove_image?: boolean;
+}): Promise<{ message: string; user: User }> => {
+  try {
+    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    if (!token) {
+      throw new Error('No access token found');
+    }
+
+    const response = await axios.post(`${API_URL}/auth/edit-user`, userData, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      }
+    });
+
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
+    throw new Error(error.message || "Failed to update user");
+  }
 };
