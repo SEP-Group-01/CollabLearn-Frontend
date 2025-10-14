@@ -41,6 +41,7 @@ import SidebarComponent from '../components/SideBar';
 import type {Option, Question, QuizDetails} from '../types/QuizInterfaces'
 import DragDropImageUpload from '../components/DragDropImageUpload'
 import { createQuiz } from '../api/quizApi';
+import { getAccessToken } from '../api/authApi';
 import { useLocation, useParams } from 'react-router-dom';
 
 
@@ -312,8 +313,18 @@ const CreateQuiz: React.FC = () => {
         
         setLoadingResources(true);
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/threads/${threadId}/resources`, {
+            // Fix: Use the same token method as quizApi.ts
+            const token = getAccessToken();
+            
+            if (!token) {
+                console.error('No authentication token found');
+                throw new Error('Authentication required');
+            }
+            
+            // Fix: Use correct API endpoint without double /api/ prefix
+            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const apiUrl = baseUrl.includes('/api') ? baseUrl : `${baseUrl}/api`;
+            const response = await fetch(`${apiUrl}/threads/${threadId}/resources`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',

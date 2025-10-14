@@ -30,8 +30,8 @@ function Header({}: HeaderProps) {
     ...(isHome
       ? [
           { name: "Home", href: "/" },
-          { name: "groups", href: "#groups" },
-          { name: "features", href: "#features" },
+          { name: "Workspaces", href: "#groups" },
+          { name: "Features", href: "#features" },
           { name: "About", href: "#about" },
         ]
       : [])

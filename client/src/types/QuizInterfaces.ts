@@ -58,6 +58,7 @@ export interface QuizDetails {
 export interface DragDropImageUploadProps {
     onImageUpload: (file: File) => void;
     currentImage: File | null;
+    currentImageUrl?: string | null; // Add support for existing image URLs
     label: string;
     fullWidth?: boolean;
     height?: string;

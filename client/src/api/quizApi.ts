@@ -83,8 +83,8 @@ const tryGetWithFallback = async (candidates: string[]) => {
  */
 export const getQuizzes = async (threadId: string): Promise<Quiz[]> => {
   const candidates = [
-    `${API_URL}/threads/${threadId}/quizzes`,
-    `${API_BASE}/threads/${threadId}/quizzes`,
+    `${API_URL}/quizzes/thread/${threadId}`,
+    `${API_BASE}/quizzes/thread/${threadId}`,
   ]
   
   console.log('[getQuizzes] Trying URLs:', candidates)
@@ -172,7 +172,8 @@ export const createQuiz = async (threadId: string, quizData: Partial<Quiz> | For
   if (!isFormData) headers['Content-Type'] = 'application/json'
 
   try {
-    const response = await axios.post(`${API_URL}/threads/${threadId}/quizzes/create`, quizData, {
+    // Use the correct API Gateway endpoint that actually works
+    const response = await axios.post(`${API_URL}/quizzes/thread/${threadId}`, quizData, {
       headers,
     })
     return response.data

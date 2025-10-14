@@ -1,14 +1,14 @@
 export type Role = "admin" | "member";
 
 export interface Author {
-  id: number;
+  id: number | string;
   name: string;
   avatar: string;
   role: Role;
 }
 
 export interface ReplyType {
-  id: number;
+  id: number | string;
   content: string;
   author: Author;
   timestamp: string;
@@ -17,7 +17,7 @@ export interface ReplyType {
 }
 
 export interface MessageType {
-  id: number;
+  id: number | string;
   content: string;
   author: Author;
   timestamp: string;

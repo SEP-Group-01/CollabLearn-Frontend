@@ -27,6 +27,8 @@ import GroupManagePage from './pages/GroupManagePage';
 import DocumentDetailsPage from './pages/DocumentDetailsPage';
 import LinksPage from './pages/LinksPage';
 import VideosPage from './pages/VideosPage';
+import VideoDetailsPage from './pages/VideoDetailsPage';
+import LinkDetailsPage from './pages/LinkDetailsPage';
 
 const App = () => {
   return (
@@ -46,6 +48,7 @@ const App = () => {
 
           <Route path="/forum" element={<Forum />} />
           <Route path="/workspace/:workspaceId" element={<Workspace />} />
+          <Route path="/workspace/:workspaceId/forum" element={<Forum />} />
           <Route path="/workspace/:workspaceId/manage" element={<ManageWorkspace />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/quizzes" element={<QuizesPage />} />
@@ -63,6 +66,8 @@ const App = () => {
           <Route path="/workspace/:workspaceId/threads/:threadId/query" element={<DocumentQuery />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/manage" element={<GroupManagePage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/links" element={<LinksPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/links/:linkId" element={<LinkDetailsPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/videos/:videoId" element={<VideoDetailsPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/videos" element={<VideosPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/quizzes" element={<QuizesPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/create-quiz" element={<CreateQuiz />} />

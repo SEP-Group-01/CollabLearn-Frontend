@@ -1,3 +1,29 @@
+// Review and Rating interfaces
+export type Review = {
+  id: number | string
+  user_id: string
+  username: string
+  rating: number  // 1-5 stars (frontend uses 'rating')
+  comment: string // frontend uses 'comment'
+  created_at: string
+  updated_at?: string
+  // Backend compatibility fields
+  ratings?: number // backend uses 'ratings'
+  review?: string  // backend uses 'review'
+}
+
+export type ResourceRating = {
+  average_rating: number
+  total_reviews: number
+  rating_distribution: {
+    1: number
+    2: number
+    3: number
+    4: number
+    5: number
+  }
+}
+
 export type Document = {
   id: string // UUID
   thread_id: string // UUID
@@ -18,22 +44,35 @@ export type Document = {
   isCurrentlyEditing?: boolean
   editedBy?: string
   lastEditTime?: string
+  // Backend-compatible fields
+  description?: string
+  file_size?: number
+  mime_type?: string
+  firebase_url?: string
+  created_at?: string
+  user_id?: string
+  // Review functionality
+  reviews?: Review[]
+  rating_summary?: ResourceRating
+  user_review?: Review  // Current user's review if any
 }
 
 export type Link = {
-  id: string // UUID
-  thread_id: string // UUID
-  user_id: string // UUID
-  resource_type: "link"
+  id: number | string  // Support both numeric and UUID string IDs
   title: string
-  description?: string
-  firebase_url?: string // The actual link URL
-  created_at: string
-  updated_at: string
-  addedBy?: string // For display purposes
-  addedAt?: string // For display purposes (formatted created_at)
-  url?: string // For backward compatibility
+  url: string
+  addedBy: string
+  addedAt: string
+  description: string
+  // Backend-compatible fields
+  created_at?: string
+  user_id?: string
+  // Review functionality
+  reviews?: Review[]
+  rating_summary?: ResourceRating
+  user_review?: Review  // Current user's review if any
 }
+
 
 export type Video = {
   id: string // UUID
@@ -42,12 +81,17 @@ export type Video = {
   resource_type: "video"
   title: string
   description?: string
-  firebase_path?: string
-  firebase_url?: string
-  file_name?: string
+  // Backend-compatible fields
   file_size?: number
   mime_type?: string
-  created_at: string
+  firebase_url?: string
+  created_at?: string
+  user_id?: string
+  // Review functionality
+  reviews?: Review[]
+  rating_summary?: ResourceRating
+  user_review?: Review  // Current user's review if any
+  firebase_path?: string
   updated_at: string
   addedBy?: string // For display purposes
   addedAt?: string // For display purposes (formatted created_at)
