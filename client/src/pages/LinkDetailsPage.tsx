@@ -39,10 +39,13 @@ import {
   Download,
   MoreVert,
   OpenInFull,
+  Checklist as ChecklistIcon,
+  PlayCircle,
 } from "@mui/icons-material";
 
 import { useResourceActions } from "../hooks/useResourceActions";
 import type { Link, Review } from "../types/ThreadInterfaces";
+import ResourceProgressTracker from '../components/ResourceProgressTracker';
 
 export default function LinkDetailsPage() {
   const { linkId, workspaceId, threadId } = useParams();
@@ -94,6 +97,13 @@ export default function LinkDetailsPage() {
     handleUpdateReview, 
     handleDeleteReview 
   } = useResourceActions(workspaceId || '', threadId || '');
+
+  // Helper function to get YouTube video ID from URL
+  const getYouTubeVideoId = (url: string) => {
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[7].length === 11) ? match[7] : null;
+  };
 
   // Load link from API
   useEffect(() => {
@@ -533,57 +543,101 @@ export default function LinkDetailsPage() {
                   p: 4
                 }}
               >
-                {/* Try to embed the link in an iframe first, fallback to description */}
-                <Box sx={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 3,
-                  transform: `scale(${zoom / 100})`,
-                  transformOrigin: 'center center'
-                }}>
-                  <Typography variant="h2" sx={{ fontSize: '4rem', mb: 2 }}>
-                    🔗
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" gutterBottom textAlign="center">
-                    {link.title}
-                  </Typography>
-                  <Typography variant="h6" color="text.secondary" sx={{ mb: 3, maxWidth: 600, textAlign: 'center' }}>
-                    {link.description || 'No description available for this link.'}
-                  </Typography>
-                  <Box sx={{ 
-                    p: 2, 
-                    bgcolor: '#f5f5f5', 
-                    borderRadius: 2, 
-                    border: '1px solid #ddd',
-                    maxWidth: '80%',
-                    wordBreak: 'break-all',
-                    textAlign: 'center'
-                  }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {link.url}
-                    </Typography>
-                  </Box>
-                  <Button 
-                    variant="contained" 
-                    size="large"
-                    startIcon={<OpenInNew />}
-                    onClick={handleOpenLink}
-                    sx={{ 
-                      mt: 2,
-                      background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-                      px: 4,
-                      py: 1.5,
-                      fontSize: '1.1rem'
-                    }}
-                  >
-                    Open Link
-                  </Button>
-                </Box>
+                {/* Link Preview - YouTube or Generic Iframe */}
+                {(() => {
+                  const youtubeVideoId = getYouTubeVideoId(link.url);
+                  
+                  if (youtubeVideoId) {
+                    // YouTube Video Embed
+                    return (
+                      <Box sx={{ 
+                        width: '100%', 
+                        height: '100%',
+                        transform: `scale(${zoom / 100})`,
+                        transformOrigin: 'center center'
+                      }}>
+                        <Box sx={{ position: 'relative', paddingTop: '56.25%', bgcolor: 'black', borderRadius: 2, overflow: 'hidden' }}>
+                          <iframe
+                            src={`https://www.youtube.com/embed/${youtubeVideoId}`}
+                            title={link.title}
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: '100%',
+                            }}
+                          />
+                        </Box>
+                        <Box sx={{ mt: 2, textAlign: 'center' }}>
+                          <Chip 
+                            icon={<PlayCircle />} 
+                            label="YouTube Video" 
+                            color="error" 
+                            sx={{ fontWeight: 'bold' }}
+                          />
+                        </Box>
+                      </Box>
+                    );
+                  } else {
+                    // Generic Link Preview
+                    return (
+                      <Box sx={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 3,
+                        transform: `scale(${zoom / 100})`,
+                        transformOrigin: 'center center'
+                      }}>
+                        <Typography variant="h2" sx={{ fontSize: '4rem', mb: 2 }}>
+                          🔗
+                        </Typography>
+                        <Typography variant="h4" fontWeight="bold" gutterBottom textAlign="center">
+                          {link.title}
+                        </Typography>
+                        <Typography variant="h6" color="text.secondary" sx={{ mb: 3, maxWidth: 600, textAlign: 'center' }}>
+                          {link.description || 'No description available for this link.'}
+                        </Typography>
+                        <Box sx={{ 
+                          p: 2, 
+                          bgcolor: '#f5f5f5', 
+                          borderRadius: 2, 
+                          border: '1px solid #ddd',
+                          maxWidth: '80%',
+                          wordBreak: 'break-all',
+                          textAlign: 'center'
+                        }}>
+                          <Typography variant="body2" color="text.secondary">
+                            {link.url}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    );
+                  }
+                })()}
               </Box>
+              <Button 
+                variant="contained" 
+                size="large"
+                startIcon={<OpenInNew />}
+                onClick={handleOpenLink}
+                sx={{ 
+                  mt: 2,
+                  background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                  px: 4,
+                  py: 1.5,
+                  fontSize: '1.1rem'
+                }}
+              >
+                Open Link
+              </Button>
             </CardContent>
           </Card>
         </Box>
@@ -596,6 +650,24 @@ export default function LinkDetailsPage() {
           gap: 2,
           maxHeight: { xs: 'auto', lg: '100%' }
         }}>
+          {/* Progress Tracking Section */}
+          <Card elevation={3} sx={{ flex: { xs: 1, md: 1, lg: 'none' } }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
+                <ChecklistIcon />
+                Your Progress
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <ResourceProgressTracker 
+                resourceId={linkId || ''} 
+                compact={false}
+                onProgressUpdate={(progress) => {
+                  console.log('Progress updated:', progress);
+                }}
+              />
+            </CardContent>
+          </Card>
+
           {/* Rating Section */}
           <Card elevation={3} sx={{ flex: { xs: 1, md: 1, lg: 'none' } }}>
             <CardContent>

@@ -70,6 +70,27 @@ export default function ThreadPage() {
   const [createLoading, setCreateLoading] = useState(false)
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' })
 
+  // Helper functions to format data (defined before useEffect that uses them)
+  const getDisplayName = (userId?: string): string => {
+    // You might want to fetch user names from an API
+    // For now, return a placeholder
+    return userId ? `User ${userId.slice(0, 8)}` : "Unknown user"
+  }
+
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return "Unknown date"
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  const formatFileSize = (bytes?: number): string => {
+    if (!bytes) return "Unknown size"
+    const kb = bytes / 1024
+    const mb = kb / 1024
+    if (mb >= 1) return `${mb.toFixed(1)} MB`
+    if (kb >= 1) return `${kb.toFixed(1)} KB`
+    return `${bytes} B`
+  }
+
   useEffect(() => {
     const fetchThreadData = async () => {
       if (!threadId || !workspaceId) {
@@ -194,19 +215,6 @@ export default function ThreadPage() {
 
     checkPermissions()
   }, [threadId])
-
-  // Helper function for display names
-  const getDisplayName = (userId?: string): string => {
-    // You might want to fetch user names from an API
-    // For now, return a placeholder
-    return userId ? `User ${userId.slice(0, 8)}` : "Unknown user"
-  }
-
-  // Helper function for date formatting
-  const formatDate = (dateString?: string): string => {
-    if (!dateString) return "Unknown date"
-    return new Date(dateString).toLocaleDateString()
-  }
 
   // Fetch editing documents for this thread
   useEffect(() => {
@@ -370,16 +378,6 @@ export default function ThreadPage() {
     }
 
     navigate(`/workspace/${workspaceId}/threads/${threadId}/editor/${documentId}`)
-  }
-
-  // Helper functions to format data
-  const formatFileSize = (bytes?: number): string => {
-    if (!bytes) return "Unknown size"
-    const kb = bytes / 1024
-    const mb = kb / 1024
-    if (mb >= 1) return `${mb.toFixed(1)} MB`
-    if (kb >= 1) return `${kb.toFixed(1)} KB`
-    return `${bytes} B`
   }
 
   const navigateToDocuments = () => {

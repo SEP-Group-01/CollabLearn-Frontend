@@ -47,7 +47,9 @@ import {
   Edit,
   Save,
   Cancel,
+  Checklist as ChecklistIcon,
 } from "@mui/icons-material";
+import ResourceProgressTracker from '../components/ResourceProgressTracker';
 import { useResourceActions } from '../hooks/useResourceActions';
 import type { Document as DocumentType, Review } from '../types/ThreadInterfaces';
 
@@ -729,6 +731,24 @@ export default function DocumentDetailsPage() {
         {/* Sidebar */}
         {!isMaximized && (
           <Box sx={{ width: { xs: "100%", md: 320 }, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* Progress Tracking Section */}
+          <Card elevation={3}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
+                <ChecklistIcon />
+                Your Progress
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <ResourceProgressTracker 
+                resourceId={docId || ''} 
+                compact={false}
+                onProgressUpdate={(progress) => {
+                  console.log('Progress updated:', progress);
+                }}
+              />
+            </CardContent>
+          </Card>
+
           {/* Rating Section */}
           <Card elevation={3}>
             <CardContent>

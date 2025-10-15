@@ -2,6 +2,7 @@ import type React from "react"
 import SidebarComponent from "../components/SideBar"
 import { useResourceActions } from '../hooks/useResourceActions';
 import type { Document as DocumentType } from '../types/ThreadInterfaces';
+import ResourceProgressTracker from '../components/ResourceProgressTracker';
 
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
@@ -113,6 +114,8 @@ export default function ThreadDocumentsPage() {
     title: "",
     description: "",
     type: "pdf" as "pdf" | "doc" | "txt",
+    estimatedHours: 0,
+    estimatedMinutes: 0
   });
 
   // Load documents from API on component mount
@@ -232,11 +235,15 @@ export default function ThreadDocumentsPage() {
     }
 
     try {
+      // Calculate total minutes from hours and minutes
+      const estimatedCompletionTime = (newDocument.estimatedHours * 60) + newDocument.estimatedMinutes;
+      
       const uploadData = {
         userId: '123e4567-e89b-12d3-a456-426614174000', // TODO: Replace with actual authenticated user ID
         title: newDocument.title,
         description: newDocument.description || '',
         file: selectedFile,
+        estimatedCompletionTime, // in minutes
         onProgress: (progress: number) => {
           setUploadProgress(progress);
         }
@@ -245,7 +252,8 @@ export default function ThreadDocumentsPage() {
       console.log('🚀 Attempting to upload document:', {
         fileName: selectedFile.name,
         fileSize: getFileSize(selectedFile.size),
-        title: newDocument.title
+        title: newDocument.title,
+        estimatedCompletionTime: estimatedCompletionTime + ' minutes'
       });
       console.log('📍 Using workspace ID:', workspaceId, 'thread ID:', threadId);
       console.log('⚠️ NOTE: Make sure user ID exists in database or create user first!');
@@ -262,7 +270,7 @@ export default function ThreadDocumentsPage() {
       
       // Close dialog and reset form immediately after success
       setAddDocumentOpen(false);
-      setNewDocument({ title: "", description: "", type: "pdf" });
+      setNewDocument({ title: "", description: "", type: "pdf", estimatedHours: 0, estimatedMinutes: 0 });
       setSelectedFile(null);
       setUploadProgress(0);
       
@@ -864,7 +872,7 @@ export default function ThreadDocumentsPage() {
                       </Box>
 
                       {/* Meta Info */}
-                      <Box display="flex" gap={1} alignItems="center" sx={{ flexShrink: 0 }}>
+                      <Box display="flex" flexDirection="column" gap={0.5} alignItems="flex-end" sx={{ flexShrink: 0 }}>
                         <Chip 
                           label={doc.type?.toUpperCase()} 
                           size="small" 
@@ -877,6 +885,14 @@ export default function ThreadDocumentsPage() {
                         </Typography>
                       </Box>
                     </CardContent>
+
+                    {/* Progress Tracker */}
+                    <Box sx={{ px: 1.5, pb: 1 }}>
+                      <ResourceProgressTracker 
+                        resourceId={doc.id.toString()} 
+                        compact={true}
+                      />
+                    </Box>
 
                     {/* Action Buttons */}
                     <Box
@@ -1325,6 +1341,34 @@ export default function ThreadDocumentsPage() {
                         </MenuItem>
                       </Select>
                     </FormControl>
+
+                    {/* Estimated Completion Time */}
+                    <Box>
+                      <Typography variant="body2" fontWeight="medium" mb={1}>
+                        Estimated Completion Time (Optional)
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <TextField
+                          label="Hours"
+                          type="number"
+                          inputProps={{ min: 0, max: 99 }}
+                          value={newDocument.estimatedHours}
+                          onChange={(e) => setNewDocument({ ...newDocument, estimatedHours: parseInt(e.target.value) || 0 })}
+                          sx={{ flex: 1 }}
+                        />
+                        <TextField
+                          label="Minutes"
+                          type="number"
+                          inputProps={{ min: 0, max: 59 }}
+                          value={newDocument.estimatedMinutes}
+                          onChange={(e) => setNewDocument({ ...newDocument, estimatedMinutes: parseInt(e.target.value) || 0 })}
+                          sx={{ flex: 1 }}
+                        />
+                      </Box>
+                      <Typography variant="caption" color="text.secondary" mt={0.5} display="block">
+                        How long do you estimate it will take to read/review this document?
+                      </Typography>
+                    </Box>
 
                     {/* File Info Summary */}
                     {selectedFile && (
