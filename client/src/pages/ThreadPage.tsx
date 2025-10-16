@@ -74,14 +74,7 @@ export default function ThreadPage() {
 
   // Helper functions to format data - moved above useEffect so they are initialized
   // before being referenced inside the effect (avoids TDZ/ReferenceError)
-  const formatFileSize = (bytes?: number): string => {
-    if (!bytes) return "Unknown size"
-    const kb = bytes / 1024
-    const mb = kb / 1024
-    if (mb >= 1) return `${mb.toFixed(1)} MB`
-    if (kb >= 1) return `${kb.toFixed(1)} KB`
-    return `${bytes} B`
-  }
+  
 
   const formatDate = (dateString?: string): string => {
     if (!dateString) return "Unknown date"
