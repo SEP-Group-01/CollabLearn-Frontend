@@ -1,420 +1,738 @@
-import React, { useState } from "react";
-import SidebarComponent from "../components/SideBar";
-import TimeSlotsManager from "../components/TimeSlotsManager";
-import WorkspaceThreadSelector from "../components/WorkspaceThreadSelector";
-import StudyCalendar from "../components/StudyCalendar";
+import React, { useState, useEffect } from 'react';
 import {
   Box,
+  Container,
   Typography,
-  Paper,
-  Stack,
-  TextField,
   Button,
-  MenuItem,
-  IconButton,
-  Drawer,
-  useMediaQuery,
   Alert,
   CircularProgress,
-  Stepper,
-  Step,
-  StepLabel,
-  StepContent,
-} from "@mui/material";
-import MenuIcon from "@mui/icons-material/Menu";
-import { 
+  Stack,
+  Divider,
+  Card,
+  CardContent,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Slider,
+  Paper,
+  Fade,
+  Zoom,
+} from '@mui/material';
+import {
   Schedule as ScheduleIcon,
-  Folder as FolderIcon,
-  Settings as SettingsIcon,
-  PlayArrow as GenerateIcon,
-} from "@mui/icons-material";
-import { useTheme } from "@mui/material/styles";
-import type { 
-  TimeSlot, 
-  WorkspaceSelection, 
-  StudyPlanRequest,
-  StudyPlanResult,
-} from "../types/StudyPlanInterfaces";
-import { generateStudyPlan } from "../api/studyPlanApi";
-import { getUserData } from "../api/authApi";
+  School as SchoolIcon,
+  CalendarMonth as CalendarIcon,
+  DeleteForever as DropIcon,
+  AutoAwesome as SparkleIcon,
+} from '@mui/icons-material';
+import { motion } from 'framer-motion';
+import SidebarComponent from '../components/SideBar';
+import WeeklyTimeSlots from '../components/TimeSlotsManager';
+import WorkspaceThreadSelector from '../components/WorkspaceThreadSelector';
+import StudyCalendar from '../components/StudyCalendar';
+import {
+  getStudySlots,
+  createStudySlot,
+  updateStudySlot,
+  deleteStudySlot,
+  getWorkspacesWithThreads,
+  generateStudyPlan,
+  dropStudyPlan,
+  getTasks,
+  updateTask,
+  type StudySlot,
+  type WorkspaceWithThreads,
+  type Resource,
+  type ResourceInput,
+  type StudyPlanResponse,
+} from '../api/studyPlanApi';
 
 const StudyPlanGenerationPage: React.FC = () => {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const [workspaceSelections, setWorkspaceSelections] = useState<WorkspaceSelection[]>([]);
-  const [preferences, setPreferences] = useState({
-    priority_level: "medium" as "high" | "medium" | "low",
-    learning_style: "reading" as "visual" | "auditory" | "kinesthetic" | "reading",
-    difficulty_preference: "medium" as "easy" | "medium" | "hard",
-    session_duration_preference: 60,
-  });
-  const [generated, setGenerated] = useState<StudyPlanResult | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
 
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const userData = getUserData();
-  const userId = typeof userData?.id === 'string' ? parseInt(userData.id) : userData?.id || 1;
+  // Step 1: Time Slots
+  const [slots, setSlots] = useState<StudySlot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
-  const steps = [
-    {
-      label: "Configure Time Slots",
-      description: "Set up your available study times",
-      icon: <ScheduleIcon />,
-    },
-    {
-      label: "Select Content",
-      description: "Choose workspaces and threads to study",
-      icon: <FolderIcon />,
-    },
-    {
-      label: "Set Preferences",
-      description: "Customize your learning preferences",
-      icon: <SettingsIcon />,
-    },
-    {
-      label: "Generate Plan",
-      description: "Create your personalized study schedule",
-      icon: <GenerateIcon />,
-    },
-  ];
+  // Step 2: Workspaces and Resources
+  const [workspaces, setWorkspaces] = useState<WorkspaceWithThreads[]>([]);
+  const [selectedResources, setSelectedResources] = useState<Set<string>>(new Set());
+  const [resourceMap, setResourceMap] = useState<Map<string, { resource: Resource; workspaceId: string; threadId: string }>>(new Map());
+  const [workspacesLoading, setWorkspacesLoading] = useState(false);
 
-  const handleTimeSlotsChange = (newTimeSlots: TimeSlot[]) => {
-    setTimeSlots(newTimeSlots);
-  };
+  // Step 3: Plan Configuration
+  const [maxWeeks, setMaxWeeks] = useState(2);
+  const [revisionRatio, setRevisionRatio] = useState(0.25);
+  const [generatedPlan, setGeneratedPlan] = useState<StudyPlanResponse | null>(null);
+  const [planTasks, setPlanTasks] = useState<any[]>([]);
 
-  const handleWorkspaceSelectionChange = (newSelections: WorkspaceSelection[]) => {
-    setWorkspaceSelections(newSelections);
-  };
+  // Dialogs
+  const [showDropDialog, setShowDropDialog] = useState(false);
 
-  const handlePreferenceChange = (field: string, value: string | number) => {
-    setPreferences(prev => ({ ...prev, [field]: value }));
-  };
+  // Load initial data
+  useEffect(() => {
+    loadSlots();
+    loadWorkspaces();
+  }, []);
 
-  const canProceedToNextStep = () => {
-    switch (currentStep) {
-      case 0:
-        return timeSlots.length > 0;
-      case 1:
-        return workspaceSelections.some(ws => ws.selected && ws.thread_ids.length > 0);
-      case 2:
-        return true; // Preferences are optional
-      default:
-        return true;
-    }
-  };
-
-  const handleGenerateStudyPlan = async () => {
+  const loadSlots = async () => {
+    setSlotsLoading(true);
     try {
-      setGenerating(true);
-      setError(null);
-
-      const selectedWorkspaceIds = workspaceSelections
-        .filter(ws => ws.selected)
-        .map(ws => ws.workspace_id);
-      
-      const selectedThreadIds = workspaceSelections
-        .filter(ws => ws.selected)
-        .flatMap(ws => ws.thread_ids);
-
-      const request: StudyPlanRequest = {
-        user_id: userId,
-        workspace_ids: selectedWorkspaceIds,
-        thread_ids: selectedThreadIds,
-        priority_level: preferences.priority_level,
-        learning_style: preferences.learning_style,
-        difficulty_preference: preferences.difficulty_preference,
-        session_duration_preference: preferences.session_duration_preference,
-      };
-
-      const result = await generateStudyPlan(request);
-      setGenerated(result);
-      setCurrentStep(3); // Move to results view
-
-    } catch (err) {
-      console.error('Error generating study plan:', err);
-      setError((err as Error).message || 'Failed to generate study plan');
-      
-      // For demo purposes, create a mock result
-      const demoResult: StudyPlanResult = {
-        id: Date.now(),
-        user_id: userId,
-        schedule: [
-          {
-            id: 1,
-            resource: {
-              id: 1,
-              name: 'Linear Algebra Fundamentals',
-              type: 'document',
-              workspace_id: workspaceSelections[0]?.workspace_id || 1,
-              thread_id: workspaceSelections[0]?.thread_ids[0] || 1,
-              estimated_duration: 120,
-              difficulty_level: preferences.difficulty_preference,
-              description: 'Introduction to vectors and matrices',
-            },
-            time_slot: timeSlots[0] || {
-              day_of_week: 'Monday',
-              start_time: '09:00',
-              end_time: '11:00',
-              is_available: true,
-            },
-            week_number: 1,
-            allocated_time: preferences.session_duration_preference,
-            status: 'scheduled',
-          },
-        ],
-        total_coverage_percentage: 85,
-        total_allocated_hours: timeSlots.reduce((total, slot) => {
-          const start = new Date(`1970-01-01T${slot.start_time}:00`);
-          const end = new Date(`1970-01-01T${slot.end_time}:00`);
-          return total + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-        }, 0),
-        plan_duration_weeks: 4,
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setGenerated(demoResult);
-      setCurrentStep(3);
+      const fetchedSlots = await getStudySlots();
+      setSlots(fetchedSlots);
+    } catch (err: any) {
+      setError('Failed to load time slots');
     } finally {
-      setGenerating(false);
+      setSlotsLoading(false);
     }
   };
 
-  const handleNextStep = () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else if (currentStep === steps.length - 1) {
-      handleGenerateStudyPlan();
+  const loadWorkspaces = async () => {
+    setWorkspacesLoading(true);
+    try {
+      const fetchedWorkspaces = await getWorkspacesWithThreads();
+      setWorkspaces(fetchedWorkspaces);
+    } catch (err: any) {
+      setError('Failed to load workspaces');
+    } finally {
+      setWorkspacesLoading(false);
     }
   };
 
-  const handlePrevStep = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+  const handleAddSlot = async (slot: Omit<StudySlot, 'id' | 'user_id'>) => {
+    try {
+      const newSlot = await createStudySlot(slot);
+      setSlots([...slots, newSlot]);
+    } catch (err: any) {
+      throw new Error(err.response?.data?.error || 'Failed to create slot');
     }
   };
 
-  const renderStepContent = (step: number) => {
-    switch (step) {
-      case 0:
-        return (
-          <TimeSlotsManager 
-            onTimeSlotsChange={handleTimeSlotsChange}
-            showTitle={false}
-          />
-        );
-      case 1:
-        return (
-          <WorkspaceThreadSelector 
-            onSelectionChange={handleWorkspaceSelectionChange}
-            showTitle={false}
-          />
-        );
-      case 2:
-        return (
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" fontWeight="bold" mb={3}>
-              Study Preferences
-            </Typography>
-            <Stack spacing={3}>
-              <TextField
-                select
-                label="Priority Level"
-                value={preferences.priority_level}
-                onChange={(e) => handlePreferenceChange('priority_level', e.target.value)}
-                fullWidth
-                helperText="How important is this study plan to you?"
-              >
-                <MenuItem value="high">High - Focus intensively</MenuItem>
-                <MenuItem value="medium">Medium - Balanced approach</MenuItem>
-                <MenuItem value="low">Low - Casual learning</MenuItem>
-              </TextField>
-
-              <TextField
-                select
-                label="Learning Style"
-                value={preferences.learning_style}
-                onChange={(e) => handlePreferenceChange('learning_style', e.target.value)}
-                fullWidth
-                helperText="How do you prefer to learn?"
-              >
-                <MenuItem value="visual">Visual - Images, diagrams, videos</MenuItem>
-                <MenuItem value="reading">Reading/Writing - Text-based content</MenuItem>
-                <MenuItem value="auditory">Auditory - Audio content, discussions</MenuItem>
-                <MenuItem value="kinesthetic">Kinesthetic - Hands-on practice</MenuItem>
-              </TextField>
-
-              <TextField
-                select
-                label="Difficulty Preference"
-                value={preferences.difficulty_preference}
-                onChange={(e) => handlePreferenceChange('difficulty_preference', e.target.value)}
-                fullWidth
-                helperText="What level of content challenge do you prefer?"
-              >
-                <MenuItem value="easy">Easy - Start with basics</MenuItem>
-                <MenuItem value="medium">Medium - Balanced challenge</MenuItem>
-                <MenuItem value="hard">Hard - Advanced content</MenuItem>
-              </TextField>
-
-              <TextField
-                label="Preferred Session Duration (minutes)"
-                type="number"
-                value={preferences.session_duration_preference}
-                onChange={(e) => handlePreferenceChange('session_duration_preference', parseInt(e.target.value) || 60)}
-                fullWidth
-                helperText="How long should each study session be?"
-                inputProps={{ min: 15, max: 180, step: 15 }}
-              />
-            </Stack>
-          </Paper>
-        );
-      case 3:
-        return generated ? (
-          <Box>
-            <Alert severity="success" sx={{ mb: 3 }}>
-              Study plan generated successfully! Your schedule is now available in your profile.
-            </Alert>
-            <StudyCalendar />
-          </Box>
-        ) : (
-          <Paper sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="h6" mb={2}>
-              Ready to Generate Your Study Plan
-            </Typography>
-            <Typography variant="body1" color="text.secondary" mb={3}>
-              Click "Generate Plan" to create your personalized study schedule based on your time slots, selected content, and preferences.
-            </Typography>
-            <Stack direction="row" spacing={2} justifyContent="center">
-              <Typography variant="body2">
-                <strong>Time Slots:</strong> {timeSlots.length} configured
-              </Typography>
-              <Typography variant="body2">
-                <strong>Content:</strong> {workspaceSelections.filter(ws => ws.selected).length} workspaces, {workspaceSelections.reduce((total, ws) => total + ws.thread_ids.length, 0)} threads
-              </Typography>
-            </Stack>
-          </Paper>
-        );
-      default:
-        return null;
+  const handleUpdateSlot = async (slotId: string, updateData: Partial<StudySlot>) => {
+    try {
+      const updated = await updateStudySlot(slotId, updateData);
+      setSlots(slots.map((s) => (s.id === slotId ? updated : s)));
+    } catch (err: any) {
+      throw new Error(err.response?.data?.error || 'Failed to update slot');
     }
   };
+
+  const handleDeleteSlot = async (slotId: string) => {
+    try {
+      await deleteStudySlot(slotId);
+      setSlots(slots.filter((s) => s.id !== slotId));
+    } catch (err: any) {
+      throw new Error(err.response?.data?.error || 'Failed to delete slot');
+    }
+  };
+
+  const handleResourceToggle = (resource: Resource, workspaceId: string, threadId: string) => {
+    const newSelected = new Set(selectedResources);
+    const newResourceMap = new Map(resourceMap);
+
+    if (newSelected.has(resource.id)) {
+      newSelected.delete(resource.id);
+      newResourceMap.delete(resource.id);
+    } else {
+      newSelected.add(resource.id);
+      newResourceMap.set(resource.id, { resource, workspaceId, threadId });
+    }
+
+    setSelectedResources(newSelected);
+    setResourceMap(newResourceMap);
+  };
+
+  const handleWorkspaceToggle = (workspaceId: string, select: boolean) => {
+    const workspace = workspaces.find((w) => w.id === workspaceId);
+    if (!workspace) return;
+
+    const newSelected = new Set(selectedResources);
+    const newResourceMap = new Map(resourceMap);
+
+    workspace.threads.forEach((thread) => {
+      thread.resources.forEach((resource) => {
+        if (select) {
+          newSelected.add(resource.id);
+          newResourceMap.set(resource.id, { resource, workspaceId, threadId: thread.id });
+        } else {
+          newSelected.delete(resource.id);
+          newResourceMap.delete(resource.id);
+        }
+      });
+    });
+
+    setSelectedResources(newSelected);
+    setResourceMap(newResourceMap);
+  };
+
+  const handleThreadToggle = (workspaceId: string, threadId: string, select: boolean) => {
+    const workspace = workspaces.find((w) => w.id === workspaceId);
+    if (!workspace) return;
+
+    const thread = workspace.threads.find((t) => t.id === threadId);
+    if (!thread) return;
+
+    const newSelected = new Set(selectedResources);
+    const newResourceMap = new Map(resourceMap);
+
+    thread.resources.forEach((resource) => {
+      if (select) {
+        newSelected.add(resource.id);
+        newResourceMap.set(resource.id, { resource, workspaceId, threadId });
+      } else {
+        newSelected.delete(resource.id);
+        newResourceMap.delete(resource.id);
+      }
+    });
+
+    setSelectedResources(newSelected);
+    setResourceMap(newResourceMap);
+  };
+
+  const handleGeneratePlan = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      // Prepare resources
+      const resources: ResourceInput[] = Array.from(resourceMap.values()).map(({ resource, workspaceId, threadId }) => ({
+        workspace_id: workspaceId,
+        thread_id: threadId,
+        resource_id: resource.id,
+        title: resource.title,
+        remaining_minutes: resource.estimated_duration || 120, // Default 2 hours if not specified
+        include_revision: true,
+        resource_type: resource.resource_type,
+      }));
+
+      // Prepare slots with week numbers
+      const freeSlots = slots.filter((s) => s.is_free);
+      const slotsInput = [];
+
+      for (let week = 1; week <= maxWeeks; week++) {
+        for (const slot of freeSlots) {
+          slotsInput.push({
+            slot_id: slot.id,
+            week_number: week,
+            day_of_week: slot.day_of_week,
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+          });
+        }
+      }
+
+      const plan = await generateStudyPlan({
+        max_weeks: maxWeeks,
+        revision_ratio: revisionRatio,
+        slots: slotsInput,
+        resources,
+      });
+
+      setGeneratedPlan(plan);
+      
+      // Reload slots to show occupied ones
+      await loadSlots();
+      
+      // Load tasks
+      const tasks = await getTasks(plan.plan_id);
+      setPlanTasks(tasks);
+
+      // Plan generated successfully - it will automatically display in section 3
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to generate study plan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDropPlan = async () => {
+    if (!generatedPlan) return;
+
+    setLoading(true);
+    try {
+      await dropStudyPlan(generatedPlan.plan_id);
+      setGeneratedPlan(null);
+      setPlanTasks([]);
+      await loadSlots(); // Reload to show freed slots
+      setShowDropDialog(false);
+      // Plan dropped successfully - section 3 will show configuration again
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to drop study plan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTaskUpdate = async (taskId: string, update: any) => {
+    try {
+      const updatedTask = await updateTask(taskId, update);
+      setPlanTasks(planTasks.map((t) => (t.id === taskId ? updatedTask : t)));
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to update task');
+    }
+  };
+
+  const canGenerate = slots.filter((s) => s.is_free).length > 0 && selectedResources.size > 0;
+
+  const sidebarWidth = sidebarCollapsed ? 80 : 250;
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f8fafc" }}>
-      {/* Responsive Sidebar */}
-      {isMobile ? (
-        <>
-          <IconButton
-            sx={{
-              position: "fixed",
-              top: 16,
-              left: 16,
-              zIndex: 1300,
-              bgcolor: "#fff",
-              boxShadow: 2,
-            }}
-            onClick={() => setSidebarOpen(true)}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Drawer
-            anchor="left"
-            open={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-            PaperProps={{ sx: { width: 240 } }}
-          >
-            <SidebarComponent collapsed={false} setCollapsed={() => {}} />
-          </Drawer>
-        </>
-      ) : (
-        <Box sx={{ minWidth: 240, bgcolor: "#fff", boxShadow: 2 }}>
-          <SidebarComponent collapsed={false} setCollapsed={() => {}} />
-        </Box>
-      )}
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      {/* Sidebar */}
+      <SidebarComponent collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
 
       {/* Main Content */}
-      <Box sx={{ flexGrow: 1, p: { xs: 2, md: 4 } }}>
-        <Paper
-          elevation={2}
-          sx={{
-            maxWidth: 1200,
-            mx: "auto",
-            p: { xs: 2, md: 4 },
-            borderRadius: 3,
-          }}
-        >
-          {/* Header */}
-          <Box sx={{ textAlign: "center", mb: 4 }}>
-            <Typography variant="h4" fontWeight="bold" color="primary" mb={1}>
-              Study Plan Generator
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Create a personalized study schedule based on your available time and learning preferences
-            </Typography>
-          </Box>
-
-          {/* Progress Stepper */}
-          <Stepper activeStep={currentStep} orientation={isMobile ? "vertical" : "horizontal"} sx={{ mb: 4 }}>
-            {steps.map((step, index) => (
-              <Step key={step.label}>
-                <StepLabel
-                  icon={step.icon}
-                  optional={
-                    <Typography variant="caption">{step.description}</Typography>
-                  }
-                >
-                  {step.label}
-                </StepLabel>
-                {isMobile && (
-                  <StepContent>
-                    {currentStep === index && renderStepContent(index)}
-                  </StepContent>
-                )}
-              </Step>
-            ))}
-          </Stepper>
-
-          {/* Desktop Step Content */}
-          {!isMobile && (
-            <Box sx={{ mt: 4 }}>
-              {renderStepContent(currentStep)}
+      <Box
+        component={motion.div}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        sx={{
+          flexGrow: 1,
+          marginLeft: `${sidebarWidth}px`,
+          transition: 'margin-left 0.3s ease',
+          background: `
+            linear-gradient(135deg, 
+              rgba(255, 255, 255, 0.95) 0%, 
+              rgba(240, 242, 255, 0.98) 50%, 
+              rgba(255, 255, 255, 0.95) 100%
+            ),
+            repeating-linear-gradient(
+              45deg,
+              rgba(139, 92, 246, 0.02) 0px,
+              rgba(139, 92, 246, 0.02) 2px,
+              transparent 2px,
+              transparent 10px
+            ),
+            repeating-linear-gradient(
+              -45deg,
+              rgba(59, 130, 246, 0.02) 0px,
+              rgba(59, 130, 246, 0.02) 2px,
+              transparent 2px,
+              transparent 10px
+            )
+          `,
+          minHeight: '100vh',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}
+      >
+        <Container maxWidth="xl" sx={{ py: 6 }}>
+          {/* Hero Header */}
+          <Fade in timeout={800}>
+            <Box
+              component={motion.div}
+              initial={{ y: -20 }}
+              animate={{ y: 0 }}
+              transition={{ duration: 0.6 }}
+              sx={{
+                mb: 6,
+                textAlign: 'center',
+                position: 'relative',
+              }}
+            >
+              <SparkleIcon
+                sx={{
+                  fontSize: 60,
+                  color: 'rgba(139, 92, 246, 0.3)',
+                  mb: 2,
+                  animation: 'pulse 2s infinite',
+                  '@keyframes pulse': {
+                    '0%, 100%': { opacity: 0.3, transform: 'scale(1)' },
+                    '50%': { opacity: 0.6, transform: 'scale(1.1)' },
+                  },
+                }}
+              />
+              <Typography
+                variant="h3"
+                gutterBottom
+                sx={{
+                  fontWeight: 800,
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  mb: 2,
+                }}
+              >
+                Study Plan Generator
+              </Typography>
+              <Typography
+                variant="h6"
+                sx={{
+                  color: 'rgba(0, 0, 0, 0.6)',
+                  fontWeight: 400,
+                  maxWidth: 800,
+                  mx: 'auto',
+                }}
+              >
+                Create an optimized study schedule based on your available time and learning goals
+              </Typography>
             </Box>
+          </Fade>
+
+          {error && (
+            <Zoom in>
+              <Alert
+                severity="error"
+                onClose={() => setError('')}
+                sx={{
+                  mb: 4,
+                  borderRadius: 3,
+                  backdropFilter: 'blur(10px)',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  boxShadow: '0 8px 32px rgba(239, 68, 68, 0.15)',
+                }}
+              >
+                {error}
+              </Alert>
+            </Zoom>
           )}
 
-          {/* Navigation Buttons */}
-          <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
-            <Button
-              onClick={handlePrevStep}
-              disabled={currentStep === 0}
-              sx={{ minWidth: 120 }}
+          {/* Section 1: Time Slots */}
+          <Fade in timeout={1000}>
+            <Paper
+              component={motion.div}
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              elevation={0}
+              sx={{
+                mb: 5,
+                borderRadius: 4,
+                overflow: 'hidden',
+                background: 'rgba(255, 255, 255, 0.7)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 8px 32px rgba(139, 92, 246, 0.1)',
+              }}
             >
-              Back
-            </Button>
+              <Box
+                sx={{
+                  p: 3,
+                  background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
+                  borderBottom: '1px solid rgba(139, 92, 246, 0.1)',
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <ScheduleIcon sx={{ fontSize: 32, color: '#8b5cf6' }} />
+                  <Box>
+                    <Typography variant="h5" fontWeight={700} sx={{ color: '#4c1d95' }}>
+                      1. Configure Time Slots
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.6)' }}>
+                      Add your available study time slots for each day of the week
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
 
-            <Box sx={{ display: "flex", gap: 2 }}>
-              {error && (
-                <Alert severity="error" sx={{ flexGrow: 1 }}>
-                  {error}
-                </Alert>
-              )}
-            </Box>
+              <Box sx={{ p: 3 }}>
+                {slotsLoading ? (
+                  <Box display="flex" justifyContent="center" py={8}>
+                    <CircularProgress sx={{ color: '#8b5cf6' }} />
+                  </Box>
+                ) : (
+                  <WeeklyTimeSlots
+                    slots={slots}
+                    onAddSlot={handleAddSlot}
+                    onUpdateSlot={handleUpdateSlot}
+                    onDeleteSlot={handleDeleteSlot}
+                    readonly={false}
+                  />
+                )}
+              </Box>
+            </Paper>
+          </Fade>
 
-            <Button
-              variant="contained"
-              onClick={handleNextStep}
-              disabled={!canProceedToNextStep() || generating}
-              sx={{ minWidth: 120 }}
-              startIcon={generating ? <CircularProgress size={20} /> : currentStep === steps.length - 1 ? <GenerateIcon /> : null}
+          {/* Section 2: Resource Selection */}
+          <Fade in timeout={1200}>
+            <Paper
+              component={motion.div}
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              elevation={0}
+              sx={{
+                mb: 5,
+                borderRadius: 4,
+                overflow: 'hidden',
+                background: 'rgba(255, 255, 255, 0.7)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 8px 32px rgba(59, 130, 246, 0.1)',
+              }}
             >
-              {generating ? "Generating..." : currentStep === steps.length - 1 ? "Generate Plan" : "Next"}
-            </Button>
-          </Box>
-        </Paper>
+              <Box
+                sx={{
+                  p: 3,
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%)',
+                  borderBottom: '1px solid rgba(59, 130, 246, 0.1)',
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <SchoolIcon sx={{ fontSize: 32, color: '#3b82f6' }} />
+                  <Box>
+                    <Typography variant="h5" fontWeight={700} sx={{ color: '#1e3a8a' }}>
+                      2. Select Learning Resources
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.6)' }}>
+                      Choose workspaces, threads, and resources for your study plan
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+
+              <Box sx={{ p: 3 }}>
+                {workspacesLoading ? (
+                  <Box display="flex" justifyContent="center" py={8}>
+                    <CircularProgress sx={{ color: '#3b82f6' }} />
+                  </Box>
+                ) : (
+                  <WorkspaceThreadSelector
+                    workspaces={workspaces}
+                    selectedResources={selectedResources}
+                    onResourceToggle={handleResourceToggle}
+                    onWorkspaceToggle={handleWorkspaceToggle}
+                    onThreadToggle={handleThreadToggle}
+                  />
+                )}
+              </Box>
+            </Paper>
+          </Fade>
+
+          {/* Section 3: Plan Configuration */}
+          <Fade in timeout={1400}>
+            <Paper
+              component={motion.div}
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              elevation={0}
+              sx={{
+                mb: 5,
+                borderRadius: 4,
+                overflow: 'hidden',
+                background: 'rgba(255, 255, 255, 0.7)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 8px 32px rgba(16, 185, 129, 0.1)',
+              }}
+            >
+              <Box
+                sx={{
+                  p: 3,
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                  borderBottom: '1px solid rgba(16, 185, 129, 0.1)',
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <CalendarIcon sx={{ fontSize: 32, color: '#10b981' }} />
+                  <Box>
+                    <Typography variant="h5" fontWeight={700} sx={{ color: '#064e3b' }}>
+                      3. Generate & View Plan
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.6)' }}>
+                      Configure your plan settings and generate your optimized schedule
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+
+              <Box sx={{ p: 3 }}>
+                {!generatedPlan ? (
+                  <Stack spacing={4}>
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                        Study Plan Duration: {maxWeeks} week{maxWeeks > 1 ? 's' : ''}
+                      </Typography>
+                      <Slider
+                        value={maxWeeks}
+                        onChange={(_, value) => setMaxWeeks(value as number)}
+                        min={1}
+                        max={12}
+                        marks
+                        valueLabelDisplay="auto"
+                        sx={{
+                          color: '#10b981',
+                          '& .MuiSlider-thumb': {
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          },
+                        }}
+                      />
+                    </Box>
+
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                        Revision Ratio: {(revisionRatio * 100).toFixed(0)}%
+                      </Typography>
+                      <Slider
+                        value={revisionRatio}
+                        onChange={(_, value) => setRevisionRatio(value as number)}
+                        min={0}
+                        max={0.5}
+                        step={0.05}
+                        marks={[
+                          { value: 0, label: '0%' },
+                          { value: 0.25, label: '25%' },
+                          { value: 0.5, label: '50%' },
+                        ]}
+                        valueLabelDisplay="auto"
+                        valueLabelFormat={(value) => `${(value * 100).toFixed(0)}%`}
+                        sx={{
+                          color: '#8b5cf6',
+                          '& .MuiSlider-thumb': {
+                            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                          },
+                        }}
+                      />
+                      <Typography variant="caption" sx={{ color: 'rgba(0, 0, 0, 0.6)' }}>
+                        Percentage of time allocated for revision
+                      </Typography>
+                    </Box>
+
+                    <Divider sx={{ borderColor: 'rgba(139, 92, 246, 0.2)' }} />
+
+                    <Box
+                      sx={{
+                        p: 3,
+                        borderRadius: 3,
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%)',
+                        border: '1px solid rgba(139, 92, 246, 0.1)',
+                      }}
+                    >
+                      <Typography variant="h6" fontWeight={700} gutterBottom sx={{ color: '#4c1d95' }}>
+                        Plan Summary
+                      </Typography>
+                      <Stack spacing={1}>
+                        <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.7)' }}>
+                          📅 {slots.filter((s) => s.is_free).length} available time slots per week
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.7)' }}>
+                          📚 {selectedResources.size} resources selected
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.7)' }}>
+                          ⏱️ {maxWeeks} week duration
+                        </Typography>
+                      </Stack>
+                    </Box>
+
+                    <Button
+                      variant="contained"
+                      size="large"
+                      onClick={handleGeneratePlan}
+                      disabled={loading || !canGenerate}
+                      startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SparkleIcon />}
+                      sx={{
+                        py: 2,
+                        borderRadius: 3,
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #5568d3 0%, #6a4293 100%)',
+                          boxShadow: '0 12px 32px rgba(102, 126, 234, 0.5)',
+                          transform: 'translateY(-2px)',
+                        },
+                        transition: 'all 0.3s ease',
+                      }}
+                      fullWidth
+                    >
+                      {loading ? 'Generating Your Perfect Schedule...' : 'Generate Study Plan'}
+                    </Button>
+                  </Stack>
+                ) : (
+                  <Stack spacing={3}>
+                    <Box
+                      sx={{
+                        p: 3,
+                        borderRadius: 3,
+                        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
+                        border: '1px solid rgba(16, 185, 129, 0.2)',
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Box>
+                          <Typography variant="h6" fontWeight={700} sx={{ color: '#064e3b' }}>
+                            ✨ Your Study Plan is Ready!
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.6)' }}>
+                            {generatedPlan.total_study_hours.toFixed(1)} hours study •{' '}
+                            {generatedPlan.total_revision_hours.toFixed(1)} hours revision
+                          </Typography>
+                        </Box>
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          startIcon={<DropIcon />}
+                          onClick={() => setShowDropDialog(true)}
+                          sx={{
+                            borderRadius: 2,
+                            borderWidth: 2,
+                            '&:hover': {
+                              borderWidth: 2,
+                              transform: 'scale(1.05)',
+                            },
+                          }}
+                        >
+                          Drop Plan
+                        </Button>
+                      </Stack>
+                    </Box>
+
+                    <StudyCalendar schedule={generatedPlan.schedule} onTaskUpdate={handleTaskUpdate} />
+                  </Stack>
+                )}
+              </Box>
+            </Paper>
+          </Fade>
+        </Container>
       </Box>
+
+      {/* Drop Plan Confirmation Dialog */}
+      <Dialog
+        open={showDropDialog}
+        onClose={() => setShowDropDialog(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: '#dc2626' }}>Drop Study Plan?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: 'rgba(0, 0, 0, 0.7)' }}>
+            Are you sure you want to drop this study plan? This will delete all scheduled tasks and free up your time
+            slots. This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setShowDropDialog(false)} sx={{ borderRadius: 2, px: 3 }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDropPlan}
+            color="error"
+            variant="contained"
+            disabled={loading}
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
+              },
+            }}
+          >
+            {loading ? 'Dropping...' : 'Drop Plan'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

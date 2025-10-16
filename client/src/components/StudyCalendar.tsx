@@ -1,532 +1,454 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
-  Typography,
-  Paper,
   Card,
   CardContent,
+  Typography,
   Chip,
-  Button,
-  IconButton,
-  Stack,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  Button,
+  Stack,
   Rating,
   TextField,
-  Alert,
-  CircularProgress,
+  Tooltip,
+  Grid,
 } from '@mui/material';
 import {
-  CalendarToday as CalendarIcon,
-  ArrowBackIos,
-  ArrowForwardIos,
-  AccessTime as TimeIcon,
-  CheckCircle as CheckCircleIcon,
-  PlayArrow as PlayIcon,
-  SkipNext as SkipIcon,
+  CheckCircle as CompletedIcon,
 } from '@mui/icons-material';
-import type { StudyPlanResult, StudySession } from '../types/StudyPlanInterfaces';
-import { getActiveStudyPlan, updateStudySessionStatus } from '../api/studyPlanApi';
-import { getUserData } from '../api/authApi';
-
-const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+import type { ScheduleSlot, ScheduledResource } from '../api/studyPlanApi';
 
 interface StudyCalendarProps {
-  showTitle?: boolean;
-  compact?: boolean;
+  schedule: ScheduleSlot[];
+  onTaskUpdate?: (taskId: string, update: any) => Promise<void>;
+  readonly?: boolean;
 }
 
-const StudyCalendar: React.FC<StudyCalendarProps> = ({ 
-  showTitle = true, 
-  compact = false 
-}) => {
-  const [studyPlan, setStudyPlan] = useState<StudyPlanResult | null>(null);
-  const [currentWeek, setCurrentWeek] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedSession, setSelectedSession] = useState<StudySession | null>(null);
-  const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
-  const [completionNotes, setCompletionNotes] = useState('');
-  const [sessionRating, setSessionRating] = useState<number>(5);
-  const [actualTimeSpent, setActualTimeSpent] = useState<number>(0);
+const StudyCalendar: React.FC<StudyCalendarProps> = ({ schedule, onTaskUpdate, readonly = false }) => {
+  const [selectedTask, setSelectedTask] = useState<{
+    task: ScheduledResource;
+    slot: ScheduleSlot;
+  } | null>(null);
+  const [taskStatus, setTaskStatus] = useState<string>('pending');
+  const [taskRating, setTaskRating] = useState<number>(0);
+  const [taskNotes, setTaskNotes] = useState<string>('');
 
-  const userData = getUserData();
-  const userId = typeof userData?.id === 'string' ? parseInt(userData.id) : userData?.id || 1;
+  // Group schedule by week
+  const scheduleByWeek = schedule.reduce((acc, slot) => {
+    if (!acc[slot.week_number]) {
+      acc[slot.week_number] = [];
+    }
+    acc[slot.week_number].push(slot);
+    return acc;
+  }, {} as Record<number, ScheduleSlot[]>);
 
-  useEffect(() => {
-    fetchActiveStudyPlan();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
-
-  const fetchActiveStudyPlan = async () => {
-    try {
-      setLoading(true);
-      const plan = await getActiveStudyPlan(userId);
-      
-      if (plan) {
-        setStudyPlan(plan);
-        setError(null);
-      } else {
-        // Demo data for when no active plan exists
-        setStudyPlan({
-          id: 1,
-          user_id: userId,
-          schedule: [
-            {
-              id: 1,
-              resource: {
-                id: 1,
-                name: 'Linear Algebra Fundamentals',
-                type: 'document',
-                workspace_id: 1,
-                thread_id: 1,
-                estimated_duration: 120,
-                difficulty_level: 'medium',
-                description: 'Introduction to vectors and matrices',
-              },
-              time_slot: {
-                day_of_week: 'Monday',
-                start_time: '09:00',
-                end_time: '11:00',
-                is_available: true,
-              },
-              week_number: 1,
-              allocated_time: 120,
-              status: 'scheduled',
-            },
-            {
-              id: 2,
-              resource: {
-                id: 2,
-                name: 'Neural Networks Quiz',
-                type: 'quiz',
-                workspace_id: 1,
-                thread_id: 2,
-                estimated_duration: 45,
-                difficulty_level: 'hard',
-                description: 'Test your understanding of neural networks',
-              },
-              time_slot: {
-                day_of_week: 'Wednesday',
-                start_time: '14:00',
-                end_time: '15:00',
-                is_available: true,
-              },
-              week_number: 1,
-              allocated_time: 60,
-              status: 'completed',
-              completion_date: '2024-01-15',
-              actual_time_spent: 50,
-              user_rating: 4,
-            },
-            {
-              id: 3,
-              resource: {
-                id: 3,
-                name: 'React Hooks Deep Dive',
-                type: 'video',
-                workspace_id: 2,
-                thread_id: 3,
-                estimated_duration: 90,
-                difficulty_level: 'medium',
-                description: 'Advanced React hooks patterns',
-              },
-              time_slot: {
-                day_of_week: 'Friday',
-                start_time: '10:00',
-                end_time: '11:30',
-                is_available: true,
-              },
-              week_number: 1,
-              allocated_time: 90,
-              status: 'in_progress',
-            },
-          ],
-          total_coverage_percentage: 75,
-          total_allocated_hours: 8.5,
-          plan_duration_weeks: 4,
-          status: 'active',
-          created_at: '2024-01-10',
-          updated_at: '2024-01-15',
-        });
+  // Sort slots within each week by day
+  Object.keys(scheduleByWeek).forEach((week) => {
+    scheduleByWeek[parseInt(week)].sort((a, b) => {
+      if (a.day_of_week !== b.day_of_week) {
+        return a.day_of_week - b.day_of_week;
       }
-    } catch (err) {
-      console.error('Error fetching study plan:', err);
-      setError('No active study plan found. Generate one to see your schedule.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getSessionsForWeek = (week: number) => {
-    if (!studyPlan) return {};
-    
-    const sessionsForWeek = studyPlan.schedule.filter(session => session.week_number === week);
-    const sessionsByDay: Record<string, StudySession[]> = {};
-    
-    daysOfWeek.forEach(day => {
-      sessionsByDay[day] = sessionsForWeek.filter(session => 
-        session.time_slot.day_of_week === day
-      );
+      return a.start_time.localeCompare(b.start_time);
     });
-    
-    return sessionsByDay;
+  });
+
+  const weeks = Object.keys(scheduleByWeek)
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  const calculatePosition = (time: string): number => {
+    const [hour, min] = time.split(':').map(Number);
+    return ((hour * 60 + min) / 1440) * 100;
   };
 
-  const handleSessionClick = (session: StudySession) => {
-    setSelectedSession(session);
-    setCompletionNotes(session.notes || '');
-    setSessionRating(session.user_rating || 5);
-    setActualTimeSpent(session.actual_time_spent || session.allocated_time);
-    setSessionDialogOpen(true);
+  const calculateHeight = (startTime: string, endTime: string): number => {
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+    const duration = endHour * 60 + endMin - (startHour * 60 + startMin);
+    return (duration / 1440) * 100;
   };
 
-  const handleSessionStatusUpdate = async (status: 'in_progress' | 'completed' | 'skipped') => {
-    if (!selectedSession) return;
+  const handleTaskClick = (task: ScheduledResource, slot: ScheduleSlot) => {
+    setSelectedTask({ task, slot });
+    setTaskStatus('pending');
+    setTaskRating(0);
+    setTaskNotes('');
+  };
+
+  const handleCloseDialog = () => {
+    setSelectedTask(null);
+    setTaskStatus('pending');
+    setTaskRating(0);
+    setTaskNotes('');
+  };
+
+  const handleMarkComplete = async () => {
+    if (!selectedTask || !onTaskUpdate || !selectedTask.task.task_id) return;
 
     try {
-      await updateStudySessionStatus(
-        userId,
-        selectedSession.id,
-        status,
-        status === 'completed' ? actualTimeSpent : undefined,
-        status === 'completed' ? sessionRating : undefined,
-        status === 'completed' ? completionNotes : undefined
-      );
-
-      // Update local state
-      setStudyPlan(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          schedule: prev.schedule.map(session => 
-            session.id === selectedSession.id
-              ? {
-                  ...session,
-                  status,
-                  actual_time_spent: status === 'completed' ? actualTimeSpent : session.actual_time_spent,
-                  user_rating: status === 'completed' ? sessionRating : session.user_rating,
-                  notes: status === 'completed' ? completionNotes : session.notes,
-                  completion_date: status === 'completed' ? new Date().toISOString() : session.completion_date,
-                }
-              : session
-          ),
-        };
+      await onTaskUpdate(selectedTask.task.task_id, {
+        status: taskStatus,
+        rating: taskRating || undefined,
+        notes: taskNotes || undefined,
+        completion_percentage: taskStatus === 'completed' ? 100 : undefined,
       });
-
-      setSessionDialogOpen(false);
-    } catch (err) {
-      console.error('Error updating session status:', err);
-      // For demo, update locally anyway
-      setStudyPlan(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          schedule: prev.schedule.map(session => 
-            session.id === selectedSession.id
-              ? {
-                  ...session,
-                  status,
-                  actual_time_spent: status === 'completed' ? actualTimeSpent : session.actual_time_spent,
-                  user_rating: status === 'completed' ? sessionRating : session.user_rating,
-                  notes: status === 'completed' ? completionNotes : session.notes,
-                  completion_date: status === 'completed' ? new Date().toISOString() : session.completion_date,
-                }
-              : session
-          ),
-        };
-      });
-      setSessionDialogOpen(false);
+      handleCloseDialog();
+    } catch (error) {
+      console.error('Failed to update task:', error);
     }
   };
 
-  const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
-    switch (status) {
-      case 'completed': return 'success';
-      case 'in_progress': return 'warning';
-      case 'skipped': return 'error';
-      default: return 'default';
-    }
-  };
-
-  const getResourceIcon = (type: string) => {
-    switch (type) {
-      case 'video': return '🎥';
-      case 'quiz': return '📝';
-      case 'document': return '📄';
-      case 'link': return '🔗';
-      default: return '📚';
-    }
-  };
-
-  if (loading) {
+  if (!schedule || schedule.length === 0) {
     return (
-      <Paper sx={{ p: 3, textAlign: 'center' }}>
-        <CircularProgress />
-        <Typography sx={{ mt: 2 }}>Loading study calendar...</Typography>
-      </Paper>
+      <Box textAlign="center" py={4}>
+        <Typography color="text.secondary">
+          No study plan generated yet. Configure your time slots and select resources to get started.
+        </Typography>
+      </Box>
     );
   }
-
-  if (error || !studyPlan) {
-    return (
-      <Paper sx={{ p: 3 }}>
-        <Alert severity="info">
-          {error || 'No active study plan found. Generate a study plan to see your scheduled sessions.'}
-        </Alert>
-      </Paper>
-    );
-  }
-
-  const sessionsByDay = getSessionsForWeek(currentWeek);
-  const totalWeeks = studyPlan.plan_duration_weeks;
 
   return (
     <Box>
-      {showTitle && (
-        <Typography variant="h6" fontWeight="bold" mb={2} display="flex" alignItems="center" gap={1}>
-          <CalendarIcon color="primary" />
-          Study Calendar
-        </Typography>
-      )}
+      <Typography variant="h6" gutterBottom>
+        Your Study Plan Schedule
+      </Typography>
 
-      {/* Week Navigation */}
-      <Paper sx={{ p: 2, mb: 3, bgcolor: 'primary.50' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Box>
-            <Typography variant="h6" color="primary.main">
-              Week {currentWeek} of {totalWeeks}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {Object.values(sessionsByDay).flat().length} sessions scheduled
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1}>
-            <IconButton 
-              onClick={() => setCurrentWeek(Math.max(1, currentWeek - 1))}
-              disabled={currentWeek === 1}
-              size="small"
-            >
-              <ArrowBackIos />
-            </IconButton>
-            <IconButton 
-              onClick={() => setCurrentWeek(Math.min(totalWeeks, currentWeek + 1))}
-              disabled={currentWeek === totalWeeks}
-              size="small"
-            >
-              <ArrowForwardIos />
-            </IconButton>
-          </Stack>
-        </Stack>
-      </Paper>
-
-      {/* Weekly Calendar */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: compact ? 'repeat(3, 1fr)' : 'repeat(7, 1fr)', gap: 1 }}>
-        {(compact ? daysOfWeek.slice(0, 3) : daysOfWeek).map((day) => (
-          <Card key={day} variant="outlined" sx={{ minHeight: 200 }}>
-            <CardContent sx={{ p: 1.5 }}>
-              <Typography variant="subtitle2" fontWeight="bold" mb={1} textAlign="center">
-                {day}
-              </Typography>
-              
-              <Stack spacing={1}>
-                {sessionsByDay[day]?.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
-                    No sessions
-                  </Typography>
-                ) : (
-                  sessionsByDay[day]?.map((session) => (
-                    <Paper
-                      key={session.id}
-                      sx={{
-                        p: 1,
-                        cursor: 'pointer',
-                        bgcolor: getStatusColor(session.status) + '.50',
-                        border: '1px solid',
-                        borderColor: getStatusColor(session.status) + '.200',
-                        '&:hover': {
-                          bgcolor: getStatusColor(session.status) + '.100',
-                          borderColor: getStatusColor(session.status) + '.400',
-                        },
-                      }}
-                      onClick={() => handleSessionClick(session)}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                        <Typography sx={{ fontSize: '1.2em' }}>
-                          {getResourceIcon(session.resource.type)}
-                        </Typography>
-                        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                          <Typography variant="body2" fontWeight="bold" noWrap>
-                            {session.resource.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" display="flex" alignItems="center" gap={0.5}>
-                            <TimeIcon fontSize="inherit" />
-                            {session.time_slot.start_time} - {session.time_slot.end_time}
-                          </Typography>
-                          <Box sx={{ mt: 0.5 }}>
-                            <Chip 
-                              label={session.status} 
-                              size="small" 
-                              color={getStatusColor(session.status)}
-                              sx={{ fontSize: '0.7rem', height: 18 }}
-                            />
-                          </Box>
-                        </Box>
-                      </Box>
-                    </Paper>
-                  ))
-                )}
-              </Stack>
-            </CardContent>
-          </Card>
-        ))}
-      </Box>
-
-      {compact && sessionsByDay && Object.values(sessionsByDay).flat().length > 3 && (
-        <Box sx={{ mt: 2, textAlign: 'center' }}>
-          <Typography variant="body2" color="text.secondary">
-            ... and {Object.values(sessionsByDay).flat().length - 3} more sessions this week
+      {weeks.map((weekNumber) => (
+        <Box key={weekNumber} mb={4}>
+          <Typography variant="h6" color="primary" gutterBottom>
+            Week {weekNumber}
           </Typography>
-        </Box>
-      )}
 
-      {/* Session Detail Dialog */}
-      <Dialog open={sessionDialogOpen} onClose={() => setSessionDialogOpen(false)} maxWidth="sm" fullWidth>
-        {selectedSession && (
-          <>
-            <DialogTitle>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <Typography sx={{ fontSize: '1.5em' }}>
-                  {getResourceIcon(selectedSession.resource.type)}
-                </Typography>
-                <Box>
-                  <Typography variant="h6">{selectedSession.resource.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedSession.time_slot.day_of_week}, {selectedSession.time_slot.start_time} - {selectedSession.time_slot.end_time}
-                  </Typography>
-                </Box>
-              </Stack>
-            </DialogTitle>
-            
-            <DialogContent>
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="body2" color="text.secondary" mb={1}>
-                    {selectedSession.resource.description}
-                  </Typography>
-                  <Stack direction="row" spacing={1}>
-                    <Chip label={selectedSession.resource.difficulty_level} size="small" />
-                    <Chip label={`${selectedSession.allocated_time} min`} size="small" />
-                    <Chip 
-                      label={selectedSession.status} 
-                      color={getStatusColor(selectedSession.status)} 
-                      size="small" 
-                    />
-                  </Stack>
-                </Box>
+          <Grid container spacing={2}>
+            {scheduleByWeek[weekNumber].map((slot, slotIndex) => {
+              const totalMinutes = slot.assigned_resources.reduce(
+                (acc, r) => acc + r.allocated_minutes,
+                0
+              );
 
-                {selectedSession.status === 'completed' && (
-                  <Box>
-                    <Typography variant="body2" fontWeight="bold" mb={1}>
-                      Completion Details:
-                    </Typography>
-                    <Stack spacing={1}>
-                      <Typography variant="body2">
-                        Time spent: {selectedSession.actual_time_spent} minutes
-                      </Typography>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <Typography variant="body2">Rating:</Typography>
-                        <Rating value={selectedSession.user_rating || 0} size="small" readOnly />
-                      </Box>
-                      {selectedSession.notes && (
-                        <Typography variant="body2">
-                          Notes: {selectedSession.notes}
+              return (
+                <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={`${slot.day_of_week}-${slotIndex}`}>
+                  <Card
+                    sx={{
+                      height: '500px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      bgcolor: 'rgba(255, 255, 255, 0.7)',
+                      backdropFilter: 'blur(10px)',
+                      borderRadius: 3,
+                      border: '1px solid rgba(139, 92, 246, 0.2)',
+                      boxShadow: '0 4px 16px rgba(139, 92, 246, 0.1)',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: '0 12px 40px rgba(139, 92, 246, 0.2)',
+                      },
+                    }}
+                  >
+                    <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 2.5 }}>
+                      <Box mb={2}>
+                        <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#4c1d95' }}>
+                          {slot.day_name}
                         </Typography>
-                      )}
+                        <Typography variant="caption" sx={{ color: 'rgba(0, 0, 0, 0.6)' }}>
+                          {new Date(slot.scheduled_date).toLocaleDateString()}
+                        </Typography>
+                      </Box>
+
+                      {/* Time visualization */}
+                      <Box
+                        sx={{
+                          flexGrow: 1,
+                          position: 'relative',
+                          border: 1,
+                          borderColor: 'divider',
+                          borderRadius: 1,
+                          bgcolor: 'background.default',
+                          minHeight: 300,
+                        }}
+                      >
+                        {/* Time markers */}
+                        {[0, 6, 12, 18, 24].map((hour) => (
+                          <Box
+                            key={hour}
+                            sx={{
+                              position: 'absolute',
+                              top: `${(hour / 24) * 100}%`,
+                              left: 0,
+                              right: 0,
+                              borderTop: 1,
+                              borderColor: 'divider',
+                              opacity: 0.3,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                position: 'absolute',
+                                left: 2,
+                                top: -8,
+                                bgcolor: 'background.default',
+                                px: 0.5,
+                                fontSize: '0.6rem',
+                              }}
+                            >
+                              {hour}:00
+                            </Typography>
+                          </Box>
+                        ))}
+
+                        {/* Slot background */}
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: `${calculatePosition(slot.start_time)}%`,
+                            left: '5%',
+                            right: '5%',
+                            height: `${calculateHeight(slot.start_time, slot.end_time)}%`,
+                            bgcolor: 'action.hover',
+                            border: 1,
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                          }}
+                        />
+
+                        {/* Render tasks */}
+                        {slot.assigned_resources.map((resource, resourceIndex) => {
+                          const topPosition = calculatePosition(slot.start_time);
+                          const taskHeight = (resource.allocated_minutes / 1440) * 100;
+                          const offsetTop =
+                            resourceIndex > 0
+                              ? slot.assigned_resources
+                                  .slice(0, resourceIndex)
+                                  .reduce((acc, r) => acc + (r.allocated_minutes / 1440) * 100, 0)
+                              : 0;
+
+                          return (
+                            <Tooltip
+                              key={resourceIndex}
+                              title={
+                                <Box>
+                                  <Typography variant="caption" display="block">
+                                    <strong>{resource.title}</strong>
+                                  </Typography>
+                                  <Typography variant="caption" display="block">
+                                    Type: {resource.task_type}
+                                  </Typography>
+                                  <Typography variant="caption" display="block">
+                                    Duration: {resource.allocated_minutes} min
+                                  </Typography>
+                                  <Typography variant="caption" display="block">
+                                    Workspace: {resource.workspace_title || 'N/A'}
+                                  </Typography>
+                                  <Typography variant="caption" display="block">
+                                    Thread: {resource.thread_title || 'N/A'}
+                                  </Typography>
+                                </Box>
+                              }
+                              arrow
+                            >
+                              <Box
+                                onClick={() => !readonly && handleTaskClick(resource, slot)}
+                                sx={{
+                                  position: 'absolute',
+                                  top: `${topPosition + offsetTop}%`,
+                                  left: '8%',
+                                  right: '8%',
+                                  height: `${taskHeight}%`,
+                                  minHeight: '45px',
+                                  bgcolor:
+                                    resource.task_type === 'revision'
+                                      ? 'rgba(236, 72, 153, 0.15)'
+                                      : 'rgba(59, 130, 246, 0.15)',
+                                  border: '2px solid',
+                                  borderColor: resource.task_type === 'revision' ? '#ec4899' : '#3b82f6',
+                                  backdropFilter: 'blur(10px)',
+                                  borderRadius: 1,
+                                  p: 0.5,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  overflow: 'hidden',
+                                  cursor: readonly ? 'default' : 'pointer',
+                                  transition: 'all 0.2s',
+                                  '&:hover': readonly
+                                    ? {}
+                                    : {
+                                        boxShadow: 3,
+                                        transform: 'scale(1.02)',
+                                        zIndex: 10,
+                                      },
+                                }}
+                              >
+                                <Typography
+                                  variant="caption"
+                                  fontWeight="bold"
+                                  sx={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    fontSize: '0.7rem',
+                                  }}
+                                >
+                                  {resource.title}
+                                </Typography>
+                                <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>
+                                  {resource.allocated_minutes}m
+                                </Typography>
+                                <Chip
+                                  label={resource.task_type}
+                                  size="small"
+                                  color={resource.task_type === 'revision' ? 'secondary' : 'primary'}
+                                  sx={{ height: 16, fontSize: '0.6rem', mt: 0.5 }}
+                                />
+                              </Box>
+                            </Tooltip>
+                          );
+                        })}
+                      </Box>
+
+                      {/* Summary */}
+                      <Box
+                        mt={1.5}
+                        sx={{
+                          pt: 1.5,
+                          borderTop: '1px solid rgba(139, 92, 246, 0.2)',
+                          minHeight: '40px',
+                        }}
+                      >
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: 'rgba(0, 0, 0, 0.7)',
+                            fontWeight: 500,
+                            display: 'block',
+                          }}
+                        >
+                          {slot.start_time} - {slot.end_time} • {slot.assigned_resources.length} task(s) •{' '}
+                          {totalMinutes} min
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </Box>
+      ))}
+
+      {/* Task Details Dialog */}
+      {selectedTask && (
+        <Dialog open={!!selectedTask} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+          <DialogTitle>Task Details</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Resource
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {selectedTask.task.title}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Workspace / Thread
+                </Typography>
+                <Typography variant="body2">
+                  {selectedTask.task.workspace_title} / {selectedTask.task.thread_title}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Schedule
+                </Typography>
+                <Typography variant="body2">
+                  {selectedTask.slot.day_name}, {new Date(selectedTask.slot.scheduled_date).toLocaleDateString()}
+                </Typography>
+                <Typography variant="body2">
+                  {selectedTask.slot.start_time} - {selectedTask.slot.end_time}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Duration & Type
+                </Typography>
+                <Stack direction="row" spacing={1}>
+                  <Chip label={`${selectedTask.task.allocated_minutes} minutes`} size="small" />
+                  <Chip
+                    label={selectedTask.task.task_type}
+                    size="small"
+                    color={selectedTask.task.task_type === 'revision' ? 'secondary' : 'primary'}
+                  />
+                </Stack>
+              </Box>
+
+              {!readonly && (
+                <>
+                  <Box>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Mark as Completed
+                    </Typography>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        variant={taskStatus === 'completed' ? 'contained' : 'outlined'}
+                        size="small"
+                        startIcon={<CompletedIcon />}
+                        onClick={() => setTaskStatus('completed')}
+                      >
+                        Completed
+                      </Button>
+                      <Button
+                        variant={taskStatus === 'skipped' ? 'contained' : 'outlined'}
+                        size="small"
+                        color="warning"
+                        onClick={() => setTaskStatus('skipped')}
+                      >
+                        Skipped
+                      </Button>
                     </Stack>
                   </Box>
-                )}
 
-                {selectedSession.status !== 'completed' && (
-                  <>
-                    <TextField
-                      label="Actual time spent (minutes)"
-                      type="number"
-                      value={actualTimeSpent}
-                      onChange={(e) => setActualTimeSpent(parseInt(e.target.value) || 0)}
-                      size="small"
-                      fullWidth
+                  <Box>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Rate this session
+                    </Typography>
+                    <Rating
+                      value={taskRating}
+                      onChange={(_, value) => setTaskRating(value || 0)}
+                      size="large"
                     />
-                    
-                    <Box>
-                      <Typography variant="body2" mb={1}>Rate this session:</Typography>
-                      <Rating
-                        value={sessionRating}
-                        onChange={(_, value) => setSessionRating(value || 5)}
-                      />
-                    </Box>
-                    
-                    <TextField
-                      label="Notes (optional)"
-                      multiline
-                      rows={3}
-                      value={completionNotes}
-                      onChange={(e) => setCompletionNotes(e.target.value)}
-                      size="small"
-                      fullWidth
-                    />
-                  </>
-                )}
-              </Stack>
-            </DialogContent>
-            
-            <DialogActions>
-              <Button onClick={() => setSessionDialogOpen(false)}>Close</Button>
-              
-              {selectedSession.status === 'scheduled' && (
-                <>
-                  <Button 
-                    startIcon={<PlayIcon />}
-                    onClick={() => handleSessionStatusUpdate('in_progress')}
-                    color="warning"
-                  >
-                    Start
-                  </Button>
-                  <Button 
-                    startIcon={<SkipIcon />}
-                    onClick={() => handleSessionStatusUpdate('skipped')}
-                    color="error"
-                  >
-                    Skip
-                  </Button>
+                  </Box>
+
+                  <TextField
+                    label="Notes (optional)"
+                    multiline
+                    rows={3}
+                    value={taskNotes}
+                    onChange={(e) => setTaskNotes(e.target.value)}
+                    fullWidth
+                  />
                 </>
               )}
-              
-              {selectedSession.status === 'in_progress' && (
-                <>
-                  <Button 
-                    startIcon={<CheckCircleIcon />}
-                    onClick={() => handleSessionStatusUpdate('completed')}
-                    color="success"
-                    variant="contained"
-                  >
-                    Complete
-                  </Button>
-                  <Button 
-                    startIcon={<SkipIcon />}
-                    onClick={() => handleSessionStatusUpdate('skipped')}
-                    color="error"
-                  >
-                    Skip
-                  </Button>
-                </>
-              )}
-            </DialogActions>
-          </>
-        )}
-      </Dialog>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog}>Close</Button>
+            {!readonly && (
+              <Button onClick={handleMarkComplete} variant="contained" disabled={!taskStatus}>
+                Save Progress
+              </Button>
+            )}
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 };
