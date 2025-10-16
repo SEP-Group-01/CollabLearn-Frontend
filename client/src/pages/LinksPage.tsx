@@ -33,6 +33,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useResourceActions } from '../hooks/useResourceActions';
 import type { Link as LinkType } from '../types/ThreadInterfaces';
+import ResourceProgressTracker from '../components/ResourceProgressTracker';
 
 // YouTube Thumbnail Component with fallback handling
 const YouTubeThumbnail = ({ videoId, onClick }: { videoId: string; onClick: () => void }) => {
@@ -156,7 +157,9 @@ export default function LinksPage() {
   const [newLink, setNewLink] = useState({
     title: '',
     url: '',
-    description: ''
+    description: '',
+    estimatedHours: 0,
+    estimatedMinutes: 0
   });
 
   // Load links from API on component mount
@@ -235,13 +238,13 @@ export default function LinksPage() {
   // Handle opening add link dialog
   const handleOpenAddLinkDialog = () => {
     setAddLinkDialogOpen(true);
-    setNewLink({ title: '', url: '', description: '' });
+    setNewLink({ title: '', url: '', description: '', estimatedHours: 0, estimatedMinutes: 0 });
   };
 
   // Handle closing add link dialog
   const handleCloseAddLinkDialog = () => {
     setAddLinkDialogOpen(false);
-    setNewLink({ title: '', url: '', description: '' });
+    setNewLink({ title: '', url: '', description: '', estimatedHours: 0, estimatedMinutes: 0 });
     clearError();
   };
 
@@ -274,15 +277,20 @@ export default function LinksPage() {
     }
 
     try {
+      // Calculate total minutes from hours and minutes
+      const estimatedCompletionTime = (newLink.estimatedHours * 60) + newLink.estimatedMinutes;
+      
       const linkData = {
         userId: '123e4567-e89b-12d3-a456-426614174000', // TODO: Replace with actual authenticated user ID
         title: newLink.title,
         url: newLink.url,
-        description: newLink.description || ''
+        description: newLink.description || '',
+        estimatedCompletionTime // in minutes
       };
       
       console.log('🚀 Attempting to create link with data:', linkData);
       console.log('📍 Using workspace ID:', workspaceId, 'thread ID:', threadId);
+      console.log('⏱️ Estimated completion time:', estimatedCompletionTime, 'minutes');
       console.log('⚠️ NOTE: Make sure user ID exists in database or create user first!');
       
       const createdLink = await handleLinkCreate(linkData);
@@ -673,19 +681,28 @@ export default function LinksPage() {
                             </Typography>
                           </Box>
 
+                          {/* Progress Tracker */}
+                          <Box sx={{ mb: 2 }}>
+                            <ResourceProgressTracker 
+                              resourceId={link.id.toString()} 
+                              compact={true}
+                            />
+                          </Box>
+
                           {/* Action Button */}
                           <Button
-                            variant="contained"
+                            variant="outlined"
                             endIcon={<OpenInNew />}
                             fullWidth
                             onClick={() => handleLinkClick(link)}
                             sx={{
                               textTransform: 'none',
                               fontWeight: 600,
-                              backgroundColor: linkInfo.color,
+                              borderColor: linkInfo.color,
+                              color: linkInfo.color,
                               '&:hover': {
-                                backgroundColor: linkInfo.color,
-                                filter: 'brightness(0.9)'
+                                borderColor: linkInfo.color,
+                                backgroundColor: `${linkInfo.color}10`
                               }
                             }}
                           >
@@ -773,6 +790,34 @@ export default function LinksPage() {
                 value={newLink.description}
                 onChange={(e) => handleLinkChange('description', e.target.value)}
               />
+
+              {/* Estimated Completion Time */}
+              <Box>
+                <Typography variant="body2" fontWeight="medium" mb={1}>
+                  Estimated Completion Time (Optional)
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <TextField
+                    label="Hours"
+                    type="number"
+                    inputProps={{ min: 0, max: 99 }}
+                    value={newLink.estimatedHours}
+                    onChange={(e) => handleLinkChange('estimatedHours', parseInt(e.target.value) || 0)}
+                    sx={{ flex: 1 }}
+                  />
+                  <TextField
+                    label="Minutes"
+                    type="number"
+                    inputProps={{ min: 0, max: 59 }}
+                    value={newLink.estimatedMinutes}
+                    onChange={(e) => handleLinkChange('estimatedMinutes', parseInt(e.target.value) || 0)}
+                    sx={{ flex: 1 }}
+                  />
+                </Box>
+                <Typography variant="caption" color="text.secondary" mt={0.5} display="block">
+                  How long do you estimate it will take to review this link?
+                </Typography>
+              </Box>
 
               {/* Link Preview */}
               {newLink.url && (

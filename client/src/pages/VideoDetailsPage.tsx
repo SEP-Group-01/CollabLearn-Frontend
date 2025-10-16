@@ -45,9 +45,11 @@ import {
   VolumeUp,
   VolumeOff,
   Fullscreen,
+  Checklist as ChecklistIcon,
 } from "@mui/icons-material";
 
 import { useResourceActions } from "../hooks/useResourceActions";
+import ResourceProgressTracker from '../components/ResourceProgressTracker';
 import type { Video, Review } from "../types/ThreadInterfaces";
 
 export default function VideoDetailsPage() {
@@ -683,6 +685,24 @@ export default function VideoDetailsPage() {
           gap: 2,
           maxHeight: { xs: 'auto', lg: '100%' }
         }}>
+          {/* Progress Tracking Section */}
+          <Card elevation={3} sx={{ flex: { xs: 1, md: 1, lg: 'none' } }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
+                <ChecklistIcon />
+                Your Progress
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <ResourceProgressTracker 
+                resourceId={videoId || ''} 
+                compact={false}
+                onProgressUpdate={(progress) => {
+                  console.log('Progress updated:', progress);
+                }}
+              />
+            </CardContent>
+          </Card>
+
           {/* Rating Section */}
           <Card elevation={3} sx={{ flex: { xs: 1, md: 1, lg: 'none' } }}>
             <CardContent>

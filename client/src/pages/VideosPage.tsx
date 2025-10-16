@@ -4,6 +4,7 @@ import { ArrowBack, PlayCircle, Close, Add, CloudUpload, OpenInNew } from "@mui/
 import { useNavigate, useParams } from "react-router-dom";
 import { useResourceActions } from "../hooks/useResourceActions";
 import type { Video } from "../types/ThreadInterfaces";
+import ResourceProgressTracker from '../components/ResourceProgressTracker';
 
 export default function VideosPage() {
   const { workspaceId, threadId } = useParams();
@@ -47,6 +48,8 @@ export default function VideosPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [videoTitle, setVideoTitle] = useState('');
   const [videoDescription, setVideoDescription] = useState('');
+  const [estimatedHours, setEstimatedHours] = useState(0);
+  const [estimatedMinutes, setEstimatedMinutes] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Load videos from API on component mount
@@ -206,15 +209,20 @@ export default function VideosPage() {
     
     try {
       setUploadError(null);
+      // Calculate total minutes from hours and minutes
+      const estimatedCompletionTime = (estimatedHours * 60) + estimatedMinutes;
+      
       const uploadData = {
         userId: '123e4567-e89b-12d3-a456-426614174000', // TODO: Replace with actual authenticated user ID
         title: videoTitle,
         description: videoDescription,
-        file: selectedFile
+        file: selectedFile,
+        estimatedCompletionTime // in minutes
       };
       
       console.log('🚀 Attempting to upload video with data:', uploadData);
       console.log('📍 Using workspace ID:', workspaceId, 'thread ID:', threadId);
+      console.log('⏱️ Estimated completion time:', estimatedCompletionTime, 'minutes');
       console.log('⚠️ NOTE: Make sure user ID exists in database or create user first!');
       
       const createdVideo = await uploadVideo(uploadData);
@@ -246,6 +254,8 @@ export default function VideosPage() {
     setSelectedFile(null);
     setVideoTitle('');
     setVideoDescription('');
+    setEstimatedHours(0);
+    setEstimatedMinutes(0);
     setUploadError(null);
   };
 
@@ -254,6 +264,8 @@ export default function VideosPage() {
     setSelectedFile(null);
     setVideoTitle('');
     setVideoDescription('');
+    setEstimatedHours(0);
+    setEstimatedMinutes(0);
     setUploadError(null);
   };
 
@@ -521,30 +533,37 @@ export default function VideosPage() {
                         {video.title}
                       </Typography>
                       
-                      {/* Author and Action */}
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Avatar sx={{ width: 16, height: 16, bgcolor: 'primary.main', fontSize: '0.6rem' }}>
-                            {video.addedBy.charAt(0)}
-                          </Avatar>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                            {video.addedBy}
-                          </Typography>
-                        </Box>
-                        
-                        <Button 
-                          onClick={() => handleVideoClick(video)}
-                          size="small"
-                          variant="text"
-                          sx={{ 
-                            minWidth: 'auto',
-                            p: 0.5,
-                            fontSize: '0.65rem'
-                          }}
-                        >
-                          {isLocalVideo(video.url) ? 'Play' : 'Watch'}
-                        </Button>
+                      {/* Author and Meta */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                        <Avatar sx={{ width: 16, height: 16, bgcolor: 'primary.main', fontSize: '0.6rem' }}>
+                          {video.addedBy.charAt(0)}
+                        </Avatar>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                          {video.addedBy}
+                        </Typography>
                       </Box>
+
+                      {/* Progress Tracker */}
+                      <Box sx={{ mb: 1 }}>
+                        <ResourceProgressTracker 
+                          resourceId={video.id.toString()} 
+                          compact={true}
+                        />
+                      </Box>
+                        
+                      {/* Action Button */}
+                      <Button 
+                        onClick={() => handleVideoClick(video)}
+                        size="small"
+                        variant="outlined"
+                        fullWidth
+                        sx={{ 
+                          fontSize: '0.65rem',
+                          py: 0.5
+                        }}
+                      >
+                        {isLocalVideo(video.url) ? 'Play' : 'Watch'}
+                      </Button>
                     </CardContent>
                   </Card>
                 ))}
@@ -791,7 +810,36 @@ export default function VideosPage() {
                     multiline
                     rows={3}
                     placeholder="Add a description to help others understand the content"
+                    sx={{ mb: 2 }}
                   />
+                  
+                  {/* Estimated Completion Time */}
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography variant="body2" fontWeight="medium" mb={1}>
+                      Estimated Completion Time (Optional)
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <TextField
+                        label="Hours"
+                        type="number"
+                        inputProps={{ min: 0, max: 99 }}
+                        value={estimatedHours}
+                        onChange={(e) => setEstimatedHours(parseInt(e.target.value) || 0)}
+                        sx={{ flex: 1 }}
+                      />
+                      <TextField
+                        label="Minutes"
+                        type="number"
+                        inputProps={{ min: 0, max: 59 }}
+                        value={estimatedMinutes}
+                        onChange={(e) => setEstimatedMinutes(parseInt(e.target.value) || 0)}
+                        sx={{ flex: 1 }}
+                      />
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" mt={0.5} display="block">
+                      How long do you estimate it will take to watch this video?
+                    </Typography>
+                  </Box>
                 </Box>
               )}
 

@@ -77,7 +77,7 @@ const getCurrentUserId = async (): Promise<string> => {
 export const uploadDocument = async (
   workspaceId: string,
   threadId: string,
-  uploadData: DocumentUploadData,
+  uploadData: DocumentUploadData & { estimatedCompletionTime?: number },
 ): Promise<Document> => {
   const currentUserId = await getCurrentUserId();
   const formData = new FormData();
@@ -86,6 +86,10 @@ export const uploadDocument = async (
   formData.append('title', uploadData.title);
   formData.append('description', uploadData.description || '');
   formData.append('type', uploadData.type || 'pdf');
+  
+  if (uploadData.estimatedCompletionTime !== undefined) {
+    formData.append('estimated_completion_time', uploadData.estimatedCompletionTime.toString());
+  }
   
   if (uploadData.tags && uploadData.tags.length > 0) {
     formData.append('tags', JSON.stringify(uploadData.tags));
@@ -96,7 +100,7 @@ export const uploadDocument = async (
   api.defaults.headers['Content-Type'] = 'multipart/form-data';
   
   const response = await api.post(
-    `/workspaces/${workspaceId}/threads/${threadId}/documents`,
+    `/resources/${workspaceId}/threads/${threadId}/documents`,
     formData
   );
   
@@ -138,7 +142,7 @@ export const getDocumentDetails = async (
   documentId: string,
 ): Promise<Document> => {
   const response = await axios.get(
-    `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/documents/${documentId}`,
+    `${API_URL}/resources/${workspaceId}/threads/${threadId}/documents/${documentId}`,
     {
       headers: {
         'Content-Type': 'application/json',
@@ -180,7 +184,7 @@ export const getDocumentDetails = async (
 export const uploadVideo = async (
   workspaceId: string,
   threadId: string,
-  uploadData: VideoUploadData,
+  uploadData: VideoUploadData & { estimatedCompletionTime?: number },
 ): Promise<Video> => {
   console.log('🔍 uploadVideo called with:', { workspaceId, threadId, uploadData: { ...uploadData, file: uploadData.file.name } });
   
@@ -190,15 +194,19 @@ export const uploadVideo = async (
   formData.append('user_id', currentUserId);
   formData.append('title', uploadData.title);
   formData.append('description', uploadData.description || '');
+  
+  if (uploadData.estimatedCompletionTime !== undefined) {
+    formData.append('estimated_completion_time', uploadData.estimatedCompletionTime.toString());
+  }
 
   const api = createAuthenticatedRequest();
   // Override content type for multipart form data
   api.defaults.headers['Content-Type'] = 'multipart/form-data';
   
-  console.log('📡 Video upload URL:', `/workspaces/${workspaceId}/threads/${threadId}/videos`);
+  console.log('📡 Video upload URL:', `/resources/${workspaceId}/threads/${threadId}/videos`);
 
   const response = await api.post(
-    `/workspaces/${workspaceId}/threads/${threadId}/videos`,
+    `/resources/${workspaceId}/threads/${threadId}/videos`,
     formData,
     {
       onUploadProgress: (progressEvent: any) => {
@@ -245,7 +253,7 @@ export const getVideoDetails = async (
   videoId: string,
 ): Promise<Video> => {
   const response = await axios.get(
-    `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/videos/${videoId}`,
+    `${API_URL}/resources/${workspaceId}/threads/${threadId}/videos/${videoId}`,
     {
       headers: {
         'Content-Type': 'application/json',
@@ -288,22 +296,26 @@ export const getVideoDetails = async (
 export const createLink = async (
   workspaceId: string,
   threadId: string,
-  linkData: LinkData,
+  linkData: LinkData & { estimatedCompletionTime?: number },
 ): Promise<Link> => {
   const currentUserId = await getCurrentUserId();
   const api = createAuthenticatedRequest();
   
-  const payload = {
+  const payload: any = {
     user_id: currentUserId,
     title: linkData.title,
     url: linkData.url,
     description: linkData.description || '',
   };
   
-  console.log('🚀 Creating link with URL:', `/workspaces/${workspaceId}/threads/${threadId}/links`);
+  if (linkData.estimatedCompletionTime !== undefined) {
+    payload.estimated_completion_time = linkData.estimatedCompletionTime;
+  }
+  
+  console.log('🚀 Creating link with URL:', `/resources/${workspaceId}/threads/${threadId}/links`);
   console.log('🚀 Payload:', payload);
   
-  const response = await api.post(`/workspaces/${workspaceId}/threads/${threadId}/links`, payload);
+  const response = await api.post(`/resources/${workspaceId}/threads/${threadId}/links`, payload);
   
   console.log('✅ Backend response:', response.data);
   
@@ -338,7 +350,7 @@ export const getLinkDetails = async (
   linkId: string,
 ): Promise<Link> => {
   const response = await axios.get(
-    `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/links/${linkId}`,
+    `${API_URL}/resources/${workspaceId}/threads/${threadId}/links/${linkId}`,
     {
       headers: {
         'Content-Type': 'application/json',
@@ -409,7 +421,7 @@ export const getDocuments = async (
   workspaceId: string,
   threadId: string,
 ): Promise<Document[]> => {
-  const url = `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/documents`;
+  const url = `${API_URL}/resources/${workspaceId}/threads/${threadId}/documents`;
   
   console.log('🔗 Fetching documents from URL:', url);
   console.log('📊 Request parameters:', { workspaceId, threadId });
@@ -493,7 +505,7 @@ export const getDocuments = async (
 };
 
 export const getVideos = async (workspaceId: string, threadId: string): Promise<Video[]> => {
-  const fetchUrl = `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/videos`;
+  const fetchUrl = `${API_URL}/resources/${workspaceId}/threads/${threadId}/videos`;
   console.log('🔍 getVideos called with:', { workspaceId, threadId });
   console.log('📡 Video fetch URL:', fetchUrl);
   
@@ -536,7 +548,7 @@ export const getVideos = async (workspaceId: string, threadId: string): Promise<
 };
 
 export const getLinks = async (workspaceId: string, threadId: string): Promise<Link[]> => {
-  const url = `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/links`;
+  const url = `${API_URL}/resources/${workspaceId}/threads/${threadId}/links`;
   console.log('🔍 Fetching links from URL:', url);
   
   const response = await axios.get(url, {
@@ -757,7 +769,7 @@ export const addReview = async (
   resourceId: string,
   reviewData: ReviewData,
 ): Promise<Review> => {
-  const url = `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews`;
+  const url = `${API_URL}/resources/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews`;
   
   console.log('🚀 Adding review with URL:', url);
   console.log('🚀 Review data being sent:', JSON.stringify(reviewData, null, 2));
@@ -818,7 +830,7 @@ export const getReviews = async (
   threadId: string,
   resourceId: string,
 ): Promise<Review[]> => {
-  const url = `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews`;
+  const url = `${API_URL}/resources/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews`;
   
   console.log('🔍 Getting reviews with URL:', url);
   
@@ -875,7 +887,7 @@ export const getRatingSummary = async (
   resourceId: string,
 ): Promise<ResourceRating> => {
   const response = await axios.get(
-    `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/resources/${resourceId}/rating-summary`,
+    `${API_URL}/resources/${workspaceId}/threads/${threadId}/resources/${resourceId}/rating-summary`,
     {
       headers: {
         'Content-Type': 'application/json',
@@ -897,7 +909,7 @@ export const updateReview = async (
   const api = createAuthenticatedRequest();
   
   const response = await api.put(
-    `/workspaces/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews/user/${currentUserId}`,
+    `/resources/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews/user/${currentUserId}`,
     updateData
   );
   
@@ -927,7 +939,7 @@ export const deleteReview = async (
   reviewId: string,
 ): Promise<void> => {
   await axios.delete(
-    `${API_URL}/workspaces/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews/${reviewId}`,
+    `${API_URL}/resources/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews/${reviewId}`,
     {
       headers: {
         'Content-Type': 'application/json',
@@ -962,7 +974,7 @@ export const getUserReview = async (
   
   try {
     const response = await api.get(
-      `/workspaces/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews/user/${currentUserId}`
+      `/resources/${workspaceId}/threads/${threadId}/resources/${resourceId}/reviews/user/${currentUserId}`
     );
     
     // Transform backend response to frontend format
@@ -986,6 +998,87 @@ export const getUserReview = async (
     if (axios.isAxiosError(error) && error.response?.status === 404) {
       return null;
     }
+    throw error;
+  }
+};
+
+// ===== USER PROGRESS TRACKING =====
+
+export interface UserProgress {
+  id?: string;
+  user_id: string;
+  resource_id: string;
+  completion_status: 'not_started' | 'in_progress' | 'completed' | 'needs_revision';
+  progress_percentage: number;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string | null;
+}
+
+// Get user's progress for a specific resource
+export const getUserProgress = async (
+  userId: string,
+  resourceId: string,
+): Promise<UserProgress> => {
+  try {
+    const response = await axios.get(
+      `${API_URL}/resources/progress/${userId}/${resourceId}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    
+    console.log('✅ User progress fetched:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error fetching user progress:', error);
+    // Return default progress if not found
+    return {
+      user_id: userId,
+      resource_id: resourceId,
+      completion_status: 'not_started',
+      progress_percentage: 0,
+      started_at: null,
+      completed_at: null,
+      updated_at: null,
+    };
+  }
+};
+
+// Update user's progress for a specific resource
+export const updateUserProgress = async (
+  userId: string,
+  resourceId: string,
+  completion_status: 'not_started' | 'in_progress' | 'completed' | 'needs_revision',
+  progress_percentage?: number,
+): Promise<UserProgress> => {
+  try {
+    console.log('📊 Updating user progress:', {
+      userId,
+      resourceId,
+      completion_status,
+      progress_percentage,
+    });
+    
+    const response = await axios.post(
+      `${API_URL}/resources/progress/${userId}/${resourceId}`,
+      {
+        completion_status,
+        progress_percentage,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    
+    console.log('✅ User progress updated:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error updating user progress:', error);
     throw error;
   }
 };
