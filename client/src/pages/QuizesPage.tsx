@@ -57,6 +57,26 @@ const QuizesPage = ({ workspaceId: propWorkspaceId, threadId: propThreadId }: Qu
 
   const handleAttemptQuiz = (quizId: string) => {
     console.log('Attempting quiz:', quizId)
+    
+    // Find the quiz to determine its status
+    const quiz = quizzesList.find(q => q.id === quizId)
+    
+    if (quiz?.studentAttempts && quiz.studentAttempts.length > 0) {
+      const activeAttempts = quiz.studentAttempts.filter(attempt => !attempt.completed)
+      const completedAttempts = quiz.studentAttempts.filter(attempt => attempt.completed)
+      
+      if (activeAttempts.length > 0) {
+        // Continue existing attempt
+        console.log('Continuing active attempt for quiz:', quizId)
+      } else if (completedAttempts.length > 0) {
+        // Starting a reattempt
+        console.log('Starting reattempt for quiz:', quizId)
+      }
+    } else {
+      // First time attempt
+      console.log('Starting first attempt for quiz:', quizId)
+    }
+    
     // Navigate to quiz attempt page with proper context
     if (workspaceId && threadId) {
       navigate(`/workspace/${workspaceId}/threads/${threadId}/quizzes/${quizId}/attempt`)
@@ -68,7 +88,13 @@ const QuizesPage = ({ workspaceId: propWorkspaceId, threadId: propThreadId }: Qu
 
   const handleReviewAttempt = (quizId: string, attemptNumber: number) => {
     console.log('Reviewing attempt:', quizId, attemptNumber)
-    // Navigate to attempt review page
+    // Navigate to quiz review page with proper context
+    if (workspaceId && threadId) {
+      navigate(`/workspace/${workspaceId}/threads/${threadId}/quizzes/${quizId}/review`)
+    } else {
+      // Fallback to previous behavior if params not available
+      navigate(`/quizzes/${quizId}/review`)
+    }
   }
 
   const formatTime = (minutes: number) => {
@@ -225,11 +251,21 @@ const QuizesPage = ({ workspaceId: propWorkspaceId, threadId: propThreadId }: Qu
                 <Typography variant="h6" color="text.secondary" gutterBottom>
                   No quizzes available
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                   {userRole === 'moderator' || userRole === 'admin' 
-                    ? 'Get started by creating your first quiz!'
+                    ? 'Get started by creating your first quiz for this thread!'
                     : 'No quizzes have been created for this thread yet.'}
                 </Typography>
+                {(userRole === 'moderator' || userRole === 'admin') && (
+                  <Button
+                    variant="outlined"
+                    startIcon={<AddIcon />}
+                    onClick={handleCreateQuiz}
+                    size="large"
+                  >
+                    Create First Quiz
+                  </Button>
+                )}
               </Box>
             )}
             {quizzesList.map((quiz, index) => (

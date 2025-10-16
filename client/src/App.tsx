@@ -15,6 +15,7 @@ import QuizDebugPage from './pages/QuizDebugPage'
 
 import CreateQuiz from './pages/CreateQuiz'
 import AttemptQuiz from './pages/AttemptQuiz'
+import QuizReview from './pages/QuizReview'
 
 import ThreadPage from './pages/ThreadPage'
 import ThreadDocumentsPage from './pages/ThreadDocument'
@@ -72,6 +73,8 @@ const App = () => {
           <Route path="/workspace/:workspaceId/threads/:threadId/quizzes" element={<QuizesPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/create-quiz" element={<CreateQuiz />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/quizzes/:quizId/attempt" element={<AttemptQuiz />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/quizzes/:quizId/review" element={<QuizReview />} />
+          <Route path="/quizzes/:quizId/review" element={<QuizReview />} />
 
           {/* Remove old module-based routes */}
         </Routes>

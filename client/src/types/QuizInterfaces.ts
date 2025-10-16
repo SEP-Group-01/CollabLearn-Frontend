@@ -35,14 +35,14 @@ export interface Option {
     id: string;
     sequenceLetter: string;
     text: string;
-    image: File | null;
+    image: File | string | null; // File for creation, string for display
     isCorrect: boolean;
 }
 
 export interface Question {
     id: string;
     questionText: string;
-    image: File | null;
+    image: File | string | null; // File for creation, string for display
     options: Option[];
     marks: number;
     isEditing: boolean;

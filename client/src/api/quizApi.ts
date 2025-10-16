@@ -82,6 +82,7 @@ const tryGetWithFallback = async (candidates: string[]) => {
  * GET /threads/:threadId/quizzes
  */
 export const getQuizzes = async (threadId: string): Promise<Quiz[]> => {
+  const token = getAccessToken()
   const candidates = [
     `${API_URL}/quizzes/thread/${threadId}`,
     `${API_BASE}/quizzes/thread/${threadId}`,
@@ -90,9 +91,23 @@ export const getQuizzes = async (threadId: string): Promise<Quiz[]> => {
   console.log('[getQuizzes] Trying URLs:', candidates)
   console.log('[getQuizzes] API_URL:', API_URL)
   console.log('[getQuizzes] API_BASE:', API_BASE)
+  console.log('[getQuizzes] Token present:', !!token)
   
   try {
-    const result = await tryGetWithFallback(candidates)
+    // Use direct axios call with auth header to get user-specific data
+    const response = await axios.get(candidates[0], {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      }
+    })
+    const result = response.data
+    
+    console.log('[getQuizzes] Raw response from backend:', result)
+    console.log('[getQuizzes] First quiz in response:', result[0])
+    console.log('[getQuizzes] First quiz studentAttempts:', result[0]?.studentAttempts)
+    console.log('[getQuizzes] First quiz averageTime:', result[0]?.averageTime)
+    
     const transformedResult = result.map((quiz: any) => ({
     ...quiz,
     title: quiz.title || `Quiz ${quiz.id?.slice(0, 8)}`,
@@ -100,6 +115,12 @@ export const getQuizzes = async (threadId: string): Promise<Quiz[]> => {
     timeAllocated: quiz.allocated_time || quiz.timeAllocated || 30,
     totalMarks: quiz.total_marks || quiz.totalMarks || (quiz.questions?.reduce((total: number, q: any) => total + (q.marks || 0), 0)) || 0,
     creator: quiz.users?.name || quiz.creator || 'Unknown',
+    // Preserve studentAttempts from backend
+    studentAttempts: quiz.studentAttempts || [],
+    // Preserve statistics from backend  
+    totalAttempts: quiz.totalAttempts || 0,
+    averageMarks: quiz.averageMarks || 0,
+    averageTime: quiz.averageTime || 0,
     questions: quiz.questions?.map((question: any) => ({
       ...question,
       text: question.question || question.text,
@@ -113,6 +134,9 @@ export const getQuizzes = async (threadId: string): Promise<Quiz[]> => {
   
   console.log('[getQuizzes] Success with result:', result)
   console.log('[getQuizzes] Transformed result:', transformedResult)
+  console.log('[getQuizzes] First transformed quiz details:', transformedResult[0])
+  console.log('[getQuizzes] First quiz studentAttempts after transform:', transformedResult[0]?.studentAttempts)
+  console.log('[getQuizzes] First quiz averageTime after transform:', transformedResult[0]?.averageTime)
   return transformedResult
   } catch (error) {
     console.error('[getQuizzes] Backend error, returning empty array:', error)
@@ -127,35 +151,59 @@ export const getQuizzes = async (threadId: string): Promise<Quiz[]> => {
  * GET /quizzes/:quizId
  */
 export const getQuizById = async (quizId: string): Promise<Quiz> => {
-  const candidates = [
-    `${API_URL}/quizzes/${quizId}`,
-    `${API_BASE}/quizzes/${quizId}`,
-  ]
-  const result = await tryGetWithFallback(candidates)
+  console.log('[getQuizById] Starting quiz fetch for ID:', quizId)
+  console.log('[getQuizById] API_URL:', API_URL)
+  console.log('[getQuizById] API_BASE:', API_BASE)
   
-  // Transform the quiz data to match frontend expectations
-  const transformedQuiz = {
-    ...result,
-    title: result.title || `Quiz ${result.id?.slice(0, 8)}`,
-    description: result.description || 'No description available',
-    timeAllocated: result.allocated_time || result.timeAllocated || 30,
-    totalMarks: result.total_marks || result.totalMarks || (result.questions?.reduce((total: number, q: any) => total + (q.marks || 0), 0)) || 0,
-    creator: result.users?.name || result.creator || 'Unknown',
-    questions: result.questions?.map((question: any) => ({
-      ...question,
-      text: question.question || question.text,
-      options: question.answer_option?.map((option: any) => ({
-        ...option,
-        text: option.text || option.option_text || option.answer,
-        isCorrect: option.is_correct !== undefined ? option.is_correct : option.isCorrect
-      })) || question.options || []
-    })) || []
+  // Try direct axios call first to debug
+  try {
+    const directUrl = `${API_URL}/quizzes/${quizId}`
+    console.log('[getQuizById] Trying direct call to:', directUrl)
+    
+    const response = await axios.get(directUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
+    
+    console.log('[getQuizById] Direct call successful:', response.data)
+    return response.data
+  } catch (error) {
+    console.error('[getQuizById] Direct call failed:', error)
+    
+    // Fallback to original logic
+    const candidates = [
+      `${API_URL}/quizzes/${quizId}`,
+      `${API_BASE}/quizzes/${quizId}`,
+    ]
+    
+    console.log('[getQuizById] Trying fallback candidates:', candidates)
+    const result = await tryGetWithFallback(candidates)
+    
+    // Transform the quiz data to match frontend expectations
+    const transformedQuiz = {
+      ...result,
+      title: result.title || `Quiz ${result.id?.slice(0, 8)}`,
+      description: result.description || 'No description available',
+      timeAllocated: result.allocated_time || result.timeAllocated || 30,
+      totalMarks: result.total_marks || result.totalMarks || (result.questions?.reduce((total: number, q: any) => total + (q.marks || 0), 0)) || 0,
+      creator: result.users?.name || result.creator || 'Unknown',
+      questions: result.questions?.map((question: any) => ({
+        ...question,
+        text: question.question || question.text,
+        options: question.answer_option?.map((option: any) => ({
+          ...option,
+          text: option.text || option.option_text || option.answer,
+          isCorrect: option.is_correct !== undefined ? option.is_correct : option.isCorrect
+        })) || question.options || []
+      })) || []
+    }
+    
+    console.log('[getQuizById] Fallback result:', result)
+    console.log('[getQuizById] Transformed result:', transformedQuiz)
+    
+    return transformedQuiz as Quiz
   }
-  
-  console.log('[getQuizById] Original result:', result)
-  console.log('[getQuizById] Transformed result:', transformedQuiz)
-  
-  return transformedQuiz as Quiz
 }
 
 /**
@@ -221,13 +269,46 @@ export const deleteQuiz = async (quizId: string) => {
 }
 
 /**
+ * Start a quiz attempt
+ * POST /quizzes/:quizId/start
+ */
+export const startQuizAttempt = async (quizId: string) => {
+  const token = getAccessToken()
+  const response = await axios.post(`${API_URL}/quizzes/${quizId}/start`, {}, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  })
+  return response.data
+}
+
+/**
+ * Get active attempt for a quiz
+ * GET /quizzes/:quizId/active-attempt
+ */
+export const getActiveAttempt = async (quizId: string) => {
+  const token = getAccessToken()
+  const response = await axios.get(`${API_URL}/quizzes/${quizId}/active-attempt`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  return response.data
+}
+
+/**
  * Submit an attempt for a quiz
  * POST /quizzes/:quizId/attempts
  * attemptData can include answers, timeTaken (in seconds or minutes as decided by backend), marksObtained (if auto-graded), etc.
  */
 export const submitQuizAttempt = async (quizId: string, attemptData: Record<string, unknown>) => {
   const token = getAccessToken()
-  const response = await axios.post(`${API_URL}/quizzes/${quizId}/attempts`, attemptData, {
+  console.log('[submitQuizAttempt] Submitting to URL:', `${API_URL}/quizzes/${quizId}/attempt`)
+  console.log('[submitQuizAttempt] Token present:', !!token)
+  console.log('[submitQuizAttempt] Attempt data:', attemptData)
+  
+  const response = await axios.post(`${API_URL}/quizzes/${quizId}/attempt`, attemptData, {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -299,6 +380,8 @@ export default {
   createQuiz,
   updateQuiz,
   deleteQuiz,
+  startQuizAttempt,
+  getActiveAttempt,
   submitQuizAttempt,
   getQuizAttempts,
   getMyAttemptsForQuiz,
