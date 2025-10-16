@@ -131,15 +131,30 @@ export const createForumMessage = async (
     const requestPath = `/workspaces/${workspaceId}/forum/messages`;
     console.log('📡 Request path:', requestPath);
     
-    // Prepare JSON payload (backend expects JSON, not FormData)
+    // Convert image to base64 if present
+    let imageBase64: string | undefined;
+    if (image) {
+      console.log('📸 Converting image to base64...');
+      imageBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(image);
+      });
+      console.log('✅ Image converted to base64');
+    }
+    
+    // Prepare JSON payload with image as base64
     console.log('📝 Preparing message payload...');
     const payload = {
       content,
-      authorId
+      authorId,
+      image: imageBase64 // Include base64 image if present
     };
     console.log('📎 Payload prepared:', {
       content: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
-      authorId
+      authorId,
+      hasImage: !!imageBase64
     });
 
     const response = await api.post(requestPath, payload);
