@@ -695,7 +695,7 @@ export default function WorkspaceDetailPage() {
               {/* Forum Card */}
               <Card
                 component={Link}
-                to={`/forum`}
+                to={`/workspace/${workspaceId}/forum`}
                 sx={{
                   p: 3,
                   textDecoration: 'none',
