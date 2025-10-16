@@ -32,10 +32,9 @@ import { useTheme } from "@mui/material/styles";
 import type { 
   TimeSlot, 
   WorkspaceSelection, 
-  StudyPlanRequest,
   StudyPlanResult,
 } from "../types/StudyPlanInterfaces";
-import { generateStudyPlan } from "../api/studyPlanApi";
+import { generateStudyPlan, type StudyPlanRequest, type StudyPlanResponse } from "../api/studyPlanApi";
 import { getUserData } from "../api/authApi";
 
 const StudyPlanGenerationPage: React.FC = () => {
@@ -48,7 +47,7 @@ const StudyPlanGenerationPage: React.FC = () => {
     difficulty_preference: "medium" as "easy" | "medium" | "hard",
     session_duration_preference: 60,
   });
-  const [generated, setGenerated] = useState<StudyPlanResult | null>(null);
+  const [generated, setGenerated] = useState<StudyPlanResponse | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -56,7 +55,7 @@ const StudyPlanGenerationPage: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const userData = getUserData();
-  const userId = typeof userData?.id === 'string' ? parseInt(userData.id) : userData?.id || 1;
+  const userId = userData?.id || 'default-user-id';
 
   const steps = [
     {
@@ -120,13 +119,15 @@ const StudyPlanGenerationPage: React.FC = () => {
         .flatMap(ws => ws.thread_ids);
 
       const request: StudyPlanRequest = {
-        user_id: userId,
-        workspace_ids: selectedWorkspaceIds,
-        thread_ids: selectedThreadIds,
-        priority_level: preferences.priority_level,
-        learning_style: preferences.learning_style,
-        difficulty_preference: preferences.difficulty_preference,
-        session_duration_preference: preferences.session_duration_preference,
+        userId: userId,
+        workspaceId: selectedWorkspaceIds[0] || 'default-workspace-id',
+        threadId: selectedThreadIds[0],
+        preferences: {
+          studyHours: preferences.session_duration_preference,
+          difficulty: preferences.difficulty_preference === 'easy' ? 'beginner' : 
+                     preferences.difficulty_preference === 'medium' ? 'intermediate' : 'advanced',
+          topics: selectedWorkspaceIds,
+        },
       };
 
       const result = await generateStudyPlan(request);
@@ -139,17 +140,17 @@ const StudyPlanGenerationPage: React.FC = () => {
       
       // For demo purposes, create a mock result
       const demoResult: StudyPlanResult = {
-        id: Date.now(),
+        id: String(Date.now()), // Convert to string for UUID consistency
         user_id: userId,
         schedule: [
           {
-            id: 1,
+            id: String(1), // Convert to string for UUID consistency
             resource: {
-              id: 1,
+              id: String(1), // Convert to string for UUID consistency
               name: 'Linear Algebra Fundamentals',
               type: 'document',
-              workspace_id: workspaceSelections[0]?.workspace_id || 1,
-              thread_id: workspaceSelections[0]?.thread_ids[0] || 1,
+              workspace_id: workspaceSelections[0]?.workspace_id || "1",
+              thread_id: workspaceSelections[0]?.thread_ids[0] || "1",
               estimated_duration: 120,
               difficulty_level: preferences.difficulty_preference,
               description: 'Introduction to vectors and matrices',
@@ -176,7 +177,29 @@ const StudyPlanGenerationPage: React.FC = () => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      setGenerated(demoResult);
+      // Wrap in StudyPlanResponse format
+      const responseFormat: StudyPlanResponse = {
+        success: true,
+        studyPlan: {
+          id: demoResult.id,
+          title: 'Generated Study Plan',
+          description: 'Your personalized study plan',
+          duration: demoResult.plan_duration_weeks * 7, // Convert weeks to days
+          tasks: demoResult.schedule.map(session => ({
+            id: session.id,
+            title: session.resource.name,
+            description: session.resource.description || 'Study session',
+            type: session.resource.type === 'document' ? 'reading' : 
+                  session.resource.type === 'quiz' ? 'quiz' : 
+                  session.resource.type === 'video' ? 'video' : 'assignment',
+            estimatedTime: session.allocated_time,
+            difficulty: session.resource.difficulty_level,
+            resources: [session.resource.name]
+          }))
+        },
+        message: 'Study plan generated successfully!'
+      };
+      setGenerated(responseFormat);
       setCurrentStep(3);
     } finally {
       setGenerating(false);

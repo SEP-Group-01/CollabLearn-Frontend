@@ -7,7 +7,7 @@ import course_4 from "../assets/course_4.png";
 
 export const mockWorkspaces: Workspace[] = [
   {
-    id: "1",
+    id: "550e8400-e29b-41d4-a716-446655440001",
     title: "Web Design",
     image_url: course_1,
     description: "Learn web design from basics to advanced topics.",
@@ -20,7 +20,7 @@ export const mockWorkspaces: Workspace[] = [
     role: "user",
   },
   {
-    id: "2",
+    id: "550e8400-e29b-41d4-a716-446655440002",
     title: "Web Development",
     image_url: course_2,
     description: "Master web development skills and frameworks.",
@@ -33,7 +33,7 @@ export const mockWorkspaces: Workspace[] = [
     role: "user",
   },
   {
-    id: "3",
+    id: "550e8400-e29b-41d4-a716-446655440003",
     title: "Digital Marketing",
     image_url: course_3,
     description: "Explore digital marketing strategies and tools.",
@@ -46,7 +46,7 @@ export const mockWorkspaces: Workspace[] = [
     role: "member",
   },
   {
-    id: "4",
+    id: "550e8400-e29b-41d4-a716-446655440004",
     title: "App Design",
     image_url: course_4,
     description: "Design modern and user-friendly mobile apps.",
@@ -63,7 +63,7 @@ export const mockWorkspaces: Workspace[] = [
 export const mockThreads: Thread[] = [
   {
     id: "12e4d168-30d7-4c1f-82e4-7327959ebe40",
-    workspace_id: "1",
+    workspace_id: "550e8400-e29b-41d4-a716-446655440001",
     title: "Getting Started with HTML & CSS",
     description: "Basics of HTML structure and CSS styling for web design.",
     created_at: "2025-09-30T21:03:33.713018",
@@ -73,7 +73,7 @@ export const mockThreads: Thread[] = [
   },
   {
     id: "23f5e279-41e8-5d2g-93f5-8438069fcf51",
-    workspace_id: "1",
+    workspace_id: "550e8400-e29b-41d4-a716-446655440001",
     title: "Responsive Design Principles",
     description: "Learn how to make your websites look great on any device.",
     created_at: "2025-09-30T21:03:33.713018",
@@ -83,7 +83,7 @@ export const mockThreads: Thread[] = [
   },
   {
     id: "34g6f380-52f9-6e3h-a4g6-9549170geg62",
-    workspace_id: "1",
+    workspace_id: "550e8400-e29b-41d4-a716-446655440001",
     title: "UI/UX Fundamentals",
     description: "Understand user experience and interface design best practices.",
     created_at: "2025-09-30T21:03:33.713018",

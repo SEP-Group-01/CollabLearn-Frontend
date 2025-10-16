@@ -39,7 +39,7 @@ const WorkspaceThreadSelector: React.FC<WorkspaceThreadSelectorProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const userData = getUserData();
-  const userId = typeof userData?.id === 'string' ? parseInt(userData.id) : userData?.id || 1;
+  const userId = userData?.id || 'default-user-id';
 
   useEffect(() => {
     fetchWorkspaces();
@@ -57,11 +57,11 @@ const WorkspaceThreadSelector: React.FC<WorkspaceThreadSelectorProps> = ({
       setLoading(true);
       const workspaceData = await getUserWorkspacesWithThreads(userId);
       
-      const mappedWorkspaces: WorkspaceSelection[] = workspaceData.map(ws => ({
-        workspace_id: ws.workspace_id,
+      const mappedWorkspaces: WorkspaceSelection[] = workspaceData.map((ws: any) => ({
+        workspace_id: String(ws.workspace_id), // Ensure it's a string
         workspace_name: ws.workspace_name,
         thread_ids: [],
-        thread_names: ws.threads.map(t => t.thread_name),
+        thread_names: ws.threads.map((t: any) => t.thread_name),
         selected: false,
       }));
       
@@ -74,21 +74,21 @@ const WorkspaceThreadSelector: React.FC<WorkspaceThreadSelectorProps> = ({
       // Demo data fallback
       setWorkspaces([
         {
-          workspace_id: 1,
+          workspace_id: "1", // Use string for UUID consistency
           workspace_name: 'Machine Learning Fundamentals',
           thread_ids: [],
           thread_names: ['Linear Algebra Basics', 'Neural Networks', 'Optimization Algorithms'],
           selected: false,
         },
         {
-          workspace_id: 2,
+          workspace_id: "2", // Use string for UUID consistency
           workspace_name: 'Web Development',
           thread_ids: [],
           thread_names: ['React Fundamentals', 'Node.js Backend', 'Database Design'],
           selected: false,
         },
         {
-          workspace_id: 3,
+          workspace_id: "3", // Use string for UUID consistency
           workspace_name: 'Data Science',
           thread_ids: [],
           thread_names: ['Statistics', 'Python for Data Science', 'Machine Learning Applications'],
@@ -100,7 +100,7 @@ const WorkspaceThreadSelector: React.FC<WorkspaceThreadSelectorProps> = ({
     }
   };
 
-  const handleWorkspaceSelection = (workspaceId: number, selected: boolean) => {
+  const handleWorkspaceSelection = (workspaceId: string, selected: boolean) => {
     setWorkspaces(prev => prev.map(ws => {
       if (ws.workspace_id === workspaceId) {
         return {
@@ -114,12 +114,13 @@ const WorkspaceThreadSelector: React.FC<WorkspaceThreadSelectorProps> = ({
     }));
   };
 
-  const handleThreadSelection = (workspaceId: number, threadIndex: number, threadName: string, selected: boolean) => {
+  const handleThreadSelection = (workspaceId: string, threadIndex: number, _threadName: string, selected: boolean) => {
     setWorkspaces(prev => prev.map(ws => {
       if (ws.workspace_id === workspaceId) {
+        const threadId = String(threadIndex + 1); // Convert to string for consistency
         const newThreadIds = selected 
-          ? [...ws.thread_ids, threadIndex + 1]
-          : ws.thread_ids.filter(id => id !== threadIndex + 1);
+          ? [...ws.thread_ids, threadId]
+          : ws.thread_ids.filter(id => id !== threadId);
         
         return {
           ...ws,
@@ -132,13 +133,13 @@ const WorkspaceThreadSelector: React.FC<WorkspaceThreadSelectorProps> = ({
     }));
   };
 
-  const selectAllThreadsForWorkspace = (workspaceId: number) => {
+  const selectAllThreadsForWorkspace = (workspaceId: string) => {
     setWorkspaces(prev => prev.map(ws => {
       if (ws.workspace_id === workspaceId) {
         return {
           ...ws,
           selected: true,
-          thread_ids: ws.thread_names.map((_, index) => index + 1),
+          thread_ids: ws.thread_names.map((_, index) => String(index + 1)), // Convert to string
         };
       }
       return ws;
@@ -268,7 +269,7 @@ const WorkspaceThreadSelector: React.FC<WorkspaceThreadSelectorProps> = ({
                     key={index}
                     control={
                       <Checkbox
-                        checked={workspace.thread_ids.includes(index + 1)}
+                        checked={workspace.thread_ids.includes(String(index + 1))}
                         onChange={(e) => handleThreadSelection(
                           workspace.workspace_id, 
                           index, 

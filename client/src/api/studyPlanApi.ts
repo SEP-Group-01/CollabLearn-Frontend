@@ -89,7 +89,7 @@ export const getStudyPlan = async (userId: string, workspaceId: string) => {
 };
 
   // Time-slot (availability) related API helpers
-  export const getUserTimeSlots = async (userId: number) => {
+  export const getUserTimeSlots = async (userId: string) => {
     try {
       const response = await fetch(`${API_URL}/timeslots/user/${userId}`);
       if (!response.ok) {
@@ -102,7 +102,7 @@ export const getStudyPlan = async (userId: string, workspaceId: string) => {
     }
   };
 
-  export const createTimeSlot = async (userId: number, slot: any) => {
+  export const createTimeSlot = async (userId: string, slot: any) => {
     try {
       const body = JSON.stringify({ userId, ...slot });
       const response = await fetch(`${API_URL}/timeslots`, {
@@ -121,7 +121,7 @@ export const getStudyPlan = async (userId: string, workspaceId: string) => {
     }
   };
 
-  export const updateTimeSlot = async (userId: number, slotId: number, slot: any) => {
+  export const updateTimeSlot = async (userId: string, slotId: number, slot: any) => {
     try {
       const response = await fetch(`${API_URL}/timeslots/${slotId}`, {
         method: 'PUT',
@@ -138,7 +138,7 @@ export const getStudyPlan = async (userId: string, workspaceId: string) => {
     }
   };
 
-  export const deleteTimeSlot = async (userId: number, slotId: number) => {
+  export const deleteTimeSlot = async (userId: string, slotId: number) => {
     try {
       const response = await fetch(`${API_URL}/timeslots/${slotId}`, {
         method: 'DELETE',
@@ -156,7 +156,7 @@ export const getStudyPlan = async (userId: string, workspaceId: string) => {
   };
 
   // Fetch workspaces for a user together with their threads
-  export const getUserWorkspacesWithThreads = async (userId: number) => {
+  export const getUserWorkspacesWithThreads = async (userId: string) => {
     try {
       // endpoint assumed: /workspaces/user/:userId/threads — update if your backend differs
       const response = await fetch(`${API_URL}/workspaces/user/${userId}/threads`);
@@ -171,7 +171,7 @@ export const getStudyPlan = async (userId: string, workspaceId: string) => {
   };
 
   // Get the user's active study plan (if any)
-  export const getActiveStudyPlan = async (userId: number) => {
+  export const getActiveStudyPlan = async (userId: string) => {
     try {
       // assumed endpoint; update to match your backend if different
       const response = await fetch(`${API_URL}/study-plans/active/${userId}`);
@@ -187,7 +187,7 @@ export const getStudyPlan = async (userId: string, workspaceId: string) => {
 
   // Update the status of a study session (in-progress, completed, skipped)
   export const updateStudySessionStatus = async (
-    userId: number,
+    userId: string,
     sessionId: number,
     status: 'in_progress' | 'completed' | 'skipped',
     actualTimeSpent?: number,
