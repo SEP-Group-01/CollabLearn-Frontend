@@ -1,23 +1,43 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AppBar, Toolbar, IconButton, Typography, Box, Button, Drawer, List, ListItem, ListItemButton, ListItemText, Avatar } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 import LogoutIcon from "@mui/icons-material/Logout";
 import {assets} from "../assets/assets";
-import {getUserData, isAuthenticated, logout} from "../api/authApi"
+import {getUserData, isAuthenticated, logout} from "../api/authApi";
+import type { User } from "../types/AuthInterfaces";
 
 type HeaderProps = {};
 
 function Header({}: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [userData, setUserData] = useState<User | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Get authentication status and user data
+  // Get authentication status
   const authenticated = isAuthenticated();
-  const userData = getUserData();
+
+  // Load user data when component mounts or authentication changes
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (authenticated) {
+        try {
+          const user = await getUserData();
+          setUserData(user);
+        } catch (error) {
+          console.error('Failed to load user data:', error);
+          setUserData(null);
+        }
+      } else {
+        setUserData(null);
+      }
+    };
+
+    loadUserData();
+  }, [authenticated]);
 
   const handleLogout = () => {
     logout();
@@ -129,6 +149,7 @@ function Header({}: HeaderProps) {
               </Typography>
               <IconButton component={Link} to="/profile">
                 <Avatar
+                  src={userData.image_url}
                   alt={`${userData.first_name} ${userData.last_name}`}
                   sx={{ width: 40, height: 40, bgcolor: "#2563eb" }}
                 >
@@ -275,6 +296,7 @@ function Header({}: HeaderProps) {
               <ListItem>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: "100%", px: 2 }}>
                   <Avatar
+                    src={userData.image_url}
                     alt={`${userData.first_name} ${userData.last_name}`}
                     sx={{ width: 40, height: 40, bgcolor: "#2563eb" }}
                   >

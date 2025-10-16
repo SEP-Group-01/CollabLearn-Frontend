@@ -63,9 +63,10 @@ const createAuthenticatedRequest = () => {
 };
 
 // Get current user ID from stored user data
-const getCurrentUserId = (): string => {
-  const userData = getUserData();
+const getCurrentUserId = async (): Promise<string> => {
+  const userData = await getUserData();
   if (!userData || !userData.id) {
+    console.log("fetched userData:", userData);
     throw new Error('User not authenticated or user ID not found');
   }
   return userData.id.toString();
@@ -78,7 +79,7 @@ export const uploadDocument = async (
   threadId: string,
   uploadData: DocumentUploadData,
 ): Promise<Document> => {
-  const currentUserId = getCurrentUserId();
+  const currentUserId = await getCurrentUserId();
   const formData = new FormData();
   formData.append('file', uploadData.file);
   formData.append('user_id', currentUserId);
@@ -183,7 +184,7 @@ export const uploadVideo = async (
 ): Promise<Video> => {
   console.log('🔍 uploadVideo called with:', { workspaceId, threadId, uploadData: { ...uploadData, file: uploadData.file.name } });
   
-  const currentUserId = getCurrentUserId();
+  const currentUserId = await getCurrentUserId();
   const formData = new FormData();
   formData.append('file', uploadData.file);
   formData.append('user_id', currentUserId);
@@ -289,7 +290,7 @@ export const createLink = async (
   threadId: string,
   linkData: LinkData,
 ): Promise<Link> => {
-  const currentUserId = getCurrentUserId();
+  const currentUserId = await getCurrentUserId();
   const api = createAuthenticatedRequest();
   
   const payload = {
@@ -390,7 +391,7 @@ export const deleteResource = async (
   resourceType: 'documents' | 'videos' | 'links',
   resourceId: string,
 ) => {
-  const currentUserId = getCurrentUserId();
+  const currentUserId = await getCurrentUserId();
   const api = createAuthenticatedRequest();
   
   const response = await api.delete(
@@ -892,7 +893,7 @@ export const updateReview = async (
   resourceId: string,
   updateData: ReviewUpdateData,
 ): Promise<Review> => {
-  const currentUserId = getCurrentUserId();
+  const currentUserId = await getCurrentUserId();
   const api = createAuthenticatedRequest();
   
   const response = await api.put(
@@ -956,7 +957,7 @@ export const getUserReview = async (
   threadId: string,
   resourceId: string,
 ): Promise<Review | null> => {
-  const currentUserId = getCurrentUserId();
+  const currentUserId = await getCurrentUserId();
   const api = createAuthenticatedRequest();
   
   try {

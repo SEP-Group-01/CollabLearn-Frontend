@@ -4,6 +4,13 @@ export interface User {
   first_name: string;
   last_name: string;
   email_verified: boolean;
+  image_url?: string;
+  created_at?: string;
+  stats?: {
+    workspaceCount: number;
+    studyHours: number;
+    completedTasks: number;
+  };
 }
 
 export interface LoginResponse {

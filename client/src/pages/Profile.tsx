@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import SidebarComponent from "../components/SideBar";
 import {
   Box,
@@ -22,6 +22,8 @@ import {
   FormControlLabel,
   Checkbox,
   Divider,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import {
   Edit,
@@ -36,10 +38,12 @@ import {
   Save,
   Cancel,
 } from "@mui/icons-material";
+import { getUserData, editUser } from "../api/authApi";
+import type { User } from "../types/AuthInterfaces";
 
 const daysOfWeek = [
   "Monday",
-  "Tuesday",
+  "Tuesday", 
   "Wednesday",
   "Thursday",
   "Friday",
@@ -47,66 +51,155 @@ const daysOfWeek = [
   "Sunday",
 ];
 
-// Mock Data
-const mockUserData = {
-  id: "1",
-  fullName: "John Doe",
-  email: "john.doe@university.edu",
-  userType: "student",
-  bio: "Computer Science student passionate about machine learning and web development. Always eager to learn new technologies and collaborate on interesting projects.",
-  location: "San Francisco, CA",
-  university: "Stanford University",
-  major: "Computer Science",
-  year: "Junior",
-  joinedDate: "2024-01-15",
-  languages: ["English", "Spanish", "Python", "JavaScript"],
-  interests: ["Machine Learning", "Web Development", "Data Science", "AI"],
-  stats: {
-    studyGroups: 5,
-    studyHours: 127,
-    completedCourses: 8,
-    achievements: 12,
-  },
-  enrolledGroups: [
-    { id: "g1", name: "Machine Learning Fundamentals" },
-    { id: "g2", name: "React.js Study Group" },
-    { id: "g3", name: "Data Science Enthusiasts" },
-  ],
-  availableDays: ["Monday", "Wednesday", "Friday"], // Example default
-};
-
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState(mockUserData);
+  const [userData, setUserData] = useState<User | null>(null);
+  const [editData, setEditData] = useState<{
+    first_name: string;
+    last_name: string;
+    image_file?: string;
+    remove_image?: boolean;
+  }>({
+    first_name: "",
+    last_name: "",
+  });
   const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const sidebarWidth = collapsed ? 80 : 250;
 
-  const handleEditToggle = () => {
-    setIsEditing(!isEditing);
-    if (!isEditing) {
-      setEditData(mockUserData);
+  // Load user data when component mounts
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      const user = await getUserData();
+      setUserData(user);
+      if (user) {
+        setEditData({
+          first_name: user.first_name,
+          last_name: user.last_name,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load user data:', error);
+      setError('Failed to load user data');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSave = () => {
-    // Save logic here
-    setIsEditing(false);
+  const handleEditToggle = () => {
+    setIsEditing(!isEditing);
+    setError(null);
+    if (!isEditing && userData) {
+      setEditData({
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+      });
+    }
+  };
+
+  const handleSave = async () => {
+    if (!userData) return;
+    
+    try {
+      setSaving(true);
+      setError(null);
+      
+      const updateData: any = {};
+      
+      if (editData.first_name !== userData.first_name) {
+        updateData.first_name = editData.first_name;
+      }
+      if (editData.last_name !== userData.last_name) {
+        updateData.last_name = editData.last_name;
+      }
+      if (editData.image_file) {
+        updateData.image_file = editData.image_file;
+      }
+      if (editData.remove_image) {
+        updateData.remove_image = editData.remove_image;
+      }
+
+      const response = await editUser(updateData);
+      
+      // Update local user data
+      setUserData(response.user);
+      setIsEditing(false);
+      setEditData({
+        first_name: response.user.first_name,
+        last_name: response.user.last_name,
+      });
+    } catch (error: any) {
+      setError(error.message || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
     setEditData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleAvailableDayChange = (day: string) => {
-    setEditData((prev) => ({
-      ...prev,
-      availableDays: prev.availableDays.includes(day)
-        ? prev.availableDays.filter((d) => d !== day)
-        : [...prev.availableDays, day],
-    }));
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        setError('Image size must be less than 5MB');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setEditData(prev => ({
+          ...prev,
+          image_file: result,
+          remove_image: false,
+        }));
+        setAvatarDialogOpen(false);
+      };
+      reader.readAsDataURL(file);
+    }
   };
+
+  const handleRemoveImage = () => {
+    setEditData(prev => ({
+      ...prev,
+      image_file: undefined,
+      remove_image: true,
+    }));
+    setAvatarDialogOpen(false);
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "linear-gradient(135deg, #e0f7fa 0%, #f8fafc 100%)" }}>
+        <SidebarComponent collapsed={collapsed} setCollapsed={setCollapsed} />
+        <Box sx={{ ml: `${sidebarWidth}px`, flexGrow: 1, p: { xs: 1, md: 2 }, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <CircularProgress />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (!userData) {
+    return (
+      <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "linear-gradient(135deg, #e0f7fa 0%, #f8fafc 100%)" }}>
+        <SidebarComponent collapsed={collapsed} setCollapsed={setCollapsed} />
+        <Box sx={{ ml: `${sidebarWidth}px`, flexGrow: 1, p: { xs: 1, md: 2 } }}>
+          <Alert severity="error">Failed to load user data. Please try refreshing the page.</Alert>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "linear-gradient(135deg, #e0f7fa 0%, #f8fafc 100%)" }}>
@@ -123,6 +216,7 @@ export default function ProfilePage() {
               <Box display="flex" alignItems="center" gap={3} flexWrap="wrap">
                 <Box position="relative">
                   <Avatar
+                    src={editData.image_file || userData.image_url}
                     sx={{
                       width: 120,
                       height: 120,
@@ -131,7 +225,7 @@ export default function ProfilePage() {
                       boxShadow: 2,
                     }}
                   >
-                    {mockUserData.fullName.charAt(0)}
+                    {`${userData.first_name.charAt(0)}${userData.last_name.charAt(0)}`}
                   </Avatar>
                   <IconButton
                     sx={{
@@ -154,27 +248,26 @@ export default function ProfilePage() {
                     <>
                       <TextField
                         fullWidth
-                        label="Full Name"
-                        value={editData.fullName}
-                        onChange={(e) => handleInputChange("fullName", e.target.value)}
+                        label="First Name"
+                        value={editData.first_name}
+                        onChange={(e) => handleInputChange("first_name", e.target.value)}
                         sx={{ mb: 2 }}
                       />
                       <TextField
                         fullWidth
-                        label="Bio"
-                        multiline
-                        rows={3}
-                        value={editData.bio}
-                        onChange={(e) => handleInputChange("bio", e.target.value)}
+                        label="Last Name"
+                        value={editData.last_name}
+                        onChange={(e) => handleInputChange("last_name", e.target.value)}
+                        sx={{ mb: 2 }}
                       />
                     </>
                   ) : (
                     <>
                       <Typography variant="h4" fontWeight="bold" gutterBottom>
-                        {mockUserData.fullName}
+                        {`${userData.first_name} ${userData.last_name}`}
                       </Typography>
                       <Typography color="text.secondary" paragraph>
-                        {mockUserData.bio}
+                        Email: {userData.email}
                       </Typography>
                     </>
                   )}
@@ -184,10 +277,22 @@ export default function ProfilePage() {
               <Box sx={{ mt: { xs: 2, md: 0 } }}>
                 {isEditing ? (
                   <Box display="flex" gap={1}>
-                    <Button variant="contained" startIcon={<Save />} onClick={handleSave} sx={{ borderRadius: 2 }}>
-                      Save
+                    <Button 
+                      variant="contained" 
+                      startIcon={<Save />} 
+                      onClick={handleSave} 
+                      sx={{ borderRadius: 2 }}
+                      disabled={saving}
+                    >
+                      {saving ? 'Saving...' : 'Save'}
                     </Button>
-                    <Button variant="outlined" startIcon={<Cancel />} onClick={handleEditToggle} sx={{ borderRadius: 2 }}>
+                    <Button 
+                      variant="outlined" 
+                      startIcon={<Cancel />} 
+                      onClick={handleEditToggle} 
+                      sx={{ borderRadius: 2 }}
+                      disabled={saving}
+                    >
                       Cancel
                     </Button>
                   </Box>
@@ -210,30 +315,23 @@ export default function ProfilePage() {
           <Card sx={{ borderRadius: 3, boxShadow: 1, minWidth: 140, textAlign: "center", px: 1.5, py: 1.5 }}>
             <Groups color="primary" sx={{ fontSize: 28, mb: 0.5 }} />
             <Typography variant="h6" fontWeight="bold">
-              {mockUserData.stats.studyGroups}
+              {userData.stats?.workspaceCount || 0}
             </Typography>
-            <Typography color="text.secondary" fontSize={13}>Study Groups</Typography>
+            <Typography color="text.secondary" fontSize={13}>Workspaces</Typography>
           </Card>
           <Card sx={{ borderRadius: 3, boxShadow: 1, minWidth: 140, textAlign: "center", px: 1.5, py: 1.5 }}>
             <School color="success" sx={{ fontSize: 28, mb: 0.5 }} />
             <Typography variant="h6" fontWeight="bold">
-              {mockUserData.stats.studyHours}
+              {userData.stats?.studyHours || 0}
             </Typography>
             <Typography color="text.secondary" fontSize={13}>Study Hours</Typography>
           </Card>
           <Card sx={{ borderRadius: 3, boxShadow: 1, minWidth: 140, textAlign: "center", px: 1.5, py: 1.5 }}>
             <BookmarkBorder color="info" sx={{ fontSize: 28, mb: 0.5 }} />
             <Typography variant="h6" fontWeight="bold">
-              {mockUserData.stats.completedCourses}
+              {userData.stats?.completedTasks || 0}
             </Typography>
-            <Typography color="text.secondary" fontSize={13}>Completed</Typography>
-          </Card>
-          <Card sx={{ borderRadius: 3, boxShadow: 1, minWidth: 140, textAlign: "center", px: 1.5, py: 1.5 }}>
-            <EmojiEvents color="warning" sx={{ fontSize: 28, mb: 0.5 }} />
-            <Typography variant="h6" fontWeight="bold">
-              {mockUserData.stats.achievements}
-            </Typography>
-            <Typography color="text.secondary" fontSize={13}>Achievements</Typography>
+            <Typography color="text.secondary" fontSize={13}>Completed Tasks</Typography>
           </Card>
         </Box>
 
@@ -257,58 +355,7 @@ export default function ProfilePage() {
                     </ListItemIcon>
                     <ListItemText
                       primary="Email"
-                      secondary={
-                        isEditing ? (
-                          <TextField
-                            size="small"
-                            value={editData.email}
-                            onChange={(e) => handleInputChange("email", e.target.value)}
-                            fullWidth
-                          />
-                        ) : (
-                          mockUserData.email
-                        )
-                      }
-                    />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      <School />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="University"
-                      secondary={
-                        isEditing ? (
-                          <TextField
-                            size="small"
-                            value={editData.university}
-                            onChange={(e) => handleInputChange("university", e.target.value)}
-                            fullWidth
-                          />
-                        ) : (
-                          mockUserData.university
-                        )
-                      }
-                    />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      <LocationOn />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Location"
-                      secondary={
-                        isEditing ? (
-                          <TextField
-                            size="small"
-                            value={editData.location}
-                            onChange={(e) => handleInputChange("location", e.target.value)}
-                            fullWidth
-                          />
-                        ) : (
-                          mockUserData.location
-                        )
-                      }
+                      secondary={userData.email}
                     />
                   </ListItem>
                   <ListItem>
@@ -317,86 +364,18 @@ export default function ProfilePage() {
                     </ListItemIcon>
                     <ListItemText
                       primary="Joined"
-                      secondary={new Date(mockUserData.joinedDate).toLocaleDateString()}
+                      secondary={new Date(userData.created_at || new Date()).toLocaleDateString()}
                     />
                   </ListItem>
                 </List>
               </Box>
 
-              {/* Right: Enrolled Groups & Available Times */}
-              <Box sx={{ flexBasis: { xs: '100%', md: '45%' }, minWidth: 0 }}>
-                {/* Enrolled Groups */}
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Enrolled Groups
-                </Typography>
-                <Divider sx={{ mb: 1 }} />
-                <List dense>
-                  {mockUserData.enrolledGroups.length > 0 ? (
-                    mockUserData.enrolledGroups.map((group) => (
-                      <ListItem
-                        key={group.id}
-                        divider
-                        sx={{
-                          borderRadius: 2,
-                          transition: "background 0.2s",
-                          "&:hover": { bgcolor: "#e0f2fe" },
-                        }}
-                      >
-                        <ListItemText primary={group.name} />
-                      </ListItem>
-                    ))
-                  ) : (
-                    <ListItem>
-                      <ListItemText
-                        primary={
-                          <Typography color="text.secondary" fontSize={14}>
-                            No enrolled groups.
-                          </Typography>
-                        }
-                      />
-                    </ListItem>
-                  )}
-                </List>
-                {/* Available Study Times */}
-                <Typography variant="h6" fontWeight="bold" mt={3} gutterBottom>
-                  Available Study Times
-                </Typography>
-                <Divider sx={{ mb: 1 }} />
-                <Box sx={{ bgcolor: "#e0f7fa", borderRadius: 2, p: 1, mb: 2 }}>
-                  {isEditing ? (
-                    <FormGroup row>
-                      {daysOfWeek.map((day) => (
-                        <FormControlLabel
-                          key={day}
-                          control={
-                            <Checkbox
-                              checked={editData.availableDays.includes(day)}
-                              onChange={() => handleAvailableDayChange(day)}
-                              color="primary"
-                            />
-                          }
-                          label={day}
-                        />
-                      ))}
-                    </FormGroup>
-                  ) : (
-                    <Box sx={{ mt: 1 }}>
-                      {mockUserData.availableDays.length > 0 ? (
-                        <Typography fontSize={14}>
-                          {mockUserData.availableDays.join(", ")}
-                        </Typography>
-                      ) : (
-                        <Typography color="text.secondary" fontSize={14}>
-                          No study times selected.
-                        </Typography>
-                      )}
-                    </Box>
-                  )}
-                </Box>
-              </Box>
+              {/* 
+              Right section with Enrolled Groups & Available Times is hidden as requested
+              TODO: Implement these sections later when needed
+              */}
             </Box>
 
-          
           </CardContent>
         </Card>
 
@@ -407,16 +386,37 @@ export default function ProfilePage() {
             <Typography color="text.secondary" paragraph>
               Upload a new profile picture. Supported formats: JPG, PNG, GIF (max 5MB)
             </Typography>
-            <Button variant="outlined" component="label" fullWidth>
+            <Button variant="outlined" component="label" fullWidth sx={{ mb: 2 }}>
               Choose File
-              <input type="file" hidden accept="image/*" />
+              <input 
+                type="file" 
+                hidden 
+                accept="image/*" 
+                onChange={handleImageUpload}
+              />
             </Button>
+            {userData.image_url && (
+              <Button 
+                variant="outlined" 
+                color="error" 
+                fullWidth
+                onClick={handleRemoveImage}
+              >
+                Remove Current Image
+              </Button>
+            )}
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setAvatarDialogOpen(false)}>Cancel</Button>
-            <Button variant="contained">Upload</Button>
           </DialogActions>
         </Dialog>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
       </Box>
     </Box>
   );

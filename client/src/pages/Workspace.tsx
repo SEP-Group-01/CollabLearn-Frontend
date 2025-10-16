@@ -93,7 +93,7 @@ export default function WorkspaceDetailPage() {
     }
     
     // If it's a relative URL, prefix with API base URL
-    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
     return imageUrl.startsWith('/') ? `${API_URL}${imageUrl}` : `${API_URL}/${imageUrl}`;
   };
 
@@ -695,7 +695,7 @@ export default function WorkspaceDetailPage() {
               {/* Forum Card */}
               <Card
                 component={Link}
-                to={`/forum`}
+                to={`/workspace/${workspaceId}/forum`}
                 sx={{
                   p: 3,
                   textDecoration: 'none',
