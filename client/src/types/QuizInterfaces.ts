@@ -10,6 +10,7 @@ export interface Quiz {
   totalAttempts: number
   averageMarks: number
   averageTime: number // in minutes
+  questions?: Question[] // Questions for the quiz
   studentAttempts?: {
     attemptNumber: number
     marksObtained: number
@@ -34,14 +35,14 @@ export interface Option {
     id: string;
     sequenceLetter: string;
     text: string;
-    image: File | null;
+    image: File | string | null; // File for creation, string for display
     isCorrect: boolean;
 }
 
 export interface Question {
     id: string;
     questionText: string;
-    image: File | null;
+    image: File | string | null; // File for creation, string for display
     options: Option[];
     marks: number;
     isEditing: boolean;
@@ -51,13 +52,13 @@ export interface QuizDetails {
     title: string;
     description: string;
     allocatedTime: number;
-    topics: string;
     selectedResources: string[];
 }
 
 export interface DragDropImageUploadProps {
     onImageUpload: (file: File) => void;
     currentImage: File | null;
+    currentImageUrl?: string | null; // Add support for existing image URLs
     label: string;
     fullWidth?: boolean;
     height?: string;

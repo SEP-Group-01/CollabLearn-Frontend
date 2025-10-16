@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
 import EditIcon from "@mui/icons-material/Edit";
-
+import { useNavigate } from "react-router-dom";
 
 import { Box } from "@mui/material";
 import { Link } from "react-router-dom";
@@ -19,6 +19,7 @@ import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
+import { logout } from "../api/authApi";
 
 // Optional: Your logo asset
 import { assets } from "../assets/assets";
@@ -65,7 +66,7 @@ const SidebarMenuItem = ({
 
 const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) => {
   const [selected, setSelected] = useState<string>("Home");
-
+  const navigate = useNavigate();
   const handleToggle = () => setCollapsed((prev) => !prev);
 
   const sidebarWidth = collapsed ? 80 : 250;
@@ -204,14 +205,32 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
             collapsed={collapsed}
           />
 
-          <SidebarMenuItem
+          {/* <SidebarMenuItem
             title="Sign Out"
-            to="/signout"
+            to="/login"
             icon={<LogoutOutlinedIcon sx={{ color: "white" }} />}
             selected={selected}
             setSelected={setSelected}
             collapsed={collapsed}
-          />
+          /> */}
+          <MenuItem
+  icon={<LogoutOutlinedIcon sx={{ color: "white" }} />}
+  onClick={async () => {
+    try {
+      logout(); // Call the logout function to clear auth data
+      navigate("/login"); // Redirect to login page
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // Optionally, show an error message to the user
+    }
+  }}
+  style={{
+    color: "white",
+    fontWeight: selected === "Sign Out" ? "bold" : "normal",
+  }}
+>
+  {!collapsed && "Sign Out"}
+</MenuItem>
         </Menu>
       </Sidebar>
     </Box>

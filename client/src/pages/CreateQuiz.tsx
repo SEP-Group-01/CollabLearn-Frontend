@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Card,
@@ -38,9 +38,11 @@ import {
 
 import Footer from '../components/Footer';
 import SidebarComponent from '../components/SideBar';
-import {mockResources} from '../mocks/Quizzes';
 import type {Option, Question, QuizDetails} from '../types/QuizInterfaces'
 import DragDropImageUpload from '../components/DragDropImageUpload'
+import { createQuiz } from '../api/quizApi';
+import { getAccessToken } from '../api/authApi';
+import { useLocation, useParams } from 'react-router-dom';
 
 
 const CreateQuiz: React.FC = () => {
@@ -51,12 +53,14 @@ const CreateQuiz: React.FC = () => {
     const [isAddingQuestion, setIsAddingQuestion] = useState(false);
     const [errors, setErrors] = useState<{[key: string]: string}>({});
     const [dragOver, setDragOver] = useState<string | null>(null);
+    const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
+    const [threadResources, setThreadResources] = useState<any[]>([]);
+    const [loadingResources, setLoadingResources] = useState(false);
 
     const [quizDetails, setQuizDetails] = useState<QuizDetails>({
         title: '',
         description: '',
         allocatedTime: 0,
-        topics: '',
         selectedResources: []
     });
 
@@ -135,12 +139,12 @@ const CreateQuiz: React.FC = () => {
         }
     };
 
-    const handleResourceSelection = (resourceId: string) => {
+    const handleResourceSelection = (resourceTitle: string) => {
         setQuizDetails(prev => ({
             ...prev,
-            selectedResources: prev.selectedResources.includes(resourceId)
-                ? prev.selectedResources.filter(id => id !== resourceId)
-                : [...prev.selectedResources, resourceId]
+            selectedResources: prev.selectedResources.includes(resourceTitle)
+                ? prev.selectedResources.filter(title => title !== resourceTitle)
+                : [...prev.selectedResources, resourceTitle]
         }));
     };
 
@@ -300,7 +304,58 @@ const CreateQuiz: React.FC = () => {
         setErrors({});
     };
 
-    const handleCreateQuiz = () => {
+    const location = useLocation()
+    const params = useParams<{ workspaceId: string; threadId: string }>()
+
+    // Function to fetch thread resources
+    const fetchThreadResources = async (threadId: string) => {
+        if (!threadId) return;
+        
+        setLoadingResources(true);
+        try {
+            // Fix: Use the same token method as quizApi.ts
+            const token = getAccessToken();
+            
+            if (!token) {
+                console.error('No authentication token found');
+                throw new Error('Authentication required');
+            }
+            
+            // Fix: Use correct API endpoint without double /api/ prefix
+            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const apiUrl = baseUrl.includes('/api') ? baseUrl : `${baseUrl}/api`;
+            const response = await fetch(`${apiUrl}/threads/${threadId}/resources`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch thread resources');
+            }
+            
+            const resources = await response.json();
+            setThreadResources(resources);
+        } catch (error) {
+            console.error('Error fetching thread resources:', error);
+            setThreadResources([]);
+        } finally {
+            setLoadingResources(false);
+        }
+    };
+
+    // Fetch thread resources when component mounts or threadId changes
+    useEffect(() => {
+        const stateThreadId = (location.state as any)?.threadId;
+        const threadId = stateThreadId || params.threadId;
+        
+        if (threadId) {
+            fetchThreadResources(threadId);
+        }
+    }, [location.state, params.threadId]);
+
+    const handleCreateQuiz = async () => {
         if (!validateQuizDetails()) {
             return;
         }
@@ -310,12 +365,53 @@ const CreateQuiz: React.FC = () => {
             return;
         }
 
-        // Here you would typically send the data to the backend
-        console.log('Creating quiz with details:', quizDetails);
-        console.log('Questions:', questions);
-        
-        // Show success message or redirect
-        alert('Quiz created successfully!');
+        setIsCreatingQuiz(true);
+        setErrors({}); // Clear any existing errors
+
+        try {
+            console.log('Creating quiz with details:', quizDetails);
+            console.log('Questions:', questions);
+
+            // Determine threadId: prefer navigation state, then route params
+            const stateThreadId = (location.state as any)?.threadId
+            const threadId = stateThreadId || params.threadId
+            if (!threadId) {
+                throw new Error('Thread ID is missing. Cannot create quiz without thread context.')
+            }
+
+            // Build payload expected by backend
+            const payload = {
+                ...quizDetails,
+                questions,
+            }
+
+            // Call the API to create the quiz with correct parameter order
+            const response = await createQuiz(threadId, payload as any);
+            
+            console.log('Quiz creation response:', response);
+            
+            // Handle different possible response structures from backend
+            const quizId = response.id || response.quizId || response.quiz?.id || 'created';
+            const isSuccess = response.success !== false; // Assume success unless explicitly false
+            
+            if (isSuccess) {
+                alert(`Quiz created successfully! Quiz ID: ${quizId}`);
+                // Navigate back to quizzes page or reset form
+                window.history.back();
+            } else {
+                setErrors({ general: response.message || 'Failed to create quiz' });
+            }
+        } catch (error: any) {
+            console.error('Error creating quiz:', error);
+            console.error('Error details:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status
+            });
+            setErrors({ general: error.message || 'Failed to create quiz. Please try again.' });
+        } finally {
+            setIsCreatingQuiz(false);
+        }
     };
 
     const handleSaveAndExit = () => {
@@ -326,10 +422,10 @@ const CreateQuiz: React.FC = () => {
         setOpenCancelDialog(true);
     };
 
-    const confirmSaveAndExit = () => {
+    const confirmSaveAndExit = async () => {
         setOpenSaveDialog(false);
-        handleCreateQuiz();
-        window.history.back();
+        await handleCreateQuiz();
+        // The navigation will be handled inside handleCreateQuiz on success
     };
 
     const confirmCancelAndExit = () => {
@@ -357,8 +453,9 @@ const CreateQuiz: React.FC = () => {
                         startIcon={<SaveIcon />}
                         sx={{ fontWeight: 'bold', textTransform: 'none', borderRadius: 2, boxShadow: 2 }}
                         onClick={handleSaveAndExit}
+                        disabled={isCreatingQuiz}
                     >
-                        Save and Exit
+                        {isCreatingQuiz ? 'Creating Quiz...' : 'Save and Exit'}
                     </Button>
                     <Button
                         variant="outlined"
@@ -485,14 +582,6 @@ const CreateQuiz: React.FC = () => {
                                     onChange={(e) => handleQuizDetailsChange('description', e.target.value)}
                                     placeholder="Brief description of the quiz content and objectives..."
                                 />
-                                
-                                <TextField
-                                    fullWidth
-                                    label="Topics"
-                                    value={quizDetails.topics}
-                                    onChange={(e) => handleQuizDetailsChange('topics', e.target.value)}
-                                    placeholder="Enter topics separated by commas (e.g., React, JavaScript, State Management)"
-                                />
                             </Box>
                         </CardContent>
                     </Card>
@@ -518,38 +607,43 @@ const CreateQuiz: React.FC = () => {
                                 gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
                                 gap: 2
                             }}>
-                                {mockResources.map((resource) => (
+                                {loadingResources ? (
+                                    <Typography>Loading resources...</Typography>
+                                ) : threadResources.length === 0 ? (
+                                    <Typography color="text.secondary">No resources available for this thread.</Typography>
+                                ) : (
+                                    threadResources.map((resource) => (
                                     <Paper
                                         key={resource.id}
                                         sx={{
                                             p: 3,
                                             cursor: 'pointer',
                                             border: '2px solid',
-                                            borderColor: quizDetails.selectedResources.includes(resource.id)
+                                            borderColor: quizDetails.selectedResources.includes(resource.title)
                                                 ? 'primary.main'
                                                 : 'divider',
-                                            bgcolor: quizDetails.selectedResources.includes(resource.id)
+                                            bgcolor: quizDetails.selectedResources.includes(resource.title)
                                                 ? 'rgba(25, 118, 210, 0.08)'
                                                 : 'background.paper',
                                             borderRadius: 2,
                                             transition: 'all 0.2s ease-in-out',
                                             '&:hover': {
                                                 borderColor: 'primary.main',
-                                                bgcolor: quizDetails.selectedResources.includes(resource.id)
+                                                bgcolor: quizDetails.selectedResources.includes(resource.title)
                                                     ? 'rgba(25, 118, 210, 0.12)'
                                                     : 'action.hover',
                                                 transform: 'translateY(-1px)',
                                                 boxShadow: 2
                                             }
                                         }}
-                                        onClick={() => handleResourceSelection(resource.id)}
+                                        onClick={() => handleResourceSelection(resource.title)}
                                     >
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                                             <Typography 
                                                 variant="subtitle1" 
                                                 sx={{ 
                                                     fontWeight: 'medium',
-                                                    color: quizDetails.selectedResources.includes(resource.id)
+                                                    color: quizDetails.selectedResources.includes(resource.title)
                                                         ? 'primary.main'
                                                         : 'text.primary'
                                                 }}
@@ -558,13 +652,13 @@ const CreateQuiz: React.FC = () => {
                                             </Typography>
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <Chip 
-                                                    label={resource.type} 
+                                                    label={resource.resource_type} 
                                                     size="small" 
-                                                    variant={quizDetails.selectedResources.includes(resource.id) ? "filled" : "outlined"}
-                                                    color={quizDetails.selectedResources.includes(resource.id) ? "primary" : "default"}
+                                                    variant={quizDetails.selectedResources.includes(resource.title) ? "filled" : "outlined"}
+                                                    color={quizDetails.selectedResources.includes(resource.title) ? "primary" : "default"}
                                                     sx={{ fontWeight: 'medium' }}
                                                 />
-                                                {quizDetails.selectedResources.includes(resource.id) && (
+                                                {quizDetails.selectedResources.includes(resource.title) && (
                                                     <Typography 
                                                         variant="caption" 
                                                         sx={{ 
@@ -579,7 +673,8 @@ const CreateQuiz: React.FC = () => {
                                             </Box>
                                         </Box>
                                     </Paper>
-                                ))}
+                                    ))
+                                )}
                             </Box>
                         </CardContent>
                     </Card>

@@ -1,40 +1,41 @@
 import { Route, Routes } from 'react-router-dom'
 
 import CollaborativeEditor from './pages/CollaborativeEditor'
-import Header from "./components/Header";
 
 import Forum from './pages/Forum'
 import Workspace from './pages/Workspace'
+import ManageWorkspace from './pages/ManageWorkspace'
 import Profile from './pages/Profile'
 import HomePage from "./pages/HomePage"
 import SignUpPage from "./pages/SignUpPage"
 import LoginPage from "./pages/LoginPage"
 // import DashboardPage from "./pages/DashboardPage"
 import QuizesPage from './pages/QuizesPage'
+import QuizDebugPage from './pages/QuizDebugPage'
 
 import CreateQuiz from './pages/CreateQuiz'
 import AttemptQuiz from './pages/AttemptQuiz'
+import QuizReview from './pages/QuizReview'
 
 import ThreadPage from './pages/ThreadPage'
 import ThreadDocumentsPage from './pages/ThreadDocument'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import DocumentQuery from './pages/DocumentQuery'
-import GroupListPage from './pages/GroupListPage'
+import WorkspaceSearchResults from './pages/WorkspaceSearchResults'
 import StudyPlanGenerationPage from './pages/StudyPlanGenerationPage'
 import GroupManagePage from './pages/GroupManagePage';
 import DocumentDetailsPage from './pages/DocumentDetailsPage';
-
-const dummyUser = {
-  name: "Student Name",
-  avatarUrl: "https://i.pravatar.cc/150?img=3", // or your user's avatar url
-};
+import LinksPage from './pages/LinksPage';
+import VideosPage from './pages/VideosPage';
+import VideoDetailsPage from './pages/VideoDetailsPage';
+import LinkDetailsPage from './pages/LinkDetailsPage';
 
 const App = () => {
   return (
 
       <div className="App">
-      <Header user={dummyUser} /> {/* Pass user prop here */}
+      {/* <Header user={dummyUser} /> Pass user prop here */}
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/signup" element={<SignUpPage />} />
@@ -43,13 +44,16 @@ const App = () => {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           {/* <Route path="/dashboard" element={<DashboardPage />} /> */}
           <Route path="/editor" element={<CollaborativeEditor />} />
-          <Route path="/workspaces-list" element={<GroupListPage />} />
-          <Route path="/workspaces-list/:search" element={<GroupListPage />} />
+          <Route path="/workspaces-list" element={<WorkspaceSearchResults />} />
+          <Route path="/workspaces-list/:search" element={<WorkspaceSearchResults />} />
 
           <Route path="/forum" element={<Forum />} />
           <Route path="/workspace/:workspaceId" element={<Workspace />} />
+          <Route path="/workspace/:workspaceId/forum" element={<Forum />} />
+          <Route path="/workspace/:workspaceId/manage" element={<ManageWorkspace />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/quizzes" element={<QuizesPage />} />
+          <Route path="/quizzes/:quizId" element={<QuizDebugPage />} />
           <Route path="/study-plan" element={<StudyPlanGenerationPage />} />
 
           <Route path="/create-quiz" element={<CreateQuiz />} />
@@ -59,8 +63,18 @@ const App = () => {
           <Route path="/workspace/:workspaceId/threads/:threadId" element={<ThreadPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/documents" element={<ThreadDocumentsPage />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/documents/:docId" element={<DocumentDetailsPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/editor/:documentId" element={<CollaborativeEditor />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/query" element={<DocumentQuery />} />
           <Route path="/workspace/:workspaceId/threads/:threadId/manage" element={<GroupManagePage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/links" element={<LinksPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/links/:linkId" element={<LinkDetailsPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/videos/:videoId" element={<VideoDetailsPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/videos" element={<VideosPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/quizzes" element={<QuizesPage />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/create-quiz" element={<CreateQuiz />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/quizzes/:quizId/attempt" element={<AttemptQuiz />} />
+          <Route path="/workspace/:workspaceId/threads/:threadId/quizzes/:quizId/review" element={<QuizReview />} />
+          <Route path="/quizzes/:quizId/review" element={<QuizReview />} />
 
           {/* Remove old module-based routes */}
         </Routes>
