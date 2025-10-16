@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import SidebarComponent from "../components/SideBar";
-import { AttachFile, Send, Close } from "@mui/icons-material";
-import {Pin, MessageCircle, Reply } from "lucide-react";
+import { AttachFile, Send, Close, Reply as ReplyIcon, Delete as DeleteIcon, ThumbUp } from "@mui/icons-material";
+import { Pin, MessageCircle } from "lucide-react";
 import {
   Box,
   Button,
@@ -16,6 +16,11 @@ import {
   useMediaQuery,
   CircularProgress,
   GlobalStyles,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Badge,
 } from "@mui/material";
 
 import type { Role, MessageType, ReplyType, Author } from "../types/ForumInterfaces";
@@ -23,7 +28,12 @@ import {
   getForumMessages, 
   createForumMessage, 
   createReply, 
-  getWorkspaceInfo 
+  getWorkspaceInfo,
+  toggleMessageLike,
+  toggleReplyLike,
+  deleteMessage,
+  deleteReply,
+  pinMessage
 } from "../api/forumApi";
 import { getUserData } from "../api/authApi";
 import type { User } from "../types/AuthInterfaces";
@@ -81,9 +91,12 @@ export default function WorkspaceForumPage() {
   const [sending, setSending] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-
-
-
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    messageId: string | number;
+    isOwnMessage: boolean;
+  } | null>(null);
 
   // Manual refresh function with duplicate prevention
   const refreshMessages = useCallback(async () => {
@@ -153,9 +166,12 @@ export default function WorkspaceForumPage() {
       };
       
       console.log('📨 New message via WebSocket added to UI');
-      return [...prevMessages, newMessage].sort((a, b) => 
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      );
+      return [...prevMessages, newMessage].sort((a, b) => {
+        // Sort pinned messages first, then by timestamp
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+      });
     });
   }, []);
 
@@ -210,9 +226,146 @@ export default function WorkspaceForumPage() {
     // You can show a notification here if needed
   }, []);
 
+  // Handle pin/unpin message
+  const handlePinMessage = useCallback(async (messageId: string | number) => {
+    try {
+      const user = await getUserData();
+      if (!user || !user.id) {
+        throw new Error('User not authenticated');
+      }
+      
+      // Get current message state
+      const currentMessage = messages.find(msg => msg.id === messageId);
+      if (!currentMessage) {
+        throw new Error('Message not found');
+      }
+      
+      // Call the API endpoint - it will toggle pin/unpin automatically
+      await pinMessage(workspaceId, Number(messageId));
+      
+      // Toggle the pin state in UI
+      setMessages(prevMessages => prevMessages.map(msg => {
+        if (msg.id === messageId) {
+          return { ...msg, isPinned: !msg.isPinned };
+        }
+        return msg;
+      }).sort((a, b) => {
+        // Sort pinned messages first, then by timestamp
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+      }));
+      
+      console.log('✅ Message pin toggled successfully');
+    } catch (error) {
+      console.error('Error pinning/unpinning message:', error);
+      setError(error instanceof Error ? error.message : 'Failed to pin/unpin message');
+    }
+  }, [messages, workspaceId]);
+
+  // Handle like/unlike message
+  const handleLikeMessage = useCallback(async (messageId: string | number) => {
+    try {
+      console.log('Toggling like for message:', messageId);
+      const result = await toggleMessageLike(workspaceId, messageId);
+      
+      // Update message likes in UI
+      setMessages(prevMessages => prevMessages.map(msg => {
+        if (msg.id === messageId) {
+          return { 
+            ...msg, 
+            likes: result.likeCount,
+            isLiked: result.liked
+          };
+        }
+        return msg;
+      }));
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      setError(error instanceof Error ? error.message : 'Failed to toggle like');
+    }
+  }, [workspaceId]);
+
+  // Handle like/unlike reply
+  const handleLikeReply = useCallback(async (messageId: string | number, replyId: string | number) => {
+    try {
+      console.log('Toggling like for reply:', replyId);
+      const result = await toggleReplyLike(messageId, replyId);
+      
+      // Update reply likes in UI
+      setMessages(prevMessages => prevMessages.map(msg => {
+        if (msg.id === messageId) {
+          return {
+            ...msg,
+            replies: msg.replies?.map(reply => {
+              if (reply.id === replyId) {
+                return {
+                  ...reply,
+                  likes: result.likeCount,
+                  isLiked: result.liked
+                };
+              }
+              return reply;
+            }) || []
+          };
+        }
+        return msg;
+      }));
+    } catch (error) {
+      console.error('Error toggling reply like:', error);
+      setError(error instanceof Error ? error.message : 'Failed to toggle reply like');
+    }
+  }, []);
+
+  // Handle delete message
+  const handleDeleteMessage = useCallback(async (messageId: string | number) => {
+    try {
+      const confirmDelete = window.confirm('Are you sure you want to delete this message?');
+      if (!confirmDelete) return;
+
+      console.log('Deleting message:', messageId);
+      await deleteMessage(workspaceId, messageId);
+      
+      // Remove message from UI
+      setMessages(prevMessages => prevMessages.filter(msg => msg.id !== messageId));
+      console.log('✅ Message deleted successfully');
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete message');
+    }
+  }, [workspaceId]);
+
+  // Handle delete reply
+  const handleDeleteReply = useCallback(async (messageId: string | number, replyId: string | number) => {
+    try {
+      const confirmDelete = window.confirm('Are you sure you want to delete this reply?');
+      if (!confirmDelete) return;
+
+      console.log('Deleting reply:', replyId);
+      await deleteReply(messageId, replyId);
+      
+      // Remove reply from UI
+      setMessages(prevMessages => prevMessages.map(msg => {
+        if (msg.id === messageId) {
+          return {
+            ...msg,
+            replies: msg.replies?.filter(reply => reply.id !== replyId) || []
+          };
+        }
+        return msg;
+      }));
+      console.log('✅ Reply deleted successfully');
+    } catch (error) {
+      console.error('Error deleting reply:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete reply');
+    }
+  }, []);
+
   // Initialize Socket.IO WebSocket connection for real-time updates
   const {
     isConnected: wsConnected,
+    sendMessage: wsSendMessage,
+    sendReply: wsSendReply,
     sendTyping: wsSendTyping
   } = useForumWebSocket({
     workspaceId,
@@ -221,20 +374,6 @@ export default function WorkspaceForumPage() {
     onUserJoined: handleUserJoined,
     onUserLeft: handleUserLeft
   });
-
-  // // Initialize Socket.IO WebSocket connection (disabled due to file issues)
-  // const {
-  //   isConnected: wsConnected,
-  //   sendMessage: wsSendMessage,
-  //   sendReply: wsSendReply,
-  //   sendTyping: wsSendTyping
-  // } = useForumWebSocket({
-  //   workspaceId,
-  //   onNewMessage: handleNewMessage,
-  //   onNewReply: handleNewReply,
-  //   onUserJoined: handleUserJoined,
-  //   onUserLeft: handleUserLeft
-  // });
 
   // Debug WebSocket connection status (reduced logging)
   React.useEffect(() => {
@@ -378,11 +517,17 @@ export default function WorkspaceForumPage() {
 
   // Load forum data on component mount
   useEffect(() => {
-    // Load current user data
-    const user = getUserData();
-    setCurrentUser(user);
-    
     const loadForumData = async () => {
+      // Load current user data FIRST - await it!
+      try {
+        const user = await getUserData();
+        setCurrentUser(user);
+        console.log('👤 Current user loaded:', user ? `${user.first_name} ${user.last_name} (ID: ${user.id})` : 'Not logged in');
+      } catch (error) {
+        console.error('Error loading user data:', error);
+        setCurrentUser(null);
+      }
+
       if (!workspaceId) {
         console.warn('⚠️ No workspace ID provided, skipping forum data load');
         return;
@@ -467,43 +612,93 @@ export default function WorkspaceForumPage() {
     if (!workspaceId) return;
 
     try {
+      // Get user data from localStorage directly (synchronous)
+      const userDataString = localStorage.getItem('user_data');
+      if (!userDataString) {
+        setError('Please sign in to send messages');
+        return;
+      }
+      
+      let user;
+      try {
+        user = JSON.parse(userDataString);
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+        setError('Invalid user data - please sign in again');
+        return;
+      }
+      
+      if (!user || !user.id) {
+        setError('Please sign in to send messages');
+        return;
+      }
+      
       setSending(true);
       setError(null);
       
       console.log('Sending message:', { workspaceId, content: newMessage });
-      const newMessageData = await createForumMessage(workspaceId, newMessage, image || undefined);
-      console.log('Received new message:', newMessageData);
       
-      // ALWAYS add the message immediately to UI for instant feedback
-      const messageWithReplies: MessageType = {
-        id: newMessageData.id,
-        content: newMessageData.content,
-        author: newMessageData.author,
-        timestamp: newMessageData.timestamp,
-        isPinned: newMessageData.isPinned || false,
-        likes: 0,
-        isLiked: false,
-        replies: newMessageData.replies || [],
-        image: newMessageData.image
-      };
-      
-      setMessages(prev => {
-        // Check for duplicates before adding
-        const exists = prev.some(msg => msg.id.toString() === newMessageData.id.toString());
-        if (exists) {
-          console.log('Message already exists in UI, skipping duplicate');
-          return prev;
-        }
+      // Use WebSocket if connected, otherwise fall back to HTTP API
+      if (wsConnected) {
+        console.log('📤 Sending via WebSocket');
+        // Send via WebSocket - backend will create in DB and broadcast
+        wsSendMessage({
+          content: newMessage.trim(),
+          author: {
+            id: user.id,
+            name: `${user.first_name} ${user.last_name}`.trim(),
+            role: 'member' as Role, // Default role since User type doesn't have role
+          }
+        });
         
-        console.log('Adding new message to UI immediately');
-        return [...prev, messageWithReplies].sort((a, b) => 
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
-      });
-      
-      // Clear the input immediately
-      setNewMessage("");
-      setImage(null);
+        // Clear input immediately
+        setNewMessage("");
+        setImage(null);
+      } else {
+        console.log('📡 Sending via HTTP API (WebSocket disconnected)');
+        // Fallback to HTTP API when WebSocket is not connected
+        const newMessageData = await createForumMessage(workspaceId, newMessage.trim(), image || undefined);
+        console.log('Received new message:', newMessageData);
+        
+        // Add message to UI
+        const messageWithReplies: MessageType = {
+          id: newMessageData.id,
+          content: newMessageData.content,
+          author: {
+            id: user.id,
+            name: `${user.first_name} ${user.last_name}`.trim(),
+            role: 'member' as Role, // Default to member role
+            avatar: '/src/assets/profile_img.png' // Default avatar
+          },
+          timestamp: newMessageData.timestamp,
+          isPinned: newMessageData.isPinned || false,
+          likes: 0,
+          isLiked: false,
+          replies: newMessageData.replies || [],
+          image: newMessageData.image
+        };
+        
+        setMessages(prev => {
+          // Check for duplicates before adding
+          const exists = prev.some(msg => msg.id.toString() === newMessageData.id.toString());
+          if (exists) {
+            console.log('Message already exists in UI, skipping duplicate');
+            return prev;
+          }
+          
+          console.log('Adding new message to UI immediately');
+          return [...prev, messageWithReplies].sort((a, b) => {
+            // Sort pinned messages first, then by timestamp
+            if (a.isPinned && !b.isPinned) return -1;
+            if (!a.isPinned && b.isPinned) return 1;
+            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+          });
+        });
+        
+        // Clear the input
+        setNewMessage("");
+        setImage(null);
+      }
       
     } catch (err) {
       console.error('Error sending message:', err);
@@ -518,20 +713,30 @@ export default function WorkspaceForumPage() {
     if (!workspaceId) return;
 
     try {
+      const user = await getUserData();
+      if (!user || !user.id) {
+        setError('Please sign in to reply to messages');
+        return;
+      }
+      
       console.log('Sending reply to message:', messageId, 'Content:', replyContent);
-      // Pass messageId as string (UUID) instead of converting to Number
-      const newReply = await createReply(workspaceId, String(messageId), replyContent);
+      const newReply = await createReply(workspaceId, String(messageId), replyContent.trim());
       console.log('Reply sent successfully:', newReply);
       
       // Clear reply input immediately
       setReplyContent("");
       setReplyingTo(null);
       
-      // ALWAYS add the reply immediately to UI for instant feedback
+      // Format reply with user data
       const formattedReply: ReplyType = {
         id: newReply.id,
         content: newReply.content,
-        author: newReply.author,
+        author: {
+          id: user.id,
+          name: `${user.first_name} ${user.last_name}`.trim(),
+          role: 'member' as Role, // Default to member role
+          avatar: '/src/assets/profile_img.png' // Default avatar
+        },
         timestamp: newReply.timestamp,
         likes: 0,
         isLiked: false
@@ -550,6 +755,7 @@ export default function WorkspaceForumPage() {
             }
             
             console.log('Adding new reply to UI immediately');
+            // Add reply and sort
             return {
               ...message,
               replies: [...(message.replies || []), formattedReply].sort((a, b) => 
@@ -560,6 +766,12 @@ export default function WorkspaceForumPage() {
           return message;
         });
       });
+      
+      // Emit via WebSocket if connected
+      if (wsConnected) {
+        console.log('Emitting reply via WebSocket');
+        wsSendReply(String(messageId), formattedReply);
+      }
       
     } catch (err) {
       console.error('Error sending reply:', err);
@@ -591,6 +803,10 @@ export default function WorkspaceForumPage() {
 
   const getRoleColor = (role: Role) =>
     role === "admin" ? "warning" : "default";
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null);
+  };
 
   return (
     <>
@@ -675,79 +891,6 @@ export default function WorkspaceForumPage() {
                   </Typography>
                 </Box>
               </Box>
-              
-              {/* Debug Info - Only show in development */}
-              {import.meta.env.DEV && (
-                <Typography variant="caption" sx={{ 
-                  display: 'block',
-                  mt: 1,
-                  opacity: 0.7,
-                  fontSize: '0.7rem'
-                }}>
-                  Debug: Workspace ID: {workspaceId || 'Not Found'} | 
-                  API: {import.meta.env.VITE_API_URL || 'http://localhost:3000'}
-                </Typography>
-              )}
-            </Box>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {/* Debug Button - Only show in development */}
-              {import.meta.env.DEV && (
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => {
-                    console.log('🔍 Debug Info:');
-                    console.log('- Workspace ID:', workspaceId);
-                    console.log('- API URL:', import.meta.env.VITE_API_URL || 'http://localhost:3000');
-                    console.log('- Full API Endpoint:', `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/workspaces/${workspaceId}/forum/messages`);
-                    console.log('- WebSocket Connected:', wsConnected);
-                    console.log('- Messages Count:', messages.length);
-                    console.log('- Error State:', error);
-                    
-                    // Test the API endpoint manually
-                    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/workspaces/${workspaceId}/forum/messages`)
-                      .then(response => {
-                        console.log('🧪 Manual API Test Response Status:', response.status);
-                        return response.text();
-                      })
-                      .then(text => {
-                        console.log('🧪 Manual API Test Response Body:', text);
-                      })
-                      .catch(err => {
-                        console.log('🧪 Manual API Test Error:', err);
-                      });
-                  }}
-                  sx={{
-                    color: 'white',
-                    borderColor: 'rgba(255,255,255,0.3)',
-                    '&:hover': {
-                      borderColor: 'white',
-                      bgcolor: 'rgba(255,255,255,0.1)'
-                    }
-                  }}
-                >
-                  Debug
-                </Button>
-              )}
-              
-              {currentUser && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Avatar 
-                    src={'/src/assets/profile_img2.png'}
-                    sx={{ 
-                      width: { xs: 32, sm: 36 }, 
-                      height: { xs: 32, sm: 36 },
-                      border: '2px solid rgba(255,255,255,0.3)'
-                    }}
-                  />
-                  <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-                    <Typography variant="body2" fontWeight="600">
-                      {currentUser.first_name} {currentUser.last_name}
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
             </Box>
           </Box>
         </Box>
@@ -811,8 +954,24 @@ export default function WorkspaceForumPage() {
             <Box sx={{ p: { xs: 1, sm: 2 } }}>
               <Stack spacing={1}>
                 {messages.filter(message => message && message.id && message.author).map((message, index) => {
-                  const isOwnMessage = message.author?.name === "You" || 
-                                       (message.author?.id && currentUser && message.author.id.toString() === currentUser.id);
+                  // Check if this message is from the current user - FIXED comparison
+                  const isOwnMessage = !!(
+                    currentUser?.id && 
+                    message.author?.id && 
+                    String(message.author.id) === String(currentUser.id)
+                  );
+                  
+                  // Debug logging (only for first render)
+                  if (index === 0 && import.meta.env.DEV) {
+                    console.log('🔍 Message ownership check:', {
+                      messageAuthorId: message.author?.id,
+                      currentUserId: currentUser?.id,
+                      isOwnMessage,
+                      messageAuthor: message.author?.name,
+                      comparison: `${String(message.author?.id)} === ${String(currentUser?.id)}`
+                    });
+                  }
+                  
                   const prevMessage = index > 0 ? messages[index - 1] : null;
                   const showAvatar = !prevMessage || prevMessage.author?.id !== message.author?.id;
                   const isGrouped = prevMessage && prevMessage.author?.id === message.author?.id;
@@ -890,32 +1049,40 @@ export default function WorkspaceForumPage() {
                           <Paper
                             elevation={0}
                             className="message-bubble"
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              setContextMenu({
+                                mouseX: e.clientX,
+                                mouseY: e.clientY,
+                                messageId: message.id,
+                                isOwnMessage
+                              });
+                            }}
                             sx={{
-                              p: { xs: 1.25, sm: 2 },
-                              borderRadius: { xs: 2.5, sm: 3 },
-                              bgcolor: isOwnMessage 
-                                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                                : 'white',
+                              p: { xs: 1.5, sm: 2.5 },
+                              borderRadius: isOwnMessage 
+                                ? '20px 20px 4px 20px'
+                                : '20px 20px 20px 4px',
                               color: isOwnMessage ? 'white' : 'text.primary',
                               border: isOwnMessage ? 'none' : '1px solid #e0e7ff',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                              boxShadow: isOwnMessage 
+                                ? '0 2px 12px rgba(102, 126, 234, 0.3)'
+                                : '0 2px 12px rgba(0,0,0,0.08)',
                               position: 'relative',
+                              minWidth: '120px',
                               background: isOwnMessage 
                                 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                                : message.isPinned ? '#fff3e0' : 'white',
-                              '&::before': showAvatar ? {
-                                content: '""',
-                                position: 'absolute',
-                                width: 0,
-                                height: 0,
-                                bottom: -8,
-                                [isOwnMessage ? 'right' : 'left']: 12,
-                                border: isOwnMessage 
-                                  ? '8px solid transparent'
-                                  : '8px solid transparent',
-                                borderTopColor: isOwnMessage ? '#667eea' : 'white',
-                                borderBottomColor: 'transparent'
-                              } : {}
+                                : message.isPinned 
+                                  ? 'linear-gradient(135deg, #fff9c4 0%, #fff3e0 100%)' 
+                                  : 'white',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              '&:hover': {
+                                boxShadow: isOwnMessage 
+                                  ? '0 4px 20px rgba(102, 126, 234, 0.4)'
+                                  : '0 4px 20px rgba(0,0,0,0.12)',
+                                transform: 'translateY(-2px)'
+                              }
                             }}
                           >
                             <Typography 
@@ -980,38 +1147,136 @@ export default function WorkspaceForumPage() {
                                   transition: 'all 0.2s'
                                 }}
                               >
-                                <Reply size={14} />
+                                <ReplyIcon sx={{ fontSize: 14 }} />
                               </IconButton>
                             </Box>
 
-                            {/* Replies Count - Show at bottom if there are replies */}
-                            {message.replies && message.replies.length > 0 && (
-                              <Box sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                                mt: 1,
-                                justifyContent: isOwnMessage ? "flex-end" : "flex-start"
-                              }}>
-                                <Button
+                            {/* Actions Row - Like, Reply, Context Menu */}
+                            <Box sx={{ 
+                              mt: 1, 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'space-between'
+                            }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <IconButton
                                   size="small"
-                                  startIcon={<MessageCircle size={14} />}
-                                  onClick={() => toggleReplies(message.id)}
+                                  onClick={() => handleLikeMessage(message.id)}
                                   sx={{
-                                    color: isOwnMessage ? 'rgba(255,255,255,0.8)' : 'text.secondary',
-                                    textTransform: 'none',
-                                    fontSize: '0.75rem',
-                                    minWidth: 'auto',
-                                    px: 1,
+                                    padding: '4px',
+                                    color: message.isLiked 
+                                      ? (isOwnMessage ? '#fff' : '#667eea') 
+                                      : (isOwnMessage ? 'rgba(255,255,255,0.9)' : 'text.secondary'),
+                                    transition: 'all 0.2s',
                                     '&:hover': {
-                                      bgcolor: isOwnMessage ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)'
+                                      transform: 'scale(1.1)',
+                                      color: isOwnMessage ? '#fff' : '#667eea'
                                     }
                                   }}
                                 >
-                                  {message.replies.length} {message.replies.length === 1 ? 'reply' : 'replies'}
-                                </Button>
+                                  <Badge 
+                                    badgeContent={message.likes} 
+                                    color="primary"
+                                    sx={{ 
+                                      '& .MuiBadge-badge': {
+                                        fontSize: '0.6rem',
+                                        height: '14px',
+                                        minWidth: '14px'
+                                      }
+                                    }}
+                                  >
+                                    <ThumbUp sx={{ 
+                                      fontSize: '0.9rem',
+                                      fill: message.isLiked ? 'currentColor' : 'none'
+                                    }} />
+                                  </Badge>
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => toggleReplies(message.id)}
+                                  sx={{
+                                    padding: '4px',
+                                    color: isOwnMessage ? 'rgba(255,255,255,0.9)' : 'text.secondary',
+                                  }}
+                                >
+                                  <Badge 
+                                    badgeContent={message.replies?.length || 0} 
+                                    color="primary"
+                                    sx={{ 
+                                      '& .MuiBadge-badge': {
+                                        fontSize: '0.6rem',
+                                        height: '14px',
+                                        minWidth: '14px'
+                                      }
+                                    }}
+                                  >
+                                    <MessageCircle size={14} />
+                                  </Badge>
+                                </IconButton>
                               </Box>
-                            )}
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  fontSize: '0.65rem',
+                                  color: isOwnMessage ? 'rgba(255,255,255,0.8)' : 'text.secondary',
+                                  ml: 1
+                                }}
+                              >
+                                {new Date(message.timestamp).toLocaleString('en-US', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </Typography>
+                            </Box>
+
+                            {/* Context Menu */}
+                            <Menu
+                              open={!!contextMenu && contextMenu.messageId === message.id}
+                              onClose={handleCloseContextMenu}
+                              anchorReference="anchorPosition"
+                              anchorPosition={
+                                contextMenu
+                                  ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+                                  : undefined
+                              }
+                            >
+                              <MenuItem onClick={() => {
+                                setReplyingTo(message.id);
+                                handleCloseContextMenu();
+                              }}>
+                                <ListItemIcon>
+                                  <ReplyIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Reply</ListItemText>
+                              </MenuItem>
+                              <MenuItem onClick={() => {
+                                handlePinMessage(message.id);
+                                handleCloseContextMenu();
+                              }}>
+                                <ListItemIcon>
+                                  <Pin size={20} 
+                                    style={{ 
+                                      transform: message.isPinned ? 'rotate(45deg)' : 'none',
+                                      transition: 'transform 0.2s ease-in-out'
+                                    }} 
+                                  />
+                                </ListItemIcon>
+                                <ListItemText>{message.isPinned ? 'Unpin' : 'Pin'}</ListItemText>
+                              </MenuItem>
+                              {contextMenu?.isOwnMessage && (
+                                <MenuItem onClick={() => {
+                                  handleDeleteMessage(message.id);
+                                  handleCloseContextMenu();
+                                }}>
+                                  <ListItemIcon>
+                                    <DeleteIcon fontSize="small" />
+                                  </ListItemIcon>
+                                  <ListItemText>Delete</ListItemText>
+                                </MenuItem>
+                              )}
+                            </Menu>
                           </Paper>
 
                           {/* Replies Thread - Modern Design */}
@@ -1035,8 +1300,12 @@ export default function WorkspaceForumPage() {
                             }}>
                               <Stack spacing={1.5}>
                                 {message.replies.filter(reply => reply && reply.id).map((reply, replyIndex) => {
-                                  const isOwnReply = reply.author?.name === "You" || 
-                                                    (reply.author?.id && currentUser && reply.author.id.toString() === currentUser.id);
+                                  // Check if this reply is from the current user - FIXED comparison
+                                  const isOwnReply = !!(
+                                    currentUser?.id && 
+                                    reply.author?.id && 
+                                    String(reply.author.id) === String(currentUser.id)
+                                  );
                                   
                                   return (
                                     <Box
@@ -1097,30 +1366,24 @@ export default function WorkspaceForumPage() {
                                           elevation={0}
                                           sx={{
                                             p: { xs: 1, sm: 1.5 },
-                                            borderRadius: 2,
+                                            borderRadius: isOwnReply 
+                                              ? '16px 16px 2px 16px'
+                                              : '16px 16px 16px 2px',
                                             bgcolor: isOwnReply 
-                                              ? 'rgba(102, 126, 234, 0.08)'
-                                              : 'rgba(0, 0, 0, 0.03)',
-                                            border: `1px solid ${isOwnReply ? 'rgba(102, 126, 234, 0.2)' : 'rgba(0, 0, 0, 0.08)'}`,
+                                              ? 'rgba(102, 126, 234, 0.15)'
+                                              : 'rgba(0, 0, 0, 0.04)',
+                                            border: `1px solid ${isOwnReply ? 'rgba(102, 126, 234, 0.3)' : 'rgba(0, 0, 0, 0.08)'}`,
                                             position: 'relative',
                                             transition: 'all 0.2s ease',
+                                            color: isOwnReply ? 'primary.dark' : 'text.primary',
                                             '&:hover': {
                                               bgcolor: isOwnReply 
-                                                ? 'rgba(102, 126, 234, 0.12)'
-                                                : 'rgba(0, 0, 0, 0.05)',
+                                                ? 'rgba(102, 126, 234, 0.2)'
+                                                : 'rgba(0, 0, 0, 0.06)',
                                               transform: 'translateY(-1px)',
-                                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                                            },
-                                            '&::before': {
-                                              content: '""',
-                                              position: 'absolute',
-                                              width: 0,
-                                              height: 0,
-                                              bottom: -6,
-                                              [isOwnReply ? 'right' : 'left']: 8,
-                                              borderLeft: isOwnReply ? 'none' : '6px solid transparent',
-                                              borderRight: isOwnReply ? '6px solid transparent' : 'none',
-                                              borderTop: `6px solid ${isOwnReply ? 'rgba(102, 126, 234, 0.08)' : 'rgba(0, 0, 0, 0.03)'}`,
+                                              boxShadow: isOwnReply
+                                                ? '0 4px 12px rgba(102, 126, 234, 0.2)'
+                                                : '0 4px 12px rgba(0,0,0,0.1)'
                                             }
                                           }}
                                         >
@@ -1136,6 +1399,79 @@ export default function WorkspaceForumPage() {
                                           >
                                             {reply.content}
                                           </Typography>
+
+                                          {/* Reply Actions - Like and Delete */}
+                                          <Box sx={{ 
+                                            mt: 1, 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'space-between',
+                                            gap: 1
+                                          }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => handleLikeReply(message.id, reply.id)}
+                                                sx={{
+                                                  padding: '2px',
+                                                  color: reply.isLiked ? '#667eea' : 'text.secondary',
+                                                  transition: 'all 0.2s',
+                                                  '&:hover': {
+                                                    transform: 'scale(1.1)',
+                                                    color: '#667eea'
+                                                  }
+                                                }}
+                                              >
+                                                <Badge 
+                                                  badgeContent={reply.likes || 0} 
+                                                  color="primary"
+                                                  sx={{ 
+                                                    '& .MuiBadge-badge': {
+                                                      fontSize: '0.55rem',
+                                                      height: '12px',
+                                                      minWidth: '12px'
+                                                    }
+                                                  }}
+                                                >
+                                                  <ThumbUp sx={{ 
+                                                    fontSize: '0.75rem',
+                                                    fill: reply.isLiked ? 'currentColor' : 'none'
+                                                  }} />
+                                                </Badge>
+                                              </IconButton>
+                                              
+                                              {isOwnReply && (
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={() => handleDeleteReply(message.id, reply.id)}
+                                                  sx={{
+                                                    padding: '2px',
+                                                    color: 'error.main',
+                                                    opacity: 0.6,
+                                                    '&:hover': {
+                                                      opacity: 1,
+                                                      bgcolor: 'error.50'
+                                                    }
+                                                  }}
+                                                >
+                                                  <DeleteIcon sx={{ fontSize: '0.75rem' }} />
+                                                </IconButton>
+                                              )}
+                                            </Box>
+                                            
+                                            <Typography
+                                              variant="caption"
+                                              sx={{
+                                                fontSize: '0.6rem',
+                                                color: 'text.secondary'
+                                              }}
+                                            >
+                                              {new Date(reply.timestamp).toLocaleString('en-US', {
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                              })}
+                                            </Typography>
+                                          </Box>
                                         </Paper>
                                       </Box>
                                     </Box>
@@ -1175,7 +1511,7 @@ export default function WorkspaceForumPage() {
                                   alignItems: 'center',
                                   gap: 1
                                 }}>
-                                  <Reply size={14} color="#667eea" />
+                                  <ReplyIcon sx={{ fontSize: 14, color: 'primary.main' }} />
                                   <Typography variant="caption" fontWeight="600" color="primary.main">
                                     Replying to {message.author?.name}
                                   </Typography>
