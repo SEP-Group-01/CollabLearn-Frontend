@@ -49,31 +49,85 @@ export const useForumWebSocket = ({
 
   const connectSocket = useCallback(() => {
     if (socketRef.current?.connected) {
+      console.log('✅ WebSocket already connected');
       return;
     }
 
-    console.log('🔌 Attempting to connect to WebSocket server...');
+    // Clean up existing connection
+    if (socketRef.current) {
+      console.log('🧹 Cleaning up existing socket connection');
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+
+    console.log('🔌 Attempting to connect to WebSocket server (API Gateway)...');
     
-    // Create socket connection
-    socketRef.current = io('http://localhost:3003', {
-      transports: ['websocket', 'polling'],
-      timeout: 20000,
+    // Get authentication token (using correct key from authApi)
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      console.error('❌ No authentication token found');
+      console.log('🔍 Checking all auth keys:', {
+        access_token: !!localStorage.getItem('access_token'),
+        accessToken: !!localStorage.getItem('accessToken'),
+        user_data: !!localStorage.getItem('user_data')
+      });
+      return;
+    }
+    
+    console.log('✅ Authentication token found');
+
+    // Create socket connection to API Gateway (port 3000), NOT forum service (port 3003)
+    socketRef.current = io('http://localhost:3000/forum', {
+      transports: ['polling', 'websocket'], // Try polling first, then upgrade
+      timeout: 15000,
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 2000,
       reconnectionDelayMax: 5000,
+      auth: {
+        token
+      },
+      extraHeaders: {
+        Authorization: `Bearer ${token}`
+      },
+      forceNew: true
     });
 
     const socket = socketRef.current;
 
     // Connection event handlers
     socket.on('connect', () => {
-      console.log('✅ WebSocket connected successfully');
+      console.log('✅ WebSocket connected successfully', {
+        socketId: socket.id,
+        transport: socket.io.engine.transport.name
+      });
       setIsConnected(true);
       
-      // Join the forum room
-      socket.emit('join-forum', { workspaceId });
-      console.log(`📡 Joined forum room: forum-${workspaceId}`);
+      // Join the workspace forum room (send as groupId to match backend interface)
+      console.log(`📡 Joining workspace forum: ${workspaceId}`);
+      
+      // Get user ID from stored user data
+      const userData = localStorage.getItem('user_data');
+      let userId = 'unknown';
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          userId = user.id || 'unknown';
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+      
+      socket.emit('join-group', { 
+        groupId: workspaceId,
+        userId: userId
+      });
+      
+      // Listen for join confirmation
+      socket.on('group-joined', (data) => {
+        console.log('✅ Successfully joined workspace forum:', data);
+      });
     });
 
     socket.on('disconnect', (reason) => {
@@ -83,12 +137,32 @@ export const useForumWebSocket = ({
 
     socket.on('connect_error', (error) => {
       console.error('🚫 WebSocket connection error:', error);
+      console.log('Connection details:', {
+        url: 'http://localhost:3000/forum',
+        workspaceId,
+        hasToken: !!token,
+        errorMessage: error.message,
+        error: error
+      });
+      setIsConnected(false);
+      
+      // Check if API Gateway is running
+      fetch('http://localhost:3000/api/health')
+        .then(() => console.log('✅ API Gateway is running'))
+        .catch(err => console.error('❌ API Gateway not accessible:', err.message));
+    });
+
+    // Add error handler
+    socket.on('error', (error) => {
+      console.error('❌ Socket error:', error);
       setIsConnected(false);
     });
 
     // Forum-specific event handlers
-    socket.on('new-message', (messageData) => {
-      console.log('📨 Received new message via WebSocket:', messageData);
+    socket.on('new-message', (data) => {
+      console.log('📨 Received new message via WebSocket:', data);
+      // Backend sends {message: {...}, workspaceId: '...'}, extract the message
+      const messageData = data.message || data;
       onNewMessage(messageData);
     });
 
@@ -132,11 +206,32 @@ export const useForumWebSocket = ({
   // WebSocket actions
   const sendMessage = useCallback((messageData: Partial<MessageData>) => {
     if (socketRef.current?.connected) {
-      console.log('📤 Sending message via WebSocket:', messageData);
-      socketRef.current.emit('send-message', {
+      // Get user ID from stored user data
+      const userData = localStorage.getItem('user_data');
+      let userId = '';
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          userId = user.id || '';
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+
+      if (!userId) {
+        console.error('❌ Cannot send message - User ID not found');
+        return;
+      }
+
+      // Format data according to backend expectations
+      const payload = {
         workspaceId,
-        ...messageData
-      });
+        userId,
+        content: messageData.content || ''
+      };
+
+      console.log('📤 Sending message via WebSocket:', payload);
+      socketRef.current.emit('send-message', payload);
     } else {
       console.warn('⚠️ Cannot send message - WebSocket not connected');
     }
@@ -163,19 +258,37 @@ export const useForumWebSocket = ({
     }
   }, [workspaceId]);
 
+  // Track reconnection attempts
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 3;
+
   // Initialize WebSocket connection
   useEffect(() => {
-    if (!workspaceId) return;
+    if (!workspaceId) {
+      console.log('⚠️ No workspace ID, skipping WebSocket connection');
+      return;
+    }
 
+    // Reset connection attempts
+    reconnectAttempts.current = 0;
     connectSocket();
 
-    // Auto-reconnect logic
+    // Auto-reconnect logic with limits
     const reconnectInterval = setInterval(() => {
       if (!socketRef.current?.connected) {
-        console.log('🔄 Attempting to reconnect WebSocket...');
-        connectSocket();
+        if (reconnectAttempts.current < maxReconnectAttempts) {
+          console.log(`🔄 Attempting to reconnect WebSocket (${reconnectAttempts.current + 1}/${maxReconnectAttempts})...`);
+          reconnectAttempts.current++;
+          connectSocket();
+        } else {
+          console.log('⚠️ Max reconnection attempts reached, stopping');
+          clearInterval(reconnectInterval);
+        }
+      } else {
+        // Reset attempts on successful connection
+        reconnectAttempts.current = 0;
       }
-    }, 10000); // Try to reconnect every 10 seconds if disconnected
+    }, 5000); // Try every 5 seconds
 
     return () => {
       clearInterval(reconnectInterval);
