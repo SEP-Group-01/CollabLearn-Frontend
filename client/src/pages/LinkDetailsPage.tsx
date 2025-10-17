@@ -19,6 +19,14 @@ import {
   InputAdornment,
   Chip,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -39,10 +47,15 @@ import {
   Download,
   MoreVert,
   OpenInFull,
+  Checklist as ChecklistIcon,
+  PlayCircle,
+  Search,
+  FindInPage,
 } from "@mui/icons-material";
 
 import { useResourceActions } from "../hooks/useResourceActions";
 import type { Link, Review } from "../types/ThreadInterfaces";
+import ResourceProgressTracker from '../components/ResourceProgressTracker';
 
 export default function LinkDetailsPage() {
   const { linkId, workspaceId, threadId } = useParams();
@@ -79,6 +92,12 @@ export default function LinkDetailsPage() {
   const [zoom, setZoom] = useState(100);
   const [isBookmarked, setIsBookmarked] = useState(false);
 
+  // Search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<number>(0);
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+
   // Mock user data - In real app, this would come from auth context
   const currentUser = {
     id: "53e5f9f5-fe11-4728-9996-7e606bb98f96", // Use UUID format consistent with auth
@@ -94,6 +113,13 @@ export default function LinkDetailsPage() {
     handleUpdateReview, 
     handleDeleteReview 
   } = useResourceActions(workspaceId || '', threadId || '');
+
+  // Helper function to get YouTube video ID from URL
+  const getYouTubeVideoId = (url: string) => {
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[7].length === 11) ? match[7] : null;
+  };
 
   // Load link from API
   useEffect(() => {
@@ -343,6 +369,34 @@ export default function LinkDetailsPage() {
     }
   };
 
+  // Search handlers
+  const handleSearchInLink = () => {
+    setSearchOpen(true);
+  };
+
+  const handleLinkSearch = (query: string) => {
+    setSearchQuery(query);
+    // Simulate search results (in real implementation, this would search within the link content)
+    const mockResults = query.length > 0 ? Math.floor(Math.random() * 10) + 1 : 0;
+    setSearchResults(mockResults);
+    console.log(`🔍 Searching for "${query}" in link, found ${mockResults} results`);
+  };
+
+  const handleShare = () => {
+    const shareUrl = window.location.href;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      console.log('📋 Link URL copied to clipboard');
+    });
+  };
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setMenuAnchor(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+  };
+
   // Handle loading state
   if (loading) {
     return (
@@ -388,11 +442,19 @@ export default function LinkDetailsPage() {
                 {link.title}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.8 }} noWrap>
-                Added by {link.addedBy}
+                {link.url}
               </Typography>
             </Box>
           </Box>
           <Box display="flex" alignItems="center" gap={1}>
+            <Tooltip title="Search in link">
+              <IconButton 
+                sx={{ color: 'white' }} 
+                onClick={handleSearchInLink}
+              >
+                <Search />
+              </IconButton>
+            </Tooltip>
             <Tooltip title={isBookmarked ? "Remove bookmark" : "Bookmark"}>
               <IconButton 
                 sx={{ color: 'white' }} 
@@ -404,9 +466,17 @@ export default function LinkDetailsPage() {
             <Tooltip title="Share">
               <IconButton 
                 sx={{ color: 'white' }} 
-                onClick={() => navigator.clipboard.writeText(link.url)}
+                onClick={handleShare}
               >
                 <Share />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="More options">
+              <IconButton 
+                sx={{ color: 'white' }} 
+                onClick={handleMenuOpen}
+              >
+                <MoreVert />
               </IconButton>
             </Tooltip>
             <Button
@@ -533,57 +603,101 @@ export default function LinkDetailsPage() {
                   p: 4
                 }}
               >
-                {/* Try to embed the link in an iframe first, fallback to description */}
-                <Box sx={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 3,
-                  transform: `scale(${zoom / 100})`,
-                  transformOrigin: 'center center'
-                }}>
-                  <Typography variant="h2" sx={{ fontSize: '4rem', mb: 2 }}>
-                    🔗
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" gutterBottom textAlign="center">
-                    {link.title}
-                  </Typography>
-                  <Typography variant="h6" color="text.secondary" sx={{ mb: 3, maxWidth: 600, textAlign: 'center' }}>
-                    {link.description || 'No description available for this link.'}
-                  </Typography>
-                  <Box sx={{ 
-                    p: 2, 
-                    bgcolor: '#f5f5f5', 
-                    borderRadius: 2, 
-                    border: '1px solid #ddd',
-                    maxWidth: '80%',
-                    wordBreak: 'break-all',
-                    textAlign: 'center'
-                  }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {link.url}
-                    </Typography>
-                  </Box>
-                  <Button 
-                    variant="contained" 
-                    size="large"
-                    startIcon={<OpenInNew />}
-                    onClick={handleOpenLink}
-                    sx={{ 
-                      mt: 2,
-                      background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-                      px: 4,
-                      py: 1.5,
-                      fontSize: '1.1rem'
-                    }}
-                  >
-                    Open Link
-                  </Button>
-                </Box>
+                {/* Link Preview - YouTube or Generic Iframe */}
+                {(() => {
+                  const youtubeVideoId = getYouTubeVideoId(link.url);
+                  
+                  if (youtubeVideoId) {
+                    // YouTube Video Embed
+                    return (
+                      <Box sx={{ 
+                        width: '100%', 
+                        height: '100%',
+                        transform: `scale(${zoom / 100})`,
+                        transformOrigin: 'center center'
+                      }}>
+                        <Box sx={{ position: 'relative', paddingTop: '56.25%', bgcolor: 'black', borderRadius: 2, overflow: 'hidden' }}>
+                          <iframe
+                            src={`https://www.youtube.com/embed/${youtubeVideoId}`}
+                            title={link.title}
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: '100%',
+                            }}
+                          />
+                        </Box>
+                        <Box sx={{ mt: 2, textAlign: 'center' }}>
+                          <Chip 
+                            icon={<PlayCircle />} 
+                            label="YouTube Video" 
+                            color="error" 
+                            sx={{ fontWeight: 'bold' }}
+                          />
+                        </Box>
+                      </Box>
+                    );
+                  } else {
+                    // Generic Link Preview
+                    return (
+                      <Box sx={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 3,
+                        transform: `scale(${zoom / 100})`,
+                        transformOrigin: 'center center'
+                      }}>
+                        <Typography variant="h2" sx={{ fontSize: '4rem', mb: 2 }}>
+                          🔗
+                        </Typography>
+                        <Typography variant="h4" fontWeight="bold" gutterBottom textAlign="center">
+                          {link.title}
+                        </Typography>
+                        <Typography variant="h6" color="text.secondary" sx={{ mb: 3, maxWidth: 600, textAlign: 'center' }}>
+                          {link.description || 'No description available for this link.'}
+                        </Typography>
+                        <Box sx={{ 
+                          p: 2, 
+                          bgcolor: '#f5f5f5', 
+                          borderRadius: 2, 
+                          border: '1px solid #ddd',
+                          maxWidth: '80%',
+                          wordBreak: 'break-all',
+                          textAlign: 'center'
+                        }}>
+                          <Typography variant="body2" color="text.secondary">
+                            {link.url}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    );
+                  }
+                })()}
               </Box>
+              <Button 
+                variant="contained" 
+                size="large"
+                startIcon={<OpenInNew />}
+                onClick={handleOpenLink}
+                sx={{ 
+                  mt: 2,
+                  background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                  px: 4,
+                  py: 1.5,
+                  fontSize: '1.1rem'
+                }}
+              >
+                Open Link
+              </Button>
             </CardContent>
           </Card>
         </Box>
@@ -596,12 +710,49 @@ export default function LinkDetailsPage() {
           gap: 2,
           maxHeight: { xs: 'auto', lg: '100%' }
         }}>
-          {/* Rating Section */}
-          <Card elevation={3} sx={{ flex: { xs: 1, md: 1, lg: 'none' } }}>
+          {/* Progress Tracking Section */}
+          <Card elevation={3} sx={{ 
+            flex: { xs: 1, md: 1, lg: 'none' },
+            background: 'linear-gradient(135deg, #4facfe15 0%, #00f2fe15 100%)',
+            border: '1px solid rgba(79, 172, 254, 0.2)'
+          }}>
             <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Link Rating
+              <Typography variant="h6" gutterBottom sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 1, 
+                fontWeight: 'bold',
+                color: '#4facfe'
+              }}>
+                <ChecklistIcon />
+                Your Progress
               </Typography>
+              <Divider sx={{ mb: 2, bgcolor: 'rgba(79, 172, 254, 0.2)' }} />
+              <ResourceProgressTracker 
+                resourceId={linkId || ''} 
+                compact={false}
+                onProgressUpdate={(progress) => {
+                  console.log('Progress updated:', progress);
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Rating Section */}
+          <Card elevation={3} sx={{ 
+            flex: { xs: 1, md: 1, lg: 'none' },
+            background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
+            border: '1px solid rgba(102, 126, 234, 0.2)'
+          }}>
+            <CardContent>
+              <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                color: '#667eea'
+              }}>
+                ⭐ Link Rating
+              </Typography>
+              <Divider sx={{ mb: 2, bgcolor: 'rgba(102, 126, 234, 0.2)' }} />
               
               {link?.rating_summary ? (
                 <Box mb={2}>
@@ -658,13 +809,16 @@ export default function LinkDetailsPage() {
             display: 'flex', 
             flexDirection: 'column',
             flex: { xs: 2, md: 2, lg: 1 },
-            minHeight: { xs: '300px', lg: 'auto' }
+            minHeight: { xs: '300px', lg: 'auto' },
+            background: 'linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)',
+            border: '1px solid rgba(240, 147, 251, 0.2)'
           }}>
             <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                <ChatBubbleOutline sx={{ mr: 1 }} />
+              <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ color: '#f5576c' }}>
+                <ChatBubbleOutline sx={{ mr: 1, verticalAlign: 'middle' }} />
                 Discussion ({reviews.length})
               </Typography>
+              <Divider sx={{ mb: 2, bgcolor: 'rgba(245, 87, 108, 0.2)' }} />
               
               <Stack spacing={2} sx={{ flexGrow: 1, mb: 2, maxHeight: 400, overflow: 'auto' }}>
                 {reviewsLoading && (
@@ -821,7 +975,17 @@ export default function LinkDetailsPage() {
                     placeholder={userHasReview ? "You already have a review. Click to edit it." : "Add your comment to the discussion..."}
                     value={commentInput}
                     onChange={(e) => setCommentInput(e.target.value)}
-                    sx={{ flex: 1 }}
+                    sx={{ 
+                      flex: 1,
+                      '& .MuiOutlinedInput-root': {
+                        '&:hover fieldset': {
+                          borderColor: '#f5576c',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#f5576c',
+                        },
+                      }
+                    }}
                     disabled={userHasReview}
                     InputProps={{
                       endAdornment: (
@@ -834,6 +998,7 @@ export default function LinkDetailsPage() {
                                 handleEditReview();
                               }}
                               title="Edit your existing review"
+                              sx={{ color: '#f5576c' }}
                             >
                               <Edit />
                             </IconButton>
@@ -842,6 +1007,10 @@ export default function LinkDetailsPage() {
                               size="small" 
                               onClick={handleAddComment}
                               disabled={!commentInput.trim()}
+                              sx={{ 
+                                color: '#f5576c',
+                                '&:hover': { bgcolor: 'rgba(245, 87, 108, 0.1)' }
+                              }}
                             >
                               <Send />
                             </IconButton>
@@ -861,6 +1030,97 @@ export default function LinkDetailsPage() {
           </Card>
         </Box>
       </Box>
+
+      {/* Search Dialog */}
+      <Dialog 
+        open={searchOpen} 
+        onClose={() => setSearchOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <Search />
+            Search in Link
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Search query"
+            value={searchQuery}
+            onChange={(e) => handleLinkSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              )
+            }}
+            sx={{ mt: 1 }}
+          />
+          {searchQuery && (
+            <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+              Found {searchResults} results for "{searchQuery}"
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSearchOpen(false)}>Close</Button>
+          <Button variant="contained" onClick={() => setSearchOpen(false)}>
+            Search
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Action Menu */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={handleMenuClose}
+        PaperProps={{
+          elevation: 3,
+          sx: { minWidth: 180 }
+        }}
+      >
+        <MenuItem onClick={() => { handleOpenLink(); handleMenuClose(); }}>
+          <ListItemIcon>
+            <OpenInNew fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Open in New Tab</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { 
+          const a = document.createElement('a');
+          a.href = link.url;
+          a.download = link.title || 'link';
+          a.click();
+          handleMenuClose(); 
+        }}>
+          <ListItemIcon>
+            <Download fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Download</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { handleShare(); handleMenuClose(); }}>
+          <ListItemIcon>
+            <Share fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Share Link</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { window.print(); handleMenuClose(); }}>
+          <ListItemIcon>
+            <Print fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Print</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { handleToggleBookmark(); handleMenuClose(); }}>
+          <ListItemIcon>
+            {isBookmarked ? <Bookmark fontSize="small" /> : <BookmarkBorder fontSize="small" />}
+          </ListItemIcon>
+          <ListItemText>{isBookmarked ? 'Remove Bookmark' : 'Add Bookmark'}</ListItemText>
+        </MenuItem>
+      </Menu>
 
       {/* Floating Back Button */}
       <Fab

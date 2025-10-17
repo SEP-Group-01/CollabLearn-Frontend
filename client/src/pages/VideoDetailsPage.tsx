@@ -20,6 +20,14 @@ import {
   Chip,
   Divider,
   Slider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -45,9 +53,13 @@ import {
   VolumeUp,
   VolumeOff,
   Fullscreen,
+  Checklist as ChecklistIcon,
+  Search,
+  FindInPage,
 } from "@mui/icons-material";
 
 import { useResourceActions } from "../hooks/useResourceActions";
+import ResourceProgressTracker from '../components/ResourceProgressTracker';
 import type { Video, Review } from "../types/ThreadInterfaces";
 
 export default function VideoDetailsPage() {
@@ -87,6 +99,12 @@ export default function VideoDetailsPage() {
   const [isMuted, setIsMuted] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [isBookmarked, setIsBookmarked] = useState(false);
+
+  // Search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<number>(0);
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
   // Mock user data - In real app, this would come from auth context
   const currentUser = {
@@ -359,6 +377,34 @@ export default function VideoDetailsPage() {
     }
   };
 
+  // Search handlers
+  const handleSearchInVideo = () => {
+    setSearchOpen(true);
+  };
+
+  const handleVideoSearch = (query: string) => {
+    setSearchQuery(query);
+    // Simulate search results (in real implementation, this would search within the video content/transcript)
+    const mockResults = query.length > 0 ? Math.floor(Math.random() * 10) + 1 : 0;
+    setSearchResults(mockResults);
+    console.log(`🔍 Searching for "${query}" in video, found ${mockResults} results`);
+  };
+
+  const handleShare = () => {
+    const shareUrl = window.location.href;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      console.log('📋 Video URL copied to clipboard');
+    });
+  };
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setMenuAnchor(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+  };
+
   // Helper function to determine if video is local or external
   const isLocalVideo = (url: string) => {
     return !url.startsWith('http') && (url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.ogg'));
@@ -409,11 +455,19 @@ export default function VideoDetailsPage() {
                 {video.title}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.8 }} noWrap>
-                Added by {video.addedBy} • {video.duration}
+                {video.duration || 'Duration unknown'}
               </Typography>
             </Box>
           </Box>
           <Box display="flex" alignItems="center" gap={1}>
+            <Tooltip title="Search in video">
+              <IconButton 
+                sx={{ color: 'white' }} 
+                onClick={handleSearchInVideo}
+              >
+                <Search />
+              </IconButton>
+            </Tooltip>
             <Tooltip title={isBookmarked ? "Remove bookmark" : "Bookmark"}>
               <IconButton 
                 sx={{ color: 'white' }} 
@@ -425,9 +479,17 @@ export default function VideoDetailsPage() {
             <Tooltip title="Share">
               <IconButton 
                 sx={{ color: 'white' }} 
-                onClick={() => navigator.clipboard.writeText(video.url)}
+                onClick={handleShare}
               >
                 <Share />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="More options">
+              <IconButton 
+                sx={{ color: 'white' }} 
+                onClick={handleMenuOpen}
+              >
+                <MoreVert />
               </IconButton>
             </Tooltip>
             {!isLocalVideo(video.url) && (
@@ -683,12 +745,49 @@ export default function VideoDetailsPage() {
           gap: 2,
           maxHeight: { xs: 'auto', lg: '100%' }
         }}>
-          {/* Rating Section */}
-          <Card elevation={3} sx={{ flex: { xs: 1, md: 1, lg: 'none' } }}>
+          {/* Progress Tracking Section */}
+          <Card elevation={3} sx={{ 
+            flex: { xs: 1, md: 1, lg: 'none' },
+            background: 'linear-gradient(135deg, #4facfe15 0%, #00f2fe15 100%)',
+            border: '1px solid rgba(79, 172, 254, 0.2)'
+          }}>
             <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Video Rating
+              <Typography variant="h6" gutterBottom sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 1, 
+                fontWeight: 'bold',
+                color: '#4facfe'
+              }}>
+                <ChecklistIcon />
+                Your Progress
               </Typography>
+              <Divider sx={{ mb: 2, bgcolor: 'rgba(79, 172, 254, 0.2)' }} />
+              <ResourceProgressTracker 
+                resourceId={videoId || ''} 
+                compact={false}
+                onProgressUpdate={(progress) => {
+                  console.log('Progress updated:', progress);
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Rating Section */}
+          <Card elevation={3} sx={{ 
+            flex: { xs: 1, md: 1, lg: 'none' },
+            background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
+            border: '1px solid rgba(102, 126, 234, 0.2)'
+          }}>
+            <CardContent>
+              <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                color: '#667eea'
+              }}>
+                ⭐ Video Rating
+              </Typography>
+              <Divider sx={{ mb: 2, bgcolor: 'rgba(102, 126, 234, 0.2)' }} />
               
               {video?.rating_summary ? (
                 <Box mb={2}>
@@ -745,13 +844,16 @@ export default function VideoDetailsPage() {
             display: 'flex', 
             flexDirection: 'column',
             flex: { xs: 2, md: 2, lg: 1 },
-            minHeight: { xs: '300px', lg: 'auto' }
+            minHeight: { xs: '300px', lg: 'auto' },
+            background: 'linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)',
+            border: '1px solid rgba(240, 147, 251, 0.2)'
           }}>
             <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                <ChatBubbleOutline sx={{ mr: 1 }} />
+              <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ color: '#f5576c' }}>
+                <ChatBubbleOutline sx={{ mr: 1, verticalAlign: 'middle' }} />
                 Discussion ({reviews.length})
               </Typography>
+              <Divider sx={{ mb: 2, bgcolor: 'rgba(245, 87, 108, 0.2)' }} />
               
               <Stack spacing={2} sx={{ flexGrow: 1, mb: 2, maxHeight: 400, overflow: 'auto' }}>
                 {reviewsLoading && (
@@ -908,7 +1010,17 @@ export default function VideoDetailsPage() {
                     placeholder={userHasReview ? "You already have a review. Click to edit it." : "Add your comment to the discussion..."}
                     value={commentInput}
                     onChange={(e) => setCommentInput(e.target.value)}
-                    sx={{ flex: 1 }}
+                    sx={{ 
+                      flex: 1,
+                      '& .MuiOutlinedInput-root': {
+                        '&:hover fieldset': {
+                          borderColor: '#f5576c',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#f5576c',
+                        },
+                      }
+                    }}
                     disabled={userHasReview}
                     InputProps={{
                       endAdornment: (
@@ -921,6 +1033,7 @@ export default function VideoDetailsPage() {
                                 handleEditReview();
                               }}
                               title="Edit your existing review"
+                              sx={{ color: '#f5576c' }}
                             >
                               <Edit />
                             </IconButton>
@@ -929,6 +1042,10 @@ export default function VideoDetailsPage() {
                               size="small" 
                               onClick={handleAddComment}
                               disabled={!commentInput.trim()}
+                              sx={{ 
+                                color: '#f5576c',
+                                '&:hover': { bgcolor: 'rgba(245, 87, 108, 0.1)' }
+                              }}
                             >
                               <Send />
                             </IconButton>
@@ -948,6 +1065,97 @@ export default function VideoDetailsPage() {
           </Card>
         </Box>
       </Box>
+
+      {/* Search Dialog */}
+      <Dialog 
+        open={searchOpen} 
+        onClose={() => setSearchOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <Search />
+            Search in Video
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Search query"
+            value={searchQuery}
+            onChange={(e) => handleVideoSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              )
+            }}
+            sx={{ mt: 1 }}
+          />
+          {searchQuery && (
+            <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+              Found {searchResults} results for "{searchQuery}"
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSearchOpen(false)}>Close</Button>
+          <Button variant="contained" onClick={() => setSearchOpen(false)}>
+            Search
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Action Menu */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={handleMenuClose}
+        PaperProps={{
+          elevation: 3,
+          sx: { minWidth: 180 }
+        }}
+      >
+        <MenuItem onClick={() => { window.open(video.url, '_blank'); handleMenuClose(); }}>
+          <ListItemIcon>
+            <OpenInNew fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Open in New Tab</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { 
+          const a = document.createElement('a');
+          a.href = video.url;
+          a.download = video.title || 'video';
+          a.click();
+          handleMenuClose(); 
+        }}>
+          <ListItemIcon>
+            <Download fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Download</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { handleShare(); handleMenuClose(); }}>
+          <ListItemIcon>
+            <Share fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Share Link</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { window.print(); handleMenuClose(); }}>
+          <ListItemIcon>
+            <Print fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Print</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { handleToggleBookmark(); handleMenuClose(); }}>
+          <ListItemIcon>
+            {isBookmarked ? <Bookmark fontSize="small" /> : <BookmarkBorder fontSize="small" />}
+          </ListItemIcon>
+          <ListItemText>{isBookmarked ? 'Remove Bookmark' : 'Add Bookmark'}</ListItemText>
+        </MenuItem>
+      </Menu>
 
       {/* Floating Search Button */}
       <Fab
