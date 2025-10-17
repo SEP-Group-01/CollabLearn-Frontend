@@ -180,9 +180,7 @@ const LazyQuizCard = ({
 
                 {/* Topic Tags */}
                 <Box sx={{ mb: 3 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                    Topics Covered:
-                  </Typography>
+                  
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     {(quiz.tags || []).map((tag, index) => (
                       <Chip key={index} label={tag} size="small" color="primary" variant="outlined" />
@@ -225,13 +223,26 @@ const LazyQuizCard = ({
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>
                         Your Attempt History
                       </Typography>
-                      {quizStatus.bestScore !== undefined && (
-                        <Chip 
-                          label={`Best: ${quizStatus.bestScore}/${quiz.totalMarks}`}
-                          color="success"
-                          variant="outlined"
-                        />
-                      )}
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        {quizStatus.bestScore !== undefined && (
+                          <Chip 
+                            label={`Best: ${quizStatus.bestScore}/${quiz.totalMarks}`}
+                            color="success"
+                            variant="outlined"
+                          />
+                        )}
+                        {quiz.studentAttempts.some(attempt => attempt.completed) && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<ViewIcon />}
+                            onClick={() => onReviewAttempt(quiz.id, 0)} // 0 indicates review all attempts
+                            sx={{ ml: 1 }}
+                          >
+                            Review Attempts
+                          </Button>
+                        )}
+                      </Box>
                     </Box>
                     
                     {quiz.studentAttempts
@@ -297,16 +308,6 @@ const LazyQuizCard = ({
                               )}
                             </Box>
                           </Box>
-                          {attempt.completed && (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<ViewIcon />}
-                              onClick={() => onReviewAttempt(quiz.id, attempt.attemptNumber)}
-                            >
-                              Review
-                            </Button>
-                          )}
                         </Box>
                       </Paper>
                     ))}
@@ -455,7 +456,8 @@ const LazyQuizCard = ({
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           Success rate: {quiz.totalMarks > 0 ? 
-                            Math.round((quizStatus.bestScore! / quiz.totalMarks) * 100) : 0}%
+                            // Use averageMarks returned from backend (avg marks across attempts)
+                            Math.round(((quiz.averageMarks || 0) / quiz.totalMarks) * 100) : 0}%
                         </Typography>
                       </Box>
                     )}
