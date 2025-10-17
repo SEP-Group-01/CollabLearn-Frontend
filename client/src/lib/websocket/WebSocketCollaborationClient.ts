@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { getAccessToken } from '../../api/authApi';
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
 export interface CollaborationMessage {
   type: 'join' | 'leave' | 'content-update' | 'cursor-update' | 'user-update' | 'awareness-update';
@@ -50,7 +51,7 @@ export class WebSocketCollaborationClient {
   constructor({
     documentId,
     user,
-    wsUrl = 'http://localhost:3000',
+    wsUrl = API_URL.replace('/api', ''),
     onConnectionStatusChange,
     onContentUpdate,
     onUsersUpdate,
