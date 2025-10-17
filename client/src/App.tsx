@@ -46,8 +46,6 @@ const App = () => {
           <Route path="/editor" element={<CollaborativeEditor />} />
           <Route path="/workspaces-list" element={<WorkspaceSearchResults />} />
           <Route path="/workspaces-list/:search" element={<WorkspaceSearchResults />} />
-
-          <Route path="/forum" element={<Forum />} />
           <Route path="/workspace/:workspaceId" element={<Workspace />} />
           <Route path="/workspace/:workspaceId/forum" element={<Forum />} />
           <Route path="/workspace/:workspaceId/manage" element={<ManageWorkspace />} />

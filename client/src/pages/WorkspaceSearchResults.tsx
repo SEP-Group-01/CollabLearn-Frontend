@@ -136,23 +136,23 @@ const WorkspaceSearchResults: React.FC = () => {
   const getJoinButtonProps = (workspace: WorkspaceSearchResult) => {
     // If user already has a role in this workspace, they're already a member
     if (workspace.role) {
-      return { text: 'Already Joined', disabled: true, variant: 'outlined' as const };
+      return { text: 'Open', disabled: false, variant: 'contained' as const, isOpen: true };
     }
     
     if (joinedWorkspaces.includes(workspace.id)) {
-      return { text: 'Joined', disabled: true, variant: 'outlined' as const };
+      return { text: 'Open', disabled: false, variant: 'contained' as const, isOpen: true };
     }
     
     if (requestedWorkspaces.includes(workspace.id)) {
-      return { text: 'Request Sent', disabled: true, variant: 'outlined' as const };
+      return { text: 'Request Sent', disabled: true, variant: 'outlined' as const, isOpen: false };
     }
 
     if (workspace.join_policy === 'Anyone') {
-      return { text: 'Join', disabled: false, variant: 'contained' as const };
+      return { text: 'Join', disabled: false, variant: 'contained' as const, isOpen: false };
     } else if (workspace.join_policy === 'Requests') {
-      return { text: 'Request to Join', disabled: false, variant: 'contained' as const };
+      return { text: 'Request to Join', disabled: false, variant: 'contained' as const, isOpen: false };
     } else {
-      return { text: 'Invite Only', disabled: true, variant: 'outlined' as const };
+      return { text: 'Invite Only', disabled: true, variant: 'outlined' as const, isOpen: false };
     }
   };
 
@@ -389,14 +389,14 @@ const WorkspaceSearchResults: React.FC = () => {
                         fullWidth
                         disabled={buttonProps.disabled || isJoining}
                         sx={{
-                          bgcolor: buttonProps.variant === 'contained' ? '#dbeafe' : 'transparent',
-                          color: '#1e40af',
+                          bgcolor: buttonProps.variant === 'contained' ? (buttonProps.isOpen ? '#2563eb' : '#dbeafe') : 'transparent',
+                          color: buttonProps.isOpen ? '#ffffff' : '#1e40af',
                           borderRadius: 2,
                           fontWeight: 600,
                           textTransform: "none",
                           py: 1,
                           fontSize: "1rem",
-                          border: `2px solid #dbeafe`,
+                          border: `2px solid ${buttonProps.isOpen ? '#2563eb' : '#dbeafe'}`,
                           boxShadow: buttonProps.variant === 'contained' ? "0 2px 8px rgba(59,130,246,0.08)" : 'none',
                           transition: "all 0.2s ease",
                           "&:hover": buttonProps.disabled ? {} : {
@@ -407,7 +407,12 @@ const WorkspaceSearchResults: React.FC = () => {
                         }}
                         onClick={(e) => {
                           e.stopPropagation(); // Prevent card click
-                          if (!buttonProps.disabled) handleJoin(workspace);
+                          if (buttonProps.isOpen) {
+                            // Navigate to workspace if it's an "Open" button
+                            navigate(`/workspace/${workspace.id}`);
+                          } else if (!buttonProps.disabled) {
+                            handleJoin(workspace);
+                          }
                         }}
                       >
                         {isJoining ? <CircularProgress size={20} /> : buttonProps.text}
