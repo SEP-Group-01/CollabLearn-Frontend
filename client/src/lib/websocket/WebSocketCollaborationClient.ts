@@ -1,6 +1,14 @@
 import { io, Socket } from 'socket.io-client';
 import { getAccessToken } from '../../api/authApi';
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+
+// Get base URL from environment variable and remove /api suffix if present
+const getBaseUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+  const baseUrl = apiUrl.replace('/api', '');
+  console.log('🔧 [WebSocket] Environment VITE_API_URL:', import.meta.env.VITE_API_URL);
+  console.log('🔧 [WebSocket] Computed base URL:', baseUrl);
+  return baseUrl;
+};
 
 export interface CollaborationMessage {
   type: 'join' | 'leave' | 'content-update' | 'cursor-update' | 'user-update' | 'awareness-update';
@@ -51,7 +59,7 @@ export class WebSocketCollaborationClient {
   constructor({
     documentId,
     user,
-    wsUrl = API_URL.replace('/api', ''),
+    wsUrl = getBaseUrl(),
     onConnectionStatusChange,
     onContentUpdate,
     onUsersUpdate,

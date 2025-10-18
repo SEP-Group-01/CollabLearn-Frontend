@@ -3,6 +3,14 @@ import { WebsocketProvider } from 'y-websocket';
 import { getAccessToken } from '../../api/authApi';
 import type { ImageMetadata } from '../imageUtils';
 
+// Get WebSocket URL from environment variable
+const getWsUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+  const baseUrl = apiUrl.replace('/api', '');
+  // Convert http/https to ws/wss
+  return baseUrl.replace(/^http/, 'ws');
+};
+
 export interface YjsConnection {
   doc: Y.Doc;
   provider: WebsocketProvider;
@@ -35,7 +43,7 @@ export class YjsCollaborationProvider {
   private connections: Map<string, YjsConnection> = new Map();
   private wsUrl: string;
 
-  constructor(wsUrl: string = 'ws://localhost:3000') {
+  constructor(wsUrl: string = getWsUrl()) {
     this.wsUrl = wsUrl;
   }
 
