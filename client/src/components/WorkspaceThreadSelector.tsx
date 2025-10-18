@@ -25,6 +25,7 @@ import type { WorkspaceWithThreads, ThreadWithResources, Resource } from '../api
 interface WorkspaceThreadSelectorProps {
   workspaces: WorkspaceWithThreads[];
   selectedResources: Set<string>;
+  resourcesInActivePlans?: Set<string>; // Resources already in active study plans
   onResourceToggle: (resource: Resource, workspaceId: string, threadId: string) => void;
   onWorkspaceToggle: (workspaceId: string, select: boolean) => void;
   onThreadToggle: (workspaceId: string, threadId: string, select: boolean) => void;
@@ -34,6 +35,7 @@ interface WorkspaceThreadSelectorProps {
 const WorkspaceThreadSelector: React.FC<WorkspaceThreadSelectorProps> = ({
   workspaces,
   selectedResources,
+  resourcesInActivePlans = new Set(), // Default to empty set
   onResourceToggle,
   onWorkspaceToggle,
   onThreadToggle,
@@ -238,30 +240,51 @@ const WorkspaceThreadSelector: React.FC<WorkspaceThreadSelectorProps> = ({
                                       No resources in this thread
                                     </Typography>
                                   ) : (
-                                    thread.resources.map((resource) => (
-                                      <FormControlLabel
-                                        key={resource.id}
-                                        control={
-                                          <Checkbox
-                                            checked={selectedResources.has(resource.id)}
-                                            onChange={() => onResourceToggle(resource, workspace.id, thread.id)}
-                                            size="small"
-                                          />
-                                        }
-                                        label={
-                                          <Stack direction="row" alignItems="center" spacing={1}>
-                                            <ResourceIcon fontSize="small" color="action" />
-                                            <Box>
-                                              <Typography variant="body2">{resource.title}</Typography>
-                                              <Typography variant="caption" color="text.secondary">
-                                                {resource.resource_type}
-                                                {resource.estimated_duration && ` • ${resource.estimated_duration} min`}
-                                              </Typography>
-                                            </Box>
-                                          </Stack>
-                                        }
-                                      />
-                                    ))
+                                    thread.resources.map((resource) => {
+                                      const isInActivePlan = resourcesInActivePlans.has(resource.id);
+                                      return (
+                                        <FormControlLabel
+                                          key={resource.id}
+                                          disabled={isInActivePlan}
+                                          control={
+                                            <Checkbox
+                                              checked={selectedResources.has(resource.id)}
+                                              onChange={() => onResourceToggle(resource, workspace.id, thread.id)}
+                                              size="small"
+                                              disabled={isInActivePlan}
+                                            />
+                                          }
+                                          label={
+                                            <Stack direction="row" alignItems="center" spacing={1}>
+                                              <ResourceIcon fontSize="small" color={isInActivePlan ? "disabled" : "action"} />
+                                              <Box>
+                                                <Typography 
+                                                  variant="body2" 
+                                                  sx={{ 
+                                                    color: isInActivePlan ? 'text.disabled' : 'text.primary',
+                                                    fontStyle: isInActivePlan ? 'italic' : 'normal'
+                                                  }}
+                                                >
+                                                  {resource.title}
+                                                  {isInActivePlan && (
+                                                    <Chip 
+                                                      label="In Active Plan" 
+                                                      size="small" 
+                                                      color="warning"
+                                                      sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
+                                                    />
+                                                  )}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                  {resource.resource_type}
+                                                  {resource.estimated_duration && ` • ${resource.estimated_duration} min`}
+                                                </Typography>
+                                              </Box>
+                                            </Stack>
+                                          }
+                                        />
+                                      );
+                                    })
                                   )}
                                 </Stack>
                               </AccordionDetails>
