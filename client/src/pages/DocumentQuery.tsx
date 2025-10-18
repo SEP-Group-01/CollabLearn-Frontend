@@ -2,6 +2,8 @@ import React from "react"
 import { useState, useRef, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useResourceActions } from '../hooks/useResourceActions'
+import { getUserData } from '../api/authApi'
+import { queryDocuments, getConversations, getConversationMessages } from '../api/queryApi'
 import {
   Box,
   Typography,
@@ -21,7 +23,6 @@ import {
   List,
   ListItem,
   ListItemIcon,
-  Collapse,
   Badge,
   Tooltip,
   InputAdornment,
@@ -39,7 +40,6 @@ import {
   Search,
   SelectAll,
   ClearAll,
-  FilterList,
   InsertDriveFile,
 } from "@mui/icons-material"
 
@@ -48,7 +48,7 @@ interface QueryDocument {
   id: string
   title: string
   description?: string
-  type: string
+  resource_type: "document" | "video" | "link"
   mime_type?: string
   file_size?: number
   firebase_url?: string
@@ -56,21 +56,19 @@ interface QueryDocument {
   uploadedAt?: string
   uploadedBy?: string
   isSelected: boolean
-  views?: number
-  tags?: string[]
 }
 
 interface ChatMessage {
-  id: number
-  type: "user" | "ai"
+  id: string
+  role: "user" | "assistant"
   content: string
   timestamp: Date
-  selectedDocuments?: number[]
+  selectedDocuments?: string[]
   references?: {
-    documentId: number
+    documentId: string
     documentTitle: string
-    page: number
-    section: string
+    page?: number
+    relevanceScore?: number
     text: string
   }[]
 }
@@ -84,10 +82,12 @@ export default function DocumentQuery() {
   const { fetchDocuments } = useResourceActions(workspaceId || '', threadId || '')
   
   const [documents, setDocuments] = useState<QueryDocument[]>([])
+  const [conversations, setConversations] = useState<Array<{id: string; title: string; created_at: string}>>([])
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: 1,
-      type: "ai",
+      id: "1",
+      role: "assistant",
       content:
         "Hello! I'm your AI assistant for document querying. Select one or more documents from the left panel, and I'll help you find information, explain concepts, or answer questions across all selected documents. What would you like to know?",
       timestamp: new Date(),
@@ -96,9 +96,83 @@ export default function DocumentQuery() {
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
-  const [showFilters, setShowFilters] = useState(false)
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Load conversations on mount
+  useEffect(() => {
+    const loadConversations = async () => {
+      try {
+        const userData = await getUserData()
+        if (!userData?.id || !threadId) {
+          console.log('[DocumentQuery] Cannot load conversations - missing userId or threadId')
+          return
+        }
+        
+        console.log('[DocumentQuery] Loading conversations for user:', userData.id, 'thread:', threadId)
+        const response = await getConversations(userData.id, threadId)
+        console.log('[DocumentQuery] Conversations response:', response)
+        
+        if (response.success && response.data) {
+          console.log('[DocumentQuery] Setting conversations:', response.data.conversations)
+          setConversations(response.data.conversations)
+        } else {
+          console.error('[DocumentQuery] Failed to load conversations:', response.error)
+        }
+      } catch (error) {
+        console.error('[DocumentQuery] Error loading conversations:', error)
+      }
+    }
+    
+    if (threadId) {
+      loadConversations()
+    }
+  }, [threadId])
+
+  // Load conversation messages when a conversation is selected
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (!currentConversationId) {
+        console.log('[DocumentQuery] No conversation selected, showing welcome message')
+        // Reset to welcome message
+        setMessages([
+          {
+            id: "1",
+            role: "assistant",
+            content:
+              "Hello! I'm your AI assistant for document querying. Select one or more documents from the left panel, and I'll help you find information, explain concepts, or answer questions across all selected documents. What would you like to know?",
+            timestamp: new Date(),
+          },
+        ])
+        return
+      }
+
+      console.log('[DocumentQuery] Loading messages for conversation:', currentConversationId)
+      const response = await getConversationMessages(currentConversationId)
+      console.log('[DocumentQuery] Messages response:', response)
+      
+      if (response.success && response.data) {
+        const loadedMessages = response.data.messages.map(msg => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          references: msg.references?.map(ref => ({
+            documentId: ref.resourceId,
+            documentTitle: ref.documentTitle,
+            page: ref.pageNumber,
+            relevanceScore: ref.relevanceScore,
+            text: ref.excerpt || ''
+          }))
+        }))
+        console.log('[DocumentQuery] Setting messages:', loadedMessages)
+        setMessages(loadedMessages)
+      } else {
+        console.error('[DocumentQuery] Failed to load messages:', response.error)
+      }
+    }
+
+    loadMessages()
+  }, [currentConversationId])
 
   // Load documents from API on component mount
   useEffect(() => {
@@ -106,19 +180,17 @@ export default function DocumentQuery() {
       try {
         const realDocuments = await fetchDocuments()
         const queryDocuments: QueryDocument[] = realDocuments.map(doc => ({
-          id: doc.id.toString(),
+          id: doc.id,
           title: doc.title,
           description: doc.description || 'No description available',
-          type: doc.type || 'document',
+          resource_type: doc.resource_type || 'document',
           mime_type: doc.mime_type,
           file_size: doc.file_size,
           firebase_url: doc.firebase_url,
           created_at: doc.created_at,
-          uploadedAt: doc.uploadedAt,
+          uploadedAt: doc.uploadedAt || doc.created_at,
           uploadedBy: doc.uploadedBy || 'Unknown',
           isSelected: false,
-          views: Math.floor(Math.random() * 100) + 1, // Mock views for now
-          tags: ['Programming', 'Tutorial', 'Reference'] // Mock tags for now
         }))
         setDocuments(queryDocuments)
         console.log('✅ Documents loaded for query:', queryDocuments)
@@ -137,11 +209,8 @@ export default function DocumentQuery() {
     const matchesSearch =
       doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (doc.description && doc.description.toLowerCase().includes(searchTerm.toLowerCase()))
-    const matchesTags = selectedTags.length === 0 || (doc.tags && selectedTags.some((tag) => doc.tags!.includes(tag)))
-    return matchesSearch && matchesTags
+    return matchesSearch
   })
-
-  const allTags = Array.from(new Set(documents.flatMap((doc) => doc.tags || [])))
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -175,55 +244,102 @@ export default function DocumentQuery() {
     if (!inputValue.trim() || isLoading || selectedDocuments.length === 0) return
 
     const userMessage: ChatMessage = {
-      id: Date.now(),
-      type: "user",
+      id: Date.now().toString(),
+      role: "user",
       content: inputValue,
       timestamp: new Date(),
-      selectedDocuments: selectedDocuments.map((doc) => parseInt(doc.id)),
+      selectedDocuments: selectedDocuments.map((doc) => doc.id),
     }
 
     setMessages((prev) => [...prev, userMessage])
+    const query = inputValue
     setInputValue("")
     setIsLoading(true)
 
-    // Simulate AI processing
-    setTimeout(() => {
-      const aiResponse: ChatMessage = {
-        id: Date.now() + 1,
-        type: "ai",
-        content: generateAIResponse(inputValue, selectedDocuments),
-        timestamp: new Date(),
-        references: generateReferences(selectedDocuments),
+    try {
+      // Get current user
+      const userData = await getUserData()
+      if (!userData?.id) {
+        throw new Error('User not authenticated')
       }
 
-      setMessages((prev) => [...prev, aiResponse])
+      console.log('[DocumentQuery] Sending query to API:', {
+        userId: userData.id,
+        query,
+        selectedDocuments: selectedDocuments.map(d => d.id)
+      })
+
+      // Call the actual API
+      const response = await queryDocuments({
+        userId: userData.id,
+        conversationId: currentConversationId || undefined,
+        query,
+        selectedDocuments: selectedDocuments.map((doc) => doc.id),
+      })
+
+      console.log('[DocumentQuery] API Response:', response)
+
+      if (response.success && response.data) {
+        // Update conversation ID if this was a new conversation
+        if (response.data.conversationId && !currentConversationId) {
+          setCurrentConversationId(response.data.conversationId)
+          // Reload conversations list
+          const convsResponse = await getConversations(userData.id, threadId!)
+          if (convsResponse.success && convsResponse.data) {
+            setConversations(convsResponse.data.conversations)
+          }
+        }
+
+        // Update user message with actual ID from server
+        if (response.data.userMessageId) {
+          setMessages((prev) => 
+            prev.map(msg => 
+              msg.id === userMessage.id 
+                ? { ...msg, id: response.data!.userMessageId! }
+                : msg
+            )
+          )
+        }
+
+        const aiResponse: ChatMessage = {
+          id: response.data.messageId,
+          role: "assistant",
+          content: response.data.response,
+          timestamp: new Date(),
+          references: response.data.references.map(ref => ({
+            documentId: ref.resourceId,
+            documentTitle: ref.documentTitle,
+            page: ref.pageNumber,
+            relevanceScore: ref.relevanceScore,
+            text: ref.excerpt
+          })),
+        }
+
+        setMessages((prev) => [...prev, aiResponse])
+      } else {
+        // Handle error response
+        const errorMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `Sorry, I encountered an error: ${response.error || 'Unknown error occurred'}`,
+          timestamp: new Date(),
+          references: [],
+        }
+        setMessages((prev) => [...prev, errorMessage])
+      }
+    } catch (error) {
+      console.error('[DocumentQuery] Error querying documents:', error)
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: `Sorry, I encountered an error while processing your question. Please try again.`,
+        timestamp: new Date(),
+        references: [],
+      }
+      setMessages((prev) => [...prev, errorMessage])
+    } finally {
       setIsLoading(false)
-    }, 2500)
-  }
-
-  const generateAIResponse = (query: string, selectedDocs: QueryDocument[]): string => {
-    const docTitles = selectedDocs.map((doc) => doc.title).join(", ")
-
-    if (query.toLowerCase().includes("vector")) {
-      return `Based on the selected documents (${docTitles}), vectors are fundamental mathematical objects with both magnitude and direction. The Linear Algebra Fundamentals document explains that vectors can be represented as ordered lists of numbers, while the Vector Space Theory Notes provide detailed coverage of vector spaces and their properties. Linear transformations, as covered in the Linear Transformations Handbook, show how vectors are mapped from one space to another.`
     }
-    if (query.toLowerCase().includes("matrix")) {
-      return `According to your selected documents (${docTitles}), matrices are rectangular arrays of numbers that represent linear transformations. The Matrix Operations Guide provides comprehensive coverage of matrix arithmetic, while the Linear Algebra Fundamentals explains how matrices relate to linear transformations. The Practice Problems Collection includes numerous examples of matrix calculations.`
-    }
-    if (query.toLowerCase().includes("eigenvalue")) {
-      return `From the selected documents (${docTitles}), eigenvalues are special scalars λ where Av = λv for some non-zero vector v. The Eigenvalue Problem Solutions document provides various methods for finding eigenvalues, while the Linear Algebra Fundamentals covers the theoretical foundation. These concepts are essential for understanding the behavior of linear transformations.`
-    }
-    return `I've analyzed the selected documents (${docTitles}) and found relevant information that addresses your question. The content spans multiple documents and provides comprehensive coverage of the topic. Could you be more specific about which aspect you'd like me to elaborate on?`
-  }
-
-  const generateReferences = (selectedDocs: QueryDocument[]) => {
-    return selectedDocs.slice(0, 3).map((doc, index) => ({
-      documentId: parseInt(doc.id),
-      documentTitle: doc.title,
-      page: Math.floor(Math.random() * 50) + 1,
-      section: `Section ${index + 2}.${Math.floor(Math.random() * 5) + 1}`,
-      text: `Relevant excerpt from ${doc.title} that relates to the query...`,
-    }))
   }
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -342,6 +458,77 @@ export default function DocumentQuery() {
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           }}
         >
+          {/* Conversation History Section */}
+          <Box sx={{ 
+            p: 2, 
+            borderBottom: "2px solid", 
+            borderColor: "divider",
+            background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)'
+          }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{
+              color: 'primary.main',
+              mb: 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              💬 Conversation History
+            </Typography>
+            
+            {conversations.length === 0 ? (
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                No previous conversations
+              </Typography>
+            ) : (
+              <Box sx={{ maxHeight: 150, overflow: 'auto' }}>
+                {conversations.map((conv) => (
+                  <Card
+                    key={conv.id}
+                    onClick={() => {
+                      console.log('[DocumentQuery] Selected conversation:', conv.id)
+                      setCurrentConversationId(conv.id)
+                    }}
+                    sx={{
+                      mb: 1,
+                      cursor: 'pointer',
+                      border: '2px solid',
+                      borderColor: currentConversationId === conv.id ? 'primary.main' : 'transparent',
+                      backgroundColor: currentConversationId === conv.id ? 'primary.50' : 'white',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        borderColor: 'primary.light',
+                        transform: 'translateX(4px)',
+                        boxShadow: 2
+                      }
+                    }}
+                  >
+                    <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'medium', mb: 0.5 }}>
+                        {conv.title}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        {new Date(conv.created_at).toLocaleString()}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            )}
+            
+            <Button
+              fullWidth
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                console.log('[DocumentQuery] Starting new conversation')
+                setCurrentConversationId(null)
+              }}
+              sx={{ mt: 1 }}
+            >
+              + New Conversation
+            </Button>
+          </Box>
+
           {/* Document Panel Header */}
           <Box sx={{ 
             p: 3, 
@@ -384,19 +571,6 @@ export default function DocumentQuery() {
                     <ClearAll fontSize="small" />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Filters">
-                  <IconButton 
-                    size="small" 
-                    onClick={() => setShowFilters(!showFilters)}
-                    sx={{
-                      backgroundColor: showFilters ? 'secondary.main' : 'grey.400',
-                      color: 'white',
-                      '&:hover': { backgroundColor: showFilters ? 'secondary.dark' : 'grey.600' }
-                    }}
-                  >
-                    <FilterList fontSize="small" />
-                  </IconButton>
-                </Tooltip>
               </Box>
             </Box>
 
@@ -427,35 +601,6 @@ export default function DocumentQuery() {
                 ),
               }}
             />
-
-            {/* Filters */}
-            <Collapse in={showFilters}>
-              <Box mt={2}>
-                <Typography variant="subtitle2" gutterBottom fontWeight="bold" color="primary">
-                  🏷️ Filter by tags:
-                </Typography>
-                <Box display="flex" flexWrap="wrap" gap={0.5}>
-                  {allTags.map((tag) => (
-                    <Chip
-                      key={tag}
-                      label={tag}
-                      size="small"
-                      clickable
-                      color={selectedTags.includes(tag) ? "primary" : "default"}
-                      onClick={() => {
-                        setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
-                      }}
-                      sx={{
-                        fontWeight: selectedTags.includes(tag) ? 'bold' : 'normal',
-                        '&:hover': {
-                          transform: 'scale(1.05)'
-                        }
-                      }}
-                    />
-                  ))}
-                </Box>
-              </Box>
-            </Collapse>
 
             {/* Selected Documents Summary */}
             {selectedDocuments.length > 0 && (
@@ -601,10 +746,10 @@ export default function DocumentQuery() {
                 <Box
                   key={message.id}
                   display="flex"
-                  justifyContent={message.type === "user" ? "flex-end" : "flex-start"}
+                  justifyContent={message.role === "user" ? "flex-end" : "flex-start"}
                   gap={2}
                 >
-                  {message.type === "ai" && (
+                  {message.role === "assistant" && (
                     <Avatar sx={{ 
                       bgcolor: "primary.main", 
                       width: 40, 
@@ -619,11 +764,11 @@ export default function DocumentQuery() {
                   <Card
                     sx={{
                       maxWidth: "75%",
-                      bgcolor: message.type === "user" 
+                      background: message.role === "user" 
                         ? "linear-gradient(45deg, #667eea 30%, #764ba2 90%)" 
                         : "white",
-                      color: message.type === "user" ? "white" : "text.primary",
-                      boxShadow: message.type === "user" 
+                      color: message.role === "user" ? "white" : "text.primary",
+                      boxShadow: message.role === "user" 
                         ? '0 4px 12px rgba(102, 126, 234, 0.3)'
                         : '0 4px 12px rgba(0, 0, 0, 0.1)',
                       borderRadius: 3,
@@ -635,7 +780,7 @@ export default function DocumentQuery() {
                       </Typography>
 
                       {/* AI References */}
-                      {message.type === "ai" && message.references && message.references.length > 0 && (
+                      {message.role === "assistant" && message.references && message.references.length > 0 && (
                         <Box mt={3}>
                           <Typography variant="caption" color="text.secondary" gutterBottom display="block" fontWeight="bold">
                             📚 References from selected documents:
@@ -656,11 +801,27 @@ export default function DocumentQuery() {
                                 transition: 'all 0.2s ease-in-out'
                               }}>
                                 <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-                                  {getFileIcon(documents.find((d) => d.id === ref.documentId.toString())?.mime_type || "application/pdf")}
+                                  {getFileIcon(documents.find((d) => d.id === ref.documentId)?.mime_type || "application/pdf")}
                                   <Typography variant="caption" fontWeight="bold" color="primary">
                                     {ref.documentTitle}
                                   </Typography>
+                                  {ref.page && (
+                                    <Typography variant="caption" color="text.secondary">
+                                      • Page {ref.page}
+                                    </Typography>
+                                  )}
+                                  {ref.relevanceScore && (
+                                    <Chip 
+                                      label={`${(ref.relevanceScore * 100).toFixed(0)}% relevant`} 
+                                      size="small" 
+                                      color="primary" 
+                                      variant="outlined"
+                                    />
+                                  )}
                                 </Box>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                                  {ref.text}
+                                </Typography>
                               </Paper>
                             ))}
                           </Stack>
@@ -668,10 +829,10 @@ export default function DocumentQuery() {
                       )}
 
                       <Box display="flex" alignItems="center" justifyContent="space-between" mt={2}>
-                        <Typography variant="caption" color={message.type === "user" ? "rgba(255,255,255,0.7)" : "text.secondary"}>
+                        <Typography variant="caption" color={message.role === "user" ? "rgba(255,255,255,0.7)" : "text.secondary"}>
                           {message.timestamp.toLocaleTimeString()}
                         </Typography>
-                        {message.type === "ai" && (
+                        {message.role === "assistant" && (
                           <Box display="flex" alignItems="center" gap={0.5}>
                             <Tooltip title="Copy response">
                               <IconButton 
@@ -695,7 +856,7 @@ export default function DocumentQuery() {
                     </CardContent>
                   </Card>
 
-                  {message.type === "user" && (
+                  {message.role === "user" && (
                     <Avatar sx={{ 
                       bgcolor: "grey.400", 
                       width: 40, 
