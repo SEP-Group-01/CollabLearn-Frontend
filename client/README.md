@@ -38,6 +38,18 @@ npm run build
 
 Copy `.env.example` to `.env` and update the values as needed for your local setup.
 
+### API URL Configuration
+
+Set the API URL in your `.env` file depending on your environment:
+
+```
+VITE_API_URL='https://collablearn.duckdns.org/api'
+# For local development, uncomment the line below:
+# VITE_API_URL='http://localhost:3000/api'
+```
+
+By default, the production API URL is used. For local development, uncomment the local line and comment out the production line.
+
 ---
 
 For backend and full-stack setup, see the main project README in the root directory.

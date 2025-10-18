@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
+// Import VITE_API_URL from environment
+const apiUrl = import.meta.env.VITE_API_URL as string;
+// Remove trailing '/api' if present
+const baseApiUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
+
 interface MessageData {
   content: string;
   author: {
@@ -77,8 +82,8 @@ export const useForumWebSocket = ({
     
     console.log('✅ Authentication token found');
 
-    // Create socket connection to API Gateway (port 3000), NOT forum service (port 3003)
-    socketRef.current = io('http://localhost:3000/forum', {
+    // Create socket connection to API Gateway using baseApiUrl
+    socketRef.current = io(`${baseApiUrl}/forum`, {
       transports: ['polling', 'websocket'], // Try polling first, then upgrade
       timeout: 15000,
       reconnection: true,
@@ -147,7 +152,7 @@ export const useForumWebSocket = ({
       setIsConnected(false);
       
       // Check if API Gateway is running
-      fetch('http://localhost:3000/api/health')
+      fetch(`${apiUrl}/health`)
         .then(() => console.log('✅ API Gateway is running'))
         .catch(err => console.error('❌ API Gateway not accessible:', err.message));
     });
