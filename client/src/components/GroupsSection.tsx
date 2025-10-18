@@ -1,14 +1,31 @@
 import type React from "react"
 import { useNavigate } from "react-router-dom"
-import { Box, Typography, Button, Card, CardMedia, CardContent, Container } from "@mui/material"
+import { Box, Typography, Button, Card, CardMedia, CardContent, Container, CircularProgress } from "@mui/material"
 import { motion, type Variants } from "framer-motion"
-import { mockWorkspaces } from "../mocks/Workspace"
+import { useState, useEffect } from "react"
+import { getAllWorkspaces } from "../api/workspacesApi"
+import type { Workspace } from "../types/WorkspaceInterfaces"
 
 const GroupsSection: React.FC = () => {
   const navigate = useNavigate()
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Use mockWorkspaces instead of hardcoded groups
-  const workspaces = mockWorkspaces
+  // Fetch workspaces on component mount
+  useEffect(() => {
+    const fetchWorkspaces = async () => {
+      try {
+        const data = await getAllWorkspaces()
+        setWorkspaces(data)
+      } catch (error) {
+        console.error('Failed to fetch workspaces:', error)
+        setWorkspaces([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchWorkspaces()
+  }, [])
 
   // Color schemes for different categories
   const getColorScheme = (tags: string[]) => {
@@ -146,7 +163,18 @@ const GroupsSection: React.FC = () => {
         </motion.div>
 
         {/* Workspaces Grid */}
-        <motion.div
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : workspaces.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 8 }}>
+            <Typography variant="body1" color="text.secondary">
+              No workspaces available at the moment.
+            </Typography>
+          </Box>
+        ) : (
+          <motion.div
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
@@ -347,6 +375,7 @@ const GroupsSection: React.FC = () => {
             })}
           </Box>
         </motion.div>
+        )}
 
         {/* CTA Section */}
         <motion.div

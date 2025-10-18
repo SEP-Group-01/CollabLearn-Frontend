@@ -4,6 +4,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import { useResourceActions } from '../hooks/useResourceActions'
 import { getUserData } from '../api/authApi'
 import { queryDocuments, getConversations, getConversationMessages } from '../api/queryApi'
+import ReactMarkdown from 'react-markdown'
 import {
   Box,
   Typography,
@@ -372,15 +373,17 @@ export default function DocumentQuery() {
       height: "100vh", 
       display: "flex", 
       flexDirection: "column",
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: '#ffffff',
     }}>
       {/* Header */}
-      <Paper elevation={1} sx={{ 
-        p: 3, 
+      <Paper elevation={0} sx={{ 
+        p: 2, 
         borderRadius: 0, 
         zIndex: 1000,
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: 'white'
+        background: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid #e5e7eb',
+        color: '#111827'
       }}>
         <Box display="flex" alignItems="center" justifyContent="space-between">
           <Box display="flex" alignItems="center" gap={2}>
@@ -389,54 +392,65 @@ export default function DocumentQuery() {
               onClick={() => navigate(`/workspace/${workspaceId}/threads/${threadId}/documents`)}
               sx={{ 
                 color: 'white',
-                borderColor: 'white',
+                border: 'none',
+                textTransform: 'none',
+                fontSize: '0.875rem',
+                px: 2,
+                py: 0.75,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: 3,
                 '&:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  borderColor: 'white'
+                  background: 'linear-gradient(135deg, #5568d3 0%, #6a4190 100%)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
                 }
               }}
-              variant="outlined"
+              variant="contained"
             >
               Back to Documents
             </Button>
-            <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.3)' }} />
+            <Divider orientation="vertical" flexItem sx={{ borderColor: '#e5e7eb' }} />
             <Box>
-              <Typography variant="h5" fontWeight="bold" sx={{ 
-                background: 'linear-gradient(45deg, #ffffff, #f0f0f0)',
-                backgroundClip: 'text',
-                color: 'transparent'
+              <Typography variant="h6" fontWeight="600" sx={{ 
+                color: '#111827',
+                fontSize: '1.1rem',
+                mb: 0.25
               }}>
-                🤖 AI Document Query Assistant
+                AI Document Query Assistant
               </Typography>
-              <Typography variant="body1" sx={{ opacity: 0.9 }}>
+              <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
                 Select documents and ask questions across multiple sources
               </Typography>
             </Box>
           </Box>
-          <Box display="flex" alignItems="center" gap={2}>
+          <Box display="flex" alignItems="center" gap={1.5}>
             <Badge badgeContent={selectedDocuments.length} color="secondary" overlap="rectangular">
               <Chip 
-                icon={<SmartToy />} 
+                icon={<SmartToy sx={{ fontSize: '1rem' }} />} 
                 label="AI Assistant" 
+                size="small"
                 sx={{ 
-                  backgroundColor: 'white',
-                  color: 'primary.main',
-                  fontWeight: 'bold'
+                  backgroundColor: '#f3f4f6',
+                  color: '#6366f1',
+                  fontWeight: '600',
+                  fontSize: '0.75rem',
+                  height: 28
                 }}
               />
             </Badge>
             <Tooltip title="Refresh">
               <IconButton 
                 onClick={() => window.location.reload()}
+                size="small"
                 sx={{ 
-                  color: 'white',
-                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  color: '#6b7280',
+                  backgroundColor: '#f9fafb',
                   '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.2)'
+                    backgroundColor: '#f3f4f6'
                   }
                 }}
               >
-                <Refresh />
+                <Refresh fontSize="small" />
               </IconButton>
             </Tooltip>
           </Box>
@@ -447,36 +461,33 @@ export default function DocumentQuery() {
       <Box sx={{ display: "flex", flexGrow: 1, overflow: "hidden" }}>
         {/* Left Panel - Document Selection */}
         <Paper
-          elevation={3}
+          elevation={0}
           sx={{
-            width: 400,
+            width: 360,
             display: "flex",
             flexDirection: "column",
             borderRadius: 0,
-            borderRight: "1px solid",
-            borderColor: "divider",
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRight: "1px solid #e5e7eb",
+            background: '#f9fafb',
           }}
         >
           {/* Conversation History Section */}
           <Box sx={{ 
             p: 2, 
-            borderBottom: "2px solid", 
-            borderColor: "divider",
-            background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)'
+            borderBottom: "1px solid #e5e7eb",
+            background: '#ffffff',
           }}>
-            <Typography variant="subtitle2" fontWeight="bold" sx={{
-              color: 'primary.main',
-              mb: 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1
+            <Typography variant="subtitle2" fontWeight="600" sx={{
+              color: '#111827',
+              mb: 1.5,
+              fontSize: '0.875rem',
+              letterSpacing: '0.5px'
             }}>
-              💬 Conversation History
+              Conversation History
             </Typography>
             
             {conversations.length === 0 ? (
-              <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+              <Typography variant="caption" sx={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.75rem' }}>
                 No previous conversations
               </Typography>
             ) : (
@@ -491,22 +502,23 @@ export default function DocumentQuery() {
                     sx={{
                       mb: 1,
                       cursor: 'pointer',
-                      border: '2px solid',
-                      borderColor: currentConversationId === conv.id ? 'primary.main' : 'transparent',
-                      backgroundColor: currentConversationId === conv.id ? 'primary.50' : 'white',
-                      transition: 'all 0.2s',
+                      border: '1px solid',
+                      borderColor: currentConversationId === conv.id ? '#6366f1' : '#e5e7eb',
+                      backgroundColor: currentConversationId === conv.id ? '#f0f0ff' : '#ffffff',
+                      transition: 'all 0.2s ease',
+                      borderRadius: 2,
                       '&:hover': {
-                        borderColor: 'primary.light',
+                        borderColor: '#6366f1',
+                        backgroundColor: '#f9fafb',
                         transform: 'translateX(4px)',
-                        boxShadow: 2
                       }
                     }}
                   >
                     <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'medium', mb: 0.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: '500', mb: 0.5, color: '#111827', fontSize: '0.8rem' }}>
                         {conv.title}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>
                         {new Date(conv.created_at).toLocaleString()}
                       </Typography>
                     </CardContent>
@@ -518,44 +530,58 @@ export default function DocumentQuery() {
             <Button
               fullWidth
               size="small"
-              variant="outlined"
+              variant="contained"
               onClick={() => {
                 console.log('[DocumentQuery] Starting new conversation')
                 setCurrentConversationId(null)
               }}
-              sx={{ mt: 1 }}
+              sx={{ 
+                mt: 1.5,
+                color: 'white',
+                textTransform: 'none',
+                fontSize: '0.75rem',
+                py: 0.75,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: 3,
+                boxShadow: 'none',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #5568d3 0%, #6a4190 100%)',
+                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                }
+              }}
             >
-              + New Conversation
+              New Conversation
             </Button>
           </Box>
 
           {/* Document Panel Header */}
           <Box sx={{ 
-            p: 3, 
-            borderBottom: "1px solid", 
-            borderColor: "divider",
-            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+            p: 2, 
+            borderBottom: "1px solid #e5e7eb",
+            background: '#ffffff',
           }}>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-              <Typography variant="h6" fontWeight="bold" sx={{
-                background: 'linear-gradient(45deg, #667eea, #764ba2)',
-                backgroundClip: 'text',
-                color: 'transparent'
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
+              <Typography variant="subtitle2" fontWeight="600" sx={{
+                color: '#111827',
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
               }}>
-                📚 Select Documents
+                Select Documents
               </Typography>
-              <Box display="flex" alignItems="center" gap={1}>
+              <Box display="flex" alignItems="center" gap={0.75}>
                 <Tooltip title="Select All">
                   <IconButton 
                     size="small" 
                     onClick={handleSelectAll}
                     sx={{
-                      backgroundColor: 'primary.main',
-                      color: 'white',
-                      '&:hover': { backgroundColor: 'primary.dark' }
+                      backgroundColor: '#f3f4f6',
+                      color: '#6b7280',
+                      width: 28,
+                      height: 28,
+                      '&:hover': { backgroundColor: '#e5e7eb' }
                     }}
                   >
-                    <SelectAll fontSize="small" />
+                    <SelectAll sx={{ fontSize: '1rem' }} />
                   </IconButton>
                 </Tooltip>
                 <Tooltip title="Clear All">
@@ -563,12 +589,14 @@ export default function DocumentQuery() {
                     size="small" 
                     onClick={handleClearAll}
                     sx={{
-                      backgroundColor: 'grey.400',
-                      color: 'white',
-                      '&:hover': { backgroundColor: 'grey.600' }
+                      backgroundColor: '#f3f4f6',
+                      color: '#6b7280',
+                      width: 28,
+                      height: 28,
+                      '&:hover': { backgroundColor: '#e5e7eb' }
                     }}
                   >
-                    <ClearAll fontSize="small" />
+                    <ClearAll sx={{ fontSize: '1rem' }} />
                   </IconButton>
                 </Tooltip>
               </Box>
@@ -578,25 +606,32 @@ export default function DocumentQuery() {
             <TextField
               fullWidth
               size="small"
-              placeholder="🔍 Search documents..."
+              placeholder="Search documents..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  backgroundColor: 'white',
-                  borderRadius: 3,
+                  backgroundColor: '#ffffff',
+                  borderRadius: 2,
+                  fontSize: '0.8rem',
                   '& fieldset': {
-                    borderColor: 'primary.main',
+                    borderColor: '#e5e7eb',
                   },
                   '&:hover fieldset': {
-                    borderColor: 'primary.dark',
+                    borderColor: '#d1d5db',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#6366f1',
                   },
                 },
+                '& input::placeholder': {
+                  fontSize: '0.8rem'
+                }
               }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search fontSize="small" color="primary" />
+                    <Search sx={{ fontSize: '1rem', color: '#9ca3af' }} />
                   </InputAdornment>
                 ),
               }}
@@ -607,84 +642,81 @@ export default function DocumentQuery() {
               <Alert 
                 severity="success" 
                 sx={{ 
-                  mt: 2,
-                  background: 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)',
-                  border: '1px solid #b8dabc'
+                  mt: 1.5,
+                  py: 0.5,
+                  fontSize: '0.75rem',
+                  background: '#f0fdf4',
+                  border: '1px solid #86efac',
+                  color: '#166534',
+                  '& .MuiAlert-icon': {
+                    fontSize: '1rem',
+                    color: '#16a34a'
+                  }
                 }}
               >
-                <Typography variant="body2" fontWeight="bold">
-                  ✅ {selectedDocuments.length} document{selectedDocuments.length > 1 ? "s" : ""} selected for AI querying
+                <Typography variant="caption" fontWeight="600" sx={{ fontSize: '0.75rem' }}>
+                  {selectedDocuments.length} document{selectedDocuments.length > 1 ? "s" : ""} selected for AI querying
                 </Typography>
               </Alert>
             )}
           </Box>
 
           {/* Document List */}
-          <Box sx={{ flexGrow: 1, overflow: "auto", background: 'white' }}>
+          <Box sx={{ flexGrow: 1, overflow: "auto", background: '#f9fafb' }}>
             <List sx={{ p: 1 }}>
               {filteredDocuments.map((doc) => (
                 <ListItem
                   key={doc.id}
                   sx={{
-                    borderBottom: "1px solid",
-                    borderColor: doc.isSelected ? 'primary.main' : "divider",
+                    borderBottom: "1px solid #f3f4f6",
                     "&:hover": { 
-                      bgcolor: "primary.50",
-                      transform: 'translateY(-1px)',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                      bgcolor: "#ffffff",
+                      transform: 'translateX(2px)',
                     },
-                    bgcolor: doc.isSelected ? "primary.100" : "transparent",
-                    borderRadius: 2,
-                    mb: 1,
-                    transition: 'all 0.2s ease-in-out',
-                    border: doc.isSelected ? '2px solid' : '1px solid transparent',
-                    py: 1,
+                    bgcolor: doc.isSelected ? "#f0f0ff" : "transparent",
+                    borderRadius: 1.5,
+                    mb: 0.75,
+                    transition: 'all 0.2s ease',
+                    border: doc.isSelected ? '1px solid #6366f1' : '1px solid transparent',
+                    py: 0.75,
+                    px: 1,
                   }}
                 >
-                  <ListItemIcon sx={{ minWidth: 36 }}>
+                  <ListItemIcon sx={{ minWidth: 32 }}>
                     <Checkbox 
                       checked={doc.isSelected} 
                       onChange={() => handleDocumentToggle(doc.id)} 
-                      color="primary"
                       size="small"
                       sx={{
+                        color: '#d1d5db',
                         '&.Mui-checked': {
-                          transform: 'scale(1.1)'
+                          color: '#6366f1',
                         }
                       }}
                     />
                   </ListItemIcon>
                   <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                    <Box display="flex" alignItems="center" gap={1.5}>
+                    <Box display="flex" alignItems="center" gap={1}>
                       <Box sx={{
                         p: 0.5,
                         borderRadius: 1,
-                        background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
-                        transition: 'transform 0.2s',
-                        '&:hover': {
-                          transform: 'scale(1.05)'
-                        },
+                        background: '#f3f4f6',
                         display: 'flex',
                         alignItems: 'center'
                       }}>
-                        {React.cloneElement(getFileIcon(doc.mime_type || 'document'), { sx: { fontSize: 20 } })}
+                        {React.cloneElement(getFileIcon(doc.mime_type || 'document'), { sx: { fontSize: 16 } })}
                       </Box>
                       <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                        <Typography variant="subtitle2" fontWeight="bold" noWrap sx={{
-                          background: doc.isSelected ? 'linear-gradient(45deg, #1976d2, #42a5f5)' : 'linear-gradient(45deg, #424242, #616161)',
-                          backgroundClip: 'text',
-                          color: 'transparent',
-                          fontSize: '0.9rem',
+                        <Typography variant="body2" fontWeight={doc.isSelected ? "600" : "500"} noWrap sx={{
+                          color: '#111827',
+                          fontSize: '0.8rem',
                           mb: 0.25
                         }}>
                           {doc.title}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ 
-                          fontSize: "0.75rem",
-                          display: 'block',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
+                        <Typography variant="caption" noWrap sx={{ 
+                          color: '#6b7280',
+                          fontSize: "0.7rem",
                         }}>
                           {doc.description}
                         </Typography>
@@ -696,30 +728,14 @@ export default function DocumentQuery() {
             </List>
 
             {filteredDocuments.length === 0 && (
-              <Box textAlign="center" py={8}>
-                <Box sx={{
-                  mb: 2,
-                  '& svg': {
-                    animation: 'bounce 2s infinite',
-                  },
-                  '@keyframes bounce': {
-                    '0%, 20%, 50%, 80%, 100%': {
-                      transform: 'translateY(0)'
-                    },
-                    '40%': {
-                      transform: 'translateY(-10px)'
-                    },
-                    '60%': {
-                      transform: 'translateY(-5px)'
-                    }
-                  }
-                }}>
-                  <InsertDriveFile sx={{ fontSize: 48, color: 'text.disabled' }} />
+              <Box textAlign="center" py={6}>
+                <Box sx={{ mb: 1.5 }}>
+                  <InsertDriveFile sx={{ fontSize: 40, color: '#d1d5db' }} />
                 </Box>
-                <Typography variant="h6" fontWeight="bold" color="text.secondary" gutterBottom>
+                <Typography variant="subtitle2" fontWeight="600" color="#6b7280" gutterBottom sx={{ fontSize: '0.875rem' }}>
                   No documents found
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="caption" sx={{ color: '#9ca3af', fontSize: '0.75rem' }}>
                   No documents match your search criteria
                 </Typography>
               </Box>
@@ -732,32 +748,31 @@ export default function DocumentQuery() {
           flexGrow: 1, 
           display: "flex", 
           flexDirection: "column",
-          background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+          background: '#ffffff',
         }}>
           {/* Chat Messages */}
           <Box sx={{ 
             flexGrow: 1, 
             overflow: "auto", 
-            p: 3, 
-            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+            p: 2.5,
+            background: '#f9fafb',
           }}>
-            <Stack spacing={3} sx={{ maxWidth: 800, mx: "auto" }}>
+            <Stack spacing={2} sx={{ maxWidth: 800, mx: "auto" }}>
               {messages.map((message) => (
                 <Box
                   key={message.id}
                   display="flex"
                   justifyContent={message.role === "user" ? "flex-end" : "flex-start"}
-                  gap={2}
+                  gap={1.5}
                 >
                   {message.role === "assistant" && (
                     <Avatar sx={{ 
-                      bgcolor: "primary.main", 
-                      width: 40, 
-                      height: 40,
-                      background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
-                      boxShadow: '0 4px 8px rgba(102, 126, 234, 0.3)'
+                      bgcolor: "#6366f1", 
+                      width: 36, 
+                      height: 36,
+                      color: 'white'
                     }}>
-                      <SmartToy />
+                      <SmartToy sx={{ fontSize: '1.2rem' }} />
                     </Avatar>
                   )}
 
@@ -765,92 +780,158 @@ export default function DocumentQuery() {
                     sx={{
                       maxWidth: "75%",
                       background: message.role === "user" 
-                        ? "linear-gradient(45deg, #667eea 30%, #764ba2 90%)" 
-                        : "white",
-                      color: message.role === "user" ? "white" : "text.primary",
+                        ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" 
+                        : "#f9fafb",
+                      color: message.role === "user" ? "white" : "#111827",
                       boxShadow: message.role === "user" 
                         ? '0 4px 12px rgba(102, 126, 234, 0.3)'
-                        : '0 4px 12px rgba(0, 0, 0, 0.1)',
-                      borderRadius: 3,
+                        : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                      borderRadius: 2.5,
+                      border: message.role === "user" ? 'none' : '1px solid #e5e7eb',
                     }}
                   >
-                    <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
-                      <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
-                        {message.content}
-                      </Typography>
+                    <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                      {message.role === "assistant" ? (
+                        <Box 
+                          sx={{ 
+                            '& p': { 
+                              margin: 0, 
+                              marginBottom: '0.5em',
+                              lineHeight: 1.6,
+                              fontSize: '0.875rem',
+                              color: '#374151',
+                              '&:last-child': { marginBottom: 0 }
+                            },
+                            '& strong': {
+                              fontWeight: 600,
+                              color: '#111827'
+                            },
+                            '& em': {
+                              fontStyle: 'italic'
+                            },
+                            '& code': {
+                              backgroundColor: '#e5e7eb',
+                              padding: '0.2em 0.4em',
+                              borderRadius: '3px',
+                              fontSize: '0.85em',
+                              fontFamily: 'monospace'
+                            },
+                            '& pre': {
+                              backgroundColor: '#1f2937',
+                              color: '#f3f4f6',
+                              padding: '1em',
+                              borderRadius: '6px',
+                              overflowX: 'auto',
+                              margin: '0.5em 0'
+                            },
+                            '& pre code': {
+                              backgroundColor: 'transparent',
+                              padding: 0,
+                              color: 'inherit'
+                            },
+                            '& ul, & ol': {
+                              margin: '0.5em 0',
+                              paddingLeft: '1.5em'
+                            },
+                            '& li': {
+                              marginBottom: '0.25em',
+                              fontSize: '0.875rem',
+                              color: '#374151'
+                            },
+                            '& h1, & h2, & h3, & h4, & h5, & h6': {
+                              marginTop: '1em',
+                              marginBottom: '0.5em',
+                              fontWeight: 600,
+                              color: '#111827'
+                            },
+                            '& blockquote': {
+                              borderLeft: '3px solid #667eea',
+                              paddingLeft: '1em',
+                              margin: '0.5em 0',
+                              color: '#6b7280'
+                            }
+                          }}
+                        >
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6, fontSize: '0.875rem', color: "white" }}>
+                          {message.content}
+                        </Typography>
+                      )}
 
                       {/* AI References */}
                       {message.role === "assistant" && message.references && message.references.length > 0 && (
-                        <Box mt={3}>
-                          <Typography variant="caption" color="text.secondary" gutterBottom display="block" fontWeight="bold">
-                            📚 References from selected documents:
+                        <Box mt={2}>
+                          <Typography variant="caption" fontWeight="600" sx={{ color: '#6b7280', mb: 1, display: 'block', fontSize: '0.75rem' }}>
+                            References from selected documents:
                           </Typography>
                           <Stack spacing={1}>
                             {message.references.map((ref, index) => (
-                              <Paper key={index} variant="outlined" sx={{ 
-                                p: 2, 
-                                bgcolor: "grey.50",
-                                borderRadius: 2,
-                                border: '1px solid',
-                                borderColor: 'primary.100',
+                              <Box key={index} sx={{ 
+                                p: 1.5, 
+                                borderRadius: 1.5,
+                                background: '#ffffff',
+                                border: '1px solid #e5e7eb',
+                                transition: 'all 0.2s',
                                 '&:hover': {
-                                  bgcolor: 'primary.50',
-                                  transform: 'translateY(-1px)',
-                                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                                },
-                                transition: 'all 0.2s ease-in-out'
+                                  borderColor: '#d1d5db',
+                                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                                }
                               }}>
-                                <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                                <Box display="flex" alignItems="center" gap={1} mb={0.75} flexWrap="wrap">
                                   {getFileIcon(documents.find((d) => d.id === ref.documentId)?.mime_type || "application/pdf")}
-                                  <Typography variant="caption" fontWeight="bold" color="primary">
+                                  <Typography variant="caption" fontWeight="600" sx={{ color: '#111827', fontSize: '0.75rem' }}>
                                     {ref.documentTitle}
                                   </Typography>
                                   {ref.page && (
-                                    <Typography variant="caption" color="text.secondary">
+                                    <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>
                                       • Page {ref.page}
                                     </Typography>
                                   )}
                                   {ref.relevanceScore && (
                                     <Chip 
-                                      label={`${(ref.relevanceScore * 100).toFixed(0)}% relevant`} 
-                                      size="small" 
-                                      color="primary" 
-                                      variant="outlined"
+                                      label={`${(ref.relevanceScore * 100).toFixed(0)}%`} 
+                                      size="small"
+                                      sx={{
+                                        height: 20,
+                                        fontSize: '0.65rem',
+                                        background: '#f0f0ff',
+                                        color: '#6366f1',
+                                        fontWeight: '600'
+                                      }}
                                     />
                                   )}
                                 </Box>
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                                <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem', lineHeight: 1.4 }}>
                                   {ref.text}
                                 </Typography>
-                              </Paper>
+                              </Box>
                             ))}
                           </Stack>
                         </Box>
                       )}
 
-                      <Box display="flex" alignItems="center" justifyContent="space-between" mt={2}>
-                        <Typography variant="caption" color={message.role === "user" ? "rgba(255,255,255,0.7)" : "text.secondary"}>
-                          {message.timestamp.toLocaleTimeString()}
+                      <Box display="flex" alignItems="center" justifyContent="space-between" mt={1.5}>
+                        <Typography variant="caption" sx={{ color: message.role === "user" ? 'rgba(255, 255, 255, 0.9)' : '#9ca3af', fontSize: '0.7rem' }}>
+                          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Typography>
                         {message.role === "assistant" && (
-                          <Box display="flex" alignItems="center" gap={0.5}>
-                            <Tooltip title="Copy response">
-                              <IconButton 
-                                size="small" 
-                                onClick={() => copyToClipboard(message.content)}
-                                sx={{
-                                  backgroundColor: 'primary.100',
-                                  color: 'primary.main',
-                                  '&:hover': {
-                                    backgroundColor: 'primary.200',
-                                    transform: 'scale(1.1)'
-                                  }
-                                }}
-                              >
-                                <ContentCopy fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
+                          <Tooltip title="Copy response">
+                            <IconButton 
+                              size="small" 
+                              onClick={() => copyToClipboard(message.content)}
+                              sx={{
+                                color: '#9ca3af',
+                                '&:hover': {
+                                  color: '#6b7280',
+                                  background: '#f3f4f6'
+                                }
+                              }}
+                            >
+                              <ContentCopy sx={{ fontSize: '0.9rem' }} />
+                            </IconButton>
+                          </Tooltip>
                         )}
                       </Box>
                     </CardContent>
@@ -858,13 +939,12 @@ export default function DocumentQuery() {
 
                   {message.role === "user" && (
                     <Avatar sx={{ 
-                      bgcolor: "grey.400", 
-                      width: 40, 
-                      height: 40,
-                      background: 'linear-gradient(45deg, #FF6B6B, #4ECDC4)',
-                      boxShadow: '0 4px 8px rgba(255, 107, 107, 0.3)'
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      width: 36, 
+                      height: 36,
+                      color: 'white'
                     }}>
-                      <Person />
+                      <Person sx={{ fontSize: '1.2rem' }} />
                     </Avatar>
                   )}
                 </Box>
@@ -872,15 +952,23 @@ export default function DocumentQuery() {
 
               {/* Loading Message */}
               {isLoading && (
-                <Box display="flex" justifyContent="flex-start" gap={1}>
-                  <Avatar sx={{ bgcolor: "primary.main", width: 32, height: 32 }}>
-                    <SmartToy fontSize="small" />
+                <Box display="flex" justifyContent="flex-start" gap={1.5}>
+                  <Avatar sx={{ 
+                    bgcolor: "#6366f1", 
+                    width: 36, 
+                    height: 36,
+                    color: 'white'
+                  }}>
+                    <SmartToy sx={{ fontSize: '1.2rem' }} />
                   </Avatar>
-                  <Card sx={{ bgcolor: "white" }}>
+                  <Card sx={{ 
+                    background: '#f9fafb',
+                    border: '1px solid #e5e7eb',
+                  }}>
                     <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
                       <Box display="flex" alignItems="center" gap={1}>
-                        <CircularProgress size={16} />
-                        <Typography variant="body2" color="text.secondary">
+                        <CircularProgress size={14} sx={{ color: '#6366f1' }} />
+                        <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
                           Analyzing {selectedDocuments.length} selected document
                           {selectedDocuments.length > 1 ? "s" : ""}...
                         </Typography>
@@ -895,54 +983,65 @@ export default function DocumentQuery() {
           </Box>
 
           {/* Input Area */}
-          <Paper elevation={5} sx={{ 
-            p: 3, 
+          <Paper elevation={0} sx={{ 
+            p: 2.5, 
             borderRadius: 0,
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderTop: '3px solid',
-            borderImage: 'linear-gradient(45deg, #667eea, #764ba2) 1'
+            background: '#ffffff',
+            borderTop: '1px solid #e5e7eb'
           }}>
             <Box sx={{ maxWidth: 800, mx: "auto" }}>
               {selectedDocuments.length === 0 ? (
                 <Alert 
                   severity="warning" 
                   sx={{ 
-                    mb: 3,
-                    background: 'linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%)',
-                    border: '1px solid #f6c23e',
-                    borderRadius: 3
+                    mb: 2,
+                    py: 0.75,
+                    fontSize: '0.75rem',
+                    background: '#fef3c7',
+                    border: '1px solid #fbbf24',
+                    color: '#92400e',
+                    '& .MuiAlert-icon': {
+                      fontSize: '1rem',
+                      color: '#f59e0b'
+                    }
                   }}
                 >
-                  <Typography variant="body2" fontWeight="bold">
-                    ⚠️ Please select at least one document from the left panel to start querying.
+                  <Typography variant="caption" fontWeight="600" sx={{ fontSize: '0.75rem' }}>
+                    Please select at least one document from the left panel to start querying.
                   </Typography>
                 </Alert>
               ) : (
                 <Alert 
                   severity="info" 
                   sx={{ 
-                    mb: 3,
-                    background: 'linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%)',
-                    border: '1px solid #5bc0de',
-                    borderRadius: 3
+                    mb: 2,
+                    py: 0.75,
+                    fontSize: '0.75rem',
+                    background: '#dbeafe',
+                    border: '1px solid #60a5fa',
+                    color: '#1e3a8a',
+                    '& .MuiAlert-icon': {
+                      fontSize: '1rem',
+                      color: '#3b82f6'
+                    }
                   }}
                 >
-                  <Typography variant="body2" fontWeight="bold">
-                    🚀 Ask questions about the {selectedDocuments.length} selected document
+                  <Typography variant="caption" fontWeight="600" sx={{ fontSize: '0.75rem' }}>
+                    Ask questions about the {selectedDocuments.length} selected document
                     {selectedDocuments.length > 1 ? "s" : ""}. The AI will search across all selected documents to
                     provide comprehensive answers.
                   </Typography>
                 </Alert>
               )}
 
-              <Box display="flex" gap={2} alignItems="flex-end">
+              <Box display="flex" gap={1.5} alignItems="flex-end">
                 <TextField
                   fullWidth
                   multiline
                   maxRows={4}
                   placeholder={
                     selectedDocuments.length > 0
-                      ? "💬 Ask a question about the selected documents..."
+                      ? "Ask a question about the selected documents..."
                       : "Select documents first, then ask your question..."
                   }
                   value={inputValue}
@@ -952,44 +1051,51 @@ export default function DocumentQuery() {
                   variant="outlined"
                   sx={{
                     "& .MuiOutlinedInput-root": {
-                      borderRadius: 3,
-                      backgroundColor: 'white',
+                      borderRadius: 2,
+                      backgroundColor: '#ffffff',
+                      fontSize: '0.875rem',
                       '& fieldset': {
-                        borderColor: 'primary.main',
-                        borderWidth: 2
+                        borderColor: '#e5e7eb',
                       },
                       '&:hover fieldset': {
-                        borderColor: 'primary.dark',
+                        borderColor: '#d1d5db',
                       },
                       '&.Mui-focused fieldset': {
-                        borderColor: 'primary.main',
+                        borderColor: '#6366f1',
                         borderWidth: 2
                       }
                     },
+                    '& input::placeholder, & textarea::placeholder': {
+                      fontSize: '0.875rem',
+                      opacity: 0.7
+                    }
                   }}
                 />
                 <Button
                   variant="contained"
-                  endIcon={<Send />}
+                  endIcon={<Send sx={{ fontSize: '1rem' }} />}
                   onClick={handleSendMessage}
                   disabled={!inputValue.trim() || isLoading || selectedDocuments.length === 0}
                   sx={{ 
-                    minWidth: 120, 
-                    height: 56, 
-                    borderRadius: 3,
-                    background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
-                    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)',
-                    fontWeight: 'bold',
-                    fontSize: '1rem',
+                    minWidth: 100, 
+                    height: 48,
+                    px: 3,
+                    borderRadius: 2,
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    fontWeight: '600',
+                    fontSize: '0.875rem',
                     textTransform: 'none',
+                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
                     '&:hover': {
-                      background: 'linear-gradient(45deg, #5a6fd8 30%, #6a3f8c 90%)',
-                      boxShadow: '0 6px 20px rgba(102, 126, 234, 0.4)',
-                      transform: 'translateY(-1px)'
+                      background: 'linear-gradient(135deg, #5568d3 0%, #6a4190 100%)',
+                      boxShadow: '0 6px 16px rgba(102, 126, 234, 0.4)',
+                      transform: 'translateY(-1px)',
                     },
                     '&:disabled': {
-                      background: 'linear-gradient(45deg, #bdbdbd 30%, #9e9e9e 90%)',
-                      boxShadow: 'none'
+                      background: '#e5e7eb',
+                      color: '#9ca3af',
+                      boxShadow: 'none',
                     }
                   }}
                 >

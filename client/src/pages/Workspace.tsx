@@ -52,6 +52,7 @@ export default function WorkspaceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [processingRequest, setProcessingRequest] = useState(false);
   
   // Confirmation dialog states
   const [confirmationDialog, setConfirmationDialog] = useState<{
@@ -268,8 +269,49 @@ export default function WorkspaceDetailPage() {
             await joinWorkspace(workspaceId);
             setWorkspace((w) => w ? ({ ...w, role: 'member' }) : null);
           } else if (workspace.join_policy === 'Requests') {
-            await sendJoinRequest(workspaceId);
-            setWorkspace((w) => w ? ({ ...w, role: 'requested' }) : null);
+            setProcessingRequest(true);
+            try {
+              await sendJoinRequest(workspaceId);
+              setWorkspace((w) => w ? ({ ...w, role: 'requested' }) : null);
+              setProcessingRequest(false);
+            } catch (err: any) {
+              // Check if it's a network error or actual API error
+              console.error('Error sending join request:', err);
+              
+              // Even if there's an error, the request might have been processed
+              // Let's reload the workspace data to check the actual status
+              setTimeout(async () => {
+                try {
+                  const updatedWorkspace = await getWorkspace(workspaceId);
+                  const processedWorkspace = {
+                    ...updatedWorkspace,
+                    image_url: getFullImageUrl(updatedWorkspace.image_url) || updatedWorkspace.image_url
+                  };
+                  setWorkspace(processedWorkspace);
+                  
+                  // If the role changed to 'requested', the request was successful despite the error
+                  if (processedWorkspace.role === 'requested') {
+                    console.log('Join request was successful despite error response');
+                    setError(null); // Clear any error message
+                  } else {
+                    // Request truly failed
+                    if (err.response?.data?.message) {
+                      setError(`Failed to send join request: ${err.response.data.message}`);
+                    } else {
+                      setError('Failed to send join request. Please try again or contact support if the issue persists.');
+                    }
+                  }
+                } catch (reloadErr) {
+                  console.error('Failed to reload workspace:', reloadErr);
+                  setError('An error occurred. Please refresh the page to check your request status.');
+                } finally {
+                  setProcessingRequest(false);
+                }
+              }, 1000); // Wait 1 second before checking to allow backend processing
+              
+              // Don't set error immediately, wait for the reload check
+              return;
+            }
           }
           break;
         case 'invited':
@@ -279,9 +321,13 @@ export default function WorkspaceDetailPage() {
         default:
           break;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error performing role action:', error);
-      setError('Failed to perform action. Please try again.');
+      if (error.response) {
+        setError(`Failed to perform action: ${error.response.data.message || error.message}`);
+      } else {
+        setError('An error occurred. Please refresh the page to see the latest status.');
+      }
     }
   };
 
@@ -544,9 +590,10 @@ export default function WorkspaceDetailPage() {
                       variant="outlined"
                       onClick={handleRoleAction}
                       size="medium"
+                      disabled={processingRequest}
                       sx={{ fontWeight: 700, borderRadius: 2, px: 2.5 }}
                     >
-                      Request to Join
+                      {processingRequest ? 'Processing...' : 'Request to Join'}
                     </Button>
                   )}
                   {workspace.role === 'user' && workspace.join_policy === 'Invites' && (
@@ -765,33 +812,59 @@ export default function WorkspaceDetailPage() {
             Threads
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 2, fontWeight: 500 }}>
-            Subscribe to threads to track progress and access resources
+            {(workspace?.role === 'member' || workspace?.role === 'admin') 
+              ? 'Subscribe to threads to track progress and access resources'
+              : 'Join this workspace to access threads and collaborate with other members'}
           </Typography>
         </Box>
         <Stack spacing={2}>
-          {threads.map((t) => (
-            <Box key={t.id}>
-              <Card
-                variant="outlined"
-                sx={{
-                  height: "auto",
-                  display: "flex",
-                  background: "linear-gradient(120deg, #e3f2fd 0%, #fff 100%)",
-                  flexDirection: "column",
-                  transition: "box-shadow 0.3s ease, background 0.3s ease",
-                  cursor: "pointer",
-                  borderRadius: 3,
-                  border: 'none',
-                  boxShadow: '0 2px 12px rgba(33,150,243,0.08)',
-                  '&:hover': {
-                    boxShadow: "0 8px 24px rgba(33,150,243,0.18)",
-                    background: "linear-gradient(120deg, #bbdefb 0%, #e3f2fd 100%)",
-                  },
-                  padding: 2,
-                }}
-              >
-                <CardHeader
-                  onClick={() => handleThreadClick(t.id)}
+          {threads.map((t) => {
+            const canAccessThread = workspace?.role === 'member' || workspace?.role === 'admin';
+            
+            return (
+              <Box key={t.id} sx={{ position: 'relative' }}>
+                <Card
+                  variant="outlined"
+                  sx={{
+                    height: "auto",
+                    display: "flex",
+                    background: "linear-gradient(120deg, #e3f2fd 0%, #fff 100%)",
+                    flexDirection: "column",
+                    transition: "box-shadow 0.3s ease, background 0.3s ease",
+                    cursor: canAccessThread ? "pointer" : "default",
+                    borderRadius: 3,
+                    border: 'none',
+                    boxShadow: '0 2px 12px rgba(33,150,243,0.08)',
+                    '&:hover': canAccessThread ? {
+                      boxShadow: "0 8px 24px rgba(33,150,243,0.18)",
+                      background: "linear-gradient(120deg, #bbdefb 0%, #e3f2fd 100%)",
+                    } : {},
+                    padding: 2,
+                    pointerEvents: canAccessThread ? 'auto' : 'none',
+                  }}
+                >
+                  {!canAccessThread && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        bgcolor: 'warning.main',
+                        color: 'white',
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: 1,
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        zIndex: 10,
+                        pointerEvents: 'auto',
+                      }}
+                    >
+                      Join to access
+                    </Box>
+                  )}
+                  <CardHeader
+                    onClick={() => canAccessThread && handleThreadClick(t.id)}
                   title={
                     <Box display="flex" flexDirection="column" gap={1}>
                       {/* Line 1: Thread Name */}
@@ -809,7 +882,7 @@ export default function WorkspaceDetailPage() {
                               handleEnrollThread(t.id, t.isSubscribed || false);
                             }}
                             size="small"
-                            sx={{ flexShrink: 0, fontWeight: 700, borderRadius: 2, px: 2 }}
+                            sx={{ flexShrink: 0, fontWeight: 700, borderRadius: 2, px: 2, pointerEvents: 'auto' }}
                           >
                             {t.isSubscribed ? "Unsubscribe" : "Subscribe"}
                           </Button>
@@ -860,7 +933,8 @@ export default function WorkspaceDetailPage() {
                 />
               </Card>
             </Box>
-          ))}
+            );
+          })}
         </Stack>
       </Box>
 
