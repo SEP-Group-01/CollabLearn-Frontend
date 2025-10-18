@@ -15,6 +15,7 @@ import {
   Stack,
   Alert,
   Grid,
+  Paper,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -22,7 +23,7 @@ import {
   Edit as EditIcon,
   AccessTime as TimeIcon,
 } from '@mui/icons-material';
-import type { StudySlot } from '../api/studyPlanApi';
+import type { StudySlot, ScheduleSlot } from '../api/studyPlanApi';
 
 interface WeeklyTimeSlotsProps {
   slots: StudySlot[];
@@ -30,6 +31,8 @@ interface WeeklyTimeSlotsProps {
   onUpdateSlot: (slotId: string, updateData: Partial<StudySlot>) => Promise<void>;
   onDeleteSlot: (slotId: string) => Promise<void>;
   readonly?: boolean;
+  schedule?: ScheduleSlot[]; // Add schedule prop to show scheduled tasks
+  onTaskUpdate?: (taskId: string, update: any) => Promise<void>; // Add task update callback
 }
 
 interface SlotFormData {
@@ -54,6 +57,8 @@ const WeeklyTimeSlots: React.FC<WeeklyTimeSlotsProps> = ({
   onUpdateSlot,
   onDeleteSlot,
   readonly = false,
+  schedule = [], // Default to empty array
+  onTaskUpdate, // Task update callback
 }) => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingSlot, setEditingSlot] = useState<StudySlot | null>(null);
@@ -64,6 +69,7 @@ const WeeklyTimeSlots: React.FC<WeeklyTimeSlotsProps> = ({
     end_time: '20:00',
   });
   const [error, setError] = useState<string>('');
+  const [hoveredSlot, setHoveredSlot] = useState<string | null>(null); // Track hovered slot for expansion
 
   // Get today's date for calculating actual dates
   const today = new Date();
@@ -218,6 +224,18 @@ const WeeklyTimeSlots: React.FC<WeeklyTimeSlotsProps> = ({
     }
   };
 
+  // Helper function to get scheduled tasks for a slot
+  const getScheduledTasksForSlot = (slot: StudySlot) => {
+    if (!schedule || schedule.length === 0) return [];
+    
+    // Find all schedule slots that match this study slot's day and time
+    return schedule.filter(scheduleSlot => 
+      scheduleSlot.day_of_week === slot.day_of_week &&
+      scheduleSlot.start_time === slot.start_time &&
+      scheduleSlot.end_time === slot.end_time
+    );
+  };
+
   return (
     <Box>
       {error && (
@@ -226,7 +244,7 @@ const WeeklyTimeSlots: React.FC<WeeklyTimeSlotsProps> = ({
         </Alert>
       )}
 
-      <Grid container spacing={2}>
+      <Grid container spacing={2} justifyContent="center">
         {DAYS_OF_WEEK.map((dayName, dayIndex) => {
           const actualDate = getDateForDay(dayIndex);
           const isToday = dayIndex === todayDayOfWeek;
@@ -342,79 +360,218 @@ const WeeklyTimeSlots: React.FC<WeeklyTimeSlotsProps> = ({
                       const duration = calculateDuration(slot.start_time, slot.end_time);
                       const topPosition = calculatePosition(slot.start_time);
                       const height = calculateHeight(slot.start_time, slot.end_time);
+                      const isHovered = hoveredSlot === slot.id;
+                      const scheduledTasks = getScheduledTasksForSlot(slot);
+                      const hasCompletedTasks = scheduledTasks.some((t: any) => t.status === 'completed');
 
                       return (
                         <Box
                           key={slot.id}
+                          onMouseEnter={() => setHoveredSlot(slot.id!)}
+                          onMouseLeave={() => setHoveredSlot(null)}
                           sx={{
-                            position: 'absolute',
-                            top: `${topPosition}%`,
-                            left: '10%',
-                            right: '10%',
-                            height: `${height}%`,
-                            minHeight: '60px',
+                            position: isHovered ? 'fixed' : 'absolute',
+                            top: isHovered ? '50%' : `${topPosition}%`,
+                            left: isHovered ? '50%' : '10%',
+                            right: isHovered ? 'auto' : '10%',
+                            height: isHovered ? 'auto' : `${height}%`,
+                            minHeight: isHovered ? '200px' : '60px',
+                            maxHeight: isHovered ? '85vh' : undefined,
+                            width: isHovered ? '240px' : 'auto',
+                            transform: isHovered ? 'translate(-50%, -50%)' : 'none',
                             bgcolor: slot.is_free
                               ? 'rgba(16, 185, 129, 0.15)'
-                              : 'rgba(251, 146, 60, 0.15)',
+                              : hasCompletedTasks
+                              ? 'rgba(59, 130, 246, 0.15)' // Blue for completed
+                              : 'rgba(251, 146, 60, 0.15)', // Orange for occupied
                             border: '2px solid',
-                            borderColor: slot.is_free ? '#10b981' : '#fb923c',
+                            borderColor: slot.is_free 
+                              ? '#10b981' 
+                              : hasCompletedTasks
+                              ? '#3b82f6' // Blue border for completed
+                              : '#fb923c',
                             borderRadius: 2,
-                            p: 1,
+                            p: isHovered ? 1.5 : 1,
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
-                            overflow: 'hidden',
+                            overflow: isHovered ? 'auto' : 'hidden',
                             backdropFilter: 'blur(10px)',
                             transition: 'all 0.2s',
+                            zIndex: isHovered ? 9999 : 1,
+                            boxShadow: isHovered
+                              ? slot.is_free
+                                ? '0 20px 60px rgba(16, 185, 129, 0.4)'
+                                : hasCompletedTasks
+                                ? '0 20px 60px rgba(59, 130, 246, 0.4)'
+                                : '0 20px 60px rgba(251, 146, 60, 0.4)'
+                              : slot.is_free
+                              ? '0 4px 20px rgba(16, 185, 129, 0.3)'
+                              : hasCompletedTasks
+                              ? '0 4px 20px rgba(59, 130, 246, 0.3)'
+                              : '0 4px 20px rgba(251, 146, 60, 0.3)',
                             '&:hover': {
-                              boxShadow: slot.is_free
-                                ? '0 4px 20px rgba(16, 185, 129, 0.3)'
-                                : '0 4px 20px rgba(251, 146, 60, 0.3)',
-                              zIndex: 10,
-                              transform: 'scale(1.02)',
+                              transform: isHovered ? 'translate(-50%, -50%)' : 'scale(1.02)',
                             },
                           }}
                         >
                           <Box>
-                            <Typography variant="caption" fontWeight="bold" display="block">
+                            <Typography variant={isHovered ? "subtitle1" : "caption"} fontWeight="bold" display="block">
                               {slot.start_time} - {slot.end_time}
                             </Typography>
-                            <Typography variant="caption" display="block">
+                            <Typography variant={isHovered ? "caption" : "caption"} display="block" sx={{ fontSize: isHovered ? '0.75rem' : '0.7rem' }}>
                               {duration} min
                             </Typography>
+
+                            {/* Show resources for occupied slots */}
+                            {!slot.is_free && scheduledTasks.length > 0 && (
+                              <Box sx={{ mt: 1 }}>
+                                {isHovered ? (
+                                  // Expanded view - show all resources with status
+                                  <Stack spacing={1} sx={{ mt: 2 }}>
+                                    <Typography variant="subtitle2" fontWeight="bold">
+                                      Scheduled Resources ({scheduledTasks.length})
+                                    </Typography>
+                                    {scheduledTasks.map((task: any, idx: number) => {
+                                      const flattenedTasks = scheduledTasks.flatMap((scheduleSlot: any) => 
+                                        scheduleSlot.assigned_resources || []
+                                      );
+                                      const taskResource = flattenedTasks[idx] || task;
+                                      
+                                      return (
+                                        <Paper
+                                          key={idx}
+                                          elevation={1}
+                                          sx={{
+                                            p: 1.5,
+                                            bgcolor: taskResource.status === 'completed' 
+                                              ? 'rgba(59, 130, 246, 0.1)' 
+                                              : taskResource.status === 'skipped'
+                                              ? 'rgba(156, 163, 175, 0.1)'
+                                              : 'rgba(251, 146, 60, 0.1)',
+                                            border: '1px solid',
+                                            borderColor: taskResource.status === 'completed'
+                                              ? '#3b82f6'
+                                              : taskResource.status === 'skipped'
+                                              ? '#9ca3af'
+                                              : '#fb923c',
+                                          }}
+                                        >
+                                          <Box>
+                                            <Typography variant="body2" fontWeight="600">
+                                              {taskResource.title || taskResource.resource_title || task.title}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" display="block">
+                                              {taskResource.task_type || task.task_type} • {taskResource.allocated_minutes || task.allocated_minutes} min
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                              {taskResource.workspace_title || 'N/A'} • {taskResource.thread_title || 'N/A'}
+                                            </Typography>
+                                            
+                                            {/* Status buttons */}
+                                            {!readonly && taskResource.task_id && (
+                                              <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
+                                                <Button
+                                                  size="small"
+                                                  variant={taskResource.status === 'completed' ? 'contained' : 'outlined'}
+                                                  color="primary"
+                                                  sx={{ fontSize: '0.65rem', py: 0.5, minWidth: 'auto' }}
+                                                  onClick={async () => {
+                                                    if (onTaskUpdate) {
+                                                      try {
+                                                        await onTaskUpdate(taskResource.task_id, { status: 'completed' });
+                                                        taskResource.status = 'completed';
+                                                      } catch (err) {
+                                                        console.error('Failed to update task:', err);
+                                                      }
+                                                    }
+                                                  }}
+                                                >
+                                                  ✓ Done
+                                                </Button>
+                                                <Button
+                                                  size="small"
+                                                  variant={taskResource.status === 'skipped' ? 'contained' : 'outlined'}
+                                                  color="warning"
+                                                  sx={{ fontSize: '0.65rem', py: 0.5, minWidth: 'auto' }}
+                                                  onClick={async () => {
+                                                    if (onTaskUpdate) {
+                                                      try {
+                                                        await onTaskUpdate(taskResource.task_id, { status: 'skipped' });
+                                                        taskResource.status = 'skipped';
+                                                      } catch (err) {
+                                                        console.error('Failed to update task:', err);
+                                                      }
+                                                    }
+                                                  }}
+                                                >
+                                                  Skip
+                                                </Button>
+                                              </Stack>
+                                            )}
+                                          </Box>
+                                        </Paper>
+                                      );
+                                    })}
+                                  </Stack>
+                                ) : (
+                                  // Compact view - show truncated resources
+                                  <Box>
+                                    <Typography variant="caption" display="block" sx={{ 
+                                      overflow: 'hidden', 
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap' 
+                                    }}>
+                                      {scheduledTasks.length} resource{scheduledTasks.length > 1 ? 's' : ''}: {scheduledTasks.map((t: any) => t.title || t.resource_title).join(', ')}
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Box>
+                            )}
                           </Box>
 
-                          <Chip
-                            label={slot.is_free ? 'Free' : 'Occupied'}
-                            size="small"
-                            sx={{
-                              height: 22,
-                              fontSize: '0.7rem',
-                              fontWeight: 600,
-                              bgcolor: slot.is_free ? '#10b981' : '#fb923c',
-                              color: 'white',
-                              border: 'none',
-                            }}
-                          />
+                          <Box>
+                            <Chip
+                              label={slot.is_free ? 'Free' : hasCompletedTasks ? 'Completed' : 'Occupied'}
+                              size="small"
+                              sx={{
+                                height: 22,
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                bgcolor: slot.is_free 
+                                  ? '#10b981' 
+                                  : hasCompletedTasks
+                                  ? '#3b82f6'
+                                  : '#fb923c',
+                                color: 'white',
+                                border: 'none',
+                                mb: isHovered ? 2 : 0,
+                              }}
+                            />
 
-                          {!readonly && slot.is_free && (
-                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleEditSlot(slot)}
-                                sx={{ p: 0.25 }}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDeleteSlot(slot.id!, slot.is_free!)}
-                                sx={{ p: 0.25 }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Stack>
-                          )}
+                            {/* Show edit/delete only on hover for free slots */}
+                            {!readonly && slot.is_free && isHovered && (
+                              <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2 }}>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={<EditIcon />}
+                                  onClick={() => handleEditSlot(slot)}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  color="error"
+                                  size="small"
+                                  startIcon={<DeleteIcon />}
+                                  onClick={() => handleDeleteSlot(slot.id!, slot.is_free!)}
+                                >
+                                  Delete
+                                </Button>
+                              </Stack>
+                            )}
+                          </Box>
                         </Box>
                       );
                     })}

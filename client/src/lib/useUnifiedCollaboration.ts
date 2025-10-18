@@ -11,6 +11,14 @@ import type {
   MediaType 
 } from './types/collaboration';
 
+// Get WebSocket URL from environment variable
+const getWsUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+  const baseUrl = apiUrl.replace('/api', '');
+  // Convert http/https to ws/wss
+  return baseUrl.replace(/^http/, 'ws');
+};
+
 export interface UseUnifiedCollaborationOptions {
   documentId: string;
   user: CollaborationUser;
@@ -58,7 +66,7 @@ export const useUnifiedCollaboration = ({
   initialContent = '',
   autoConnect = true,
   preferYjs = true,
-  wsUrl = 'ws://localhost:3001'
+  wsUrl = getWsUrl()
 }: UseUnifiedCollaborationOptions): UseUnifiedCollaborationReturn => {
   // State
   const [content, setContent] = useState(initialContent);

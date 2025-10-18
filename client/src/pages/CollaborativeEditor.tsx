@@ -84,9 +84,20 @@ import {
 
 import { useWebSocketCollaboration } from '../lib/websocket/useWebSocketCollaboration';
 import type { CollaborationUser } from '../lib/websocket/WebSocketCollaborationClient';
-import { currentUser as mockUser, sharedDocuments, fontOptions, fontSizeOptions, textColors, highlightColors } from '../mocks/EditorMocks';
 import { getUserData } from '../api/authApi';
-import { getDocument, type DocumentResponse } from '../api/editorApi';
+import type { User } from '../types/AuthInterfaces';
+import { 
+  getDocument, 
+  type DocumentResponse,
+  getDocumentsByThread,
+  checkAdminOrModerator,
+  requestDocumentAccess,
+  getPendingAccessRequests,
+  approveAccessRequest,
+  rejectAccessRequest,
+  type DocumentListItem,
+  type DocumentAccessRequest
+} from '../api/editorApi';
 import { uploadImageWithProgress } from '../api/imageApi';
 import type { ImageMetadata } from '../lib/imageUtils';
 import { 
@@ -96,6 +107,35 @@ import {
   fileToBase64, 
   extractImagesFromClipboard 
 } from '../lib/imageUtils';
+
+// Font and color configuration constants
+const fontOptions = ['Arial', 'Times New Roman', 'Helvetica', 'Georgia', 'Verdana', 'Courier New', 'Comic Sans MS'];
+const fontSizeOptions = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72];
+
+// Predefined color palettes with better organization
+const textColors = [
+  // Basic colors
+  '#000000', '#424242', '#636363', '#9C9C94', '#CEC6CE', '#EFEFEF', '#F7F3F7', '#FFFFFF',
+  // Primary colors  
+  '#FF0000', '#FF9C00', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#9C00FF', '#FF00FF',
+  // Light shades
+  '#F7C6CE', '#FFE6CC', '#FFEAA7', '#DFF2BF', '#BDE6FF', '#BDB4FE', '#C6A4C6', '#FFCCC9',
+  // Medium shades
+  '#E06B6B', '#DD8500', '#B8860B', '#2E8B57', '#4682B4', '#6A5ACD', '#9370DB', '#DA70D6',
+  // Dark shades
+  '#8B0000', '#B22222', '#DC143C', '#C71585', '#FF1493', '#FF69B4', '#FFB6C1', '#FFC0CB'
+];
+
+const highlightColors = [
+  // Popular highlight colors
+  '#FFFF00', '#00FF00', '#00FFFF', '#FF00FF', '#FFA500', '#FF69B4', '#98FB98', '#87CEEB',
+  // Light highlights  
+  '#FFE4B5', '#F0E68C', '#E0FFFF', '#F5DEB3', '#FFB6C1', '#D3D3D3', '#FAFAFA', '#FFFFFF',
+  // Pastel highlights
+  '#FFCCCB', '#FFE4E1', '#F0F8FF', '#F5F5DC', '#FDF5E6', '#F0FFF0', '#FFF8DC', '#FFFACD',
+  // Soft highlights
+  '#E6E6FA', '#FFF0F5', '#F8F8FF', '#FFFAF0', '#F5FFFA', '#F0FFFF', '#F0FFFF', '#FFFFF0'
+];
 
 const CollaborativeEditor = () => {
   // URL Parameters
@@ -158,16 +198,41 @@ const CollaborativeEditor = () => {
   const [uploadProgress, setUploadProgress] = useState<Map<string, number>>(new Map());
   const [dragOver, setDragOver] = useState(false);
 
-  // Get real user data from authentication system
-  const authUserData = getUserData();
-  const currentUser = authUserData || mockUser; // Fallback to mock if not authenticated
+  // User data state
+  const [authUserData, setAuthUserData] = useState<User | null>(null);
 
-  // Convert currentUser to CollaborationUser type
-  const collaborationUser: CollaborationUser = {
-    id: currentUser.id?.toString() || 'anonymous-' + Date.now(),
-    name: authUserData ? `${authUserData.first_name} ${authUserData.last_name}`.trim() || authUserData.email : mockUser.name,
-    avatar: authUserData ? `${authUserData.first_name?.charAt(0) || ''}${authUserData.last_name?.charAt(0) || ''}`.toUpperCase() || 'A' : mockUser.avatar,
+  // Shared documents and access requests state
+  const [sharedDocuments, setSharedDocuments] = useState<DocumentListItem[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [isAdminOrModerator, setIsAdminOrModerator] = useState(false);
+  const [accessRequests, setAccessRequests] = useState<DocumentAccessRequest[]>([]);
+  const [accessRequestsLoading, setAccessRequestsLoading] = useState(false);
+
+  // Load user data on mount
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const userData = await getUserData();
+        setAuthUserData(userData);
+      } catch (error) {
+        console.error('Failed to load user data:', error);
+      }
+    };
+    loadUserData();
+  }, []);
+
+  // Convert authUserData to CollaborationUser type
+  const collaborationUser: CollaborationUser = authUserData ? {
+    id: authUserData.id?.toString() || 'anonymous-' + Date.now(),
+    name: `${authUserData.first_name} ${authUserData.last_name}`.trim() || authUserData.email,
+    avatar: `${authUserData.first_name?.charAt(0) || ''}${authUserData.last_name?.charAt(0) || ''}`.toUpperCase() || 'A',
     color: '#4caf50', // Default color
+    isActive: true
+  } : {
+    id: 'anonymous-' + Date.now(),
+    name: 'Anonymous',
+    avatar: 'A',
+    color: '#4caf50',
     isActive: true
   };
 
@@ -183,7 +248,7 @@ const CollaborativeEditor = () => {
   } = useWebSocketCollaboration({
     documentId: documentId || 'doc-fallback', // Use documentId from URL
     user: collaborationUser,
-    wsUrl: 'http://localhost:3000', // API Gateway Socket.IO server
+    // wsUrl will use default from environment variable (no need to specify)
     autoConnect: false, // We'll connect after loading the document
     debounceMs: 300
   });
@@ -671,6 +736,58 @@ const CollaborativeEditor = () => {
       loadDocument();
     }
   }, [documentId]); // Only depend on documentId to prevent infinite loops
+
+  // Fetch shared documents in the thread
+  useEffect(() => {
+    const fetchSharedDocuments = async () => {
+      if (!threadId) return;
+
+      try {
+        setDocumentsLoading(true);
+        const documents = await getDocumentsByThread(threadId);
+        // Filter out current document and mark current one as active
+        const otherDocs = documents
+          .filter(doc => doc.id !== documentId)
+          .map(doc => ({
+            ...doc,
+            isActive: doc.id === documentId,
+          }));
+        setSharedDocuments(otherDocs);
+      } catch (error) {
+        console.error('Error fetching shared documents:', error);
+      } finally {
+        setDocumentsLoading(false);
+      }
+    };
+
+    fetchSharedDocuments();
+  }, [threadId, documentId]);
+
+  // Check admin/moderator status and fetch access requests
+  useEffect(() => {
+    const checkAdminStatusAndFetchRequests = async () => {
+      if (!threadId) return;
+
+      try {
+        // Check admin/moderator status
+        const adminCheck = await checkAdminOrModerator(threadId);
+        setIsAdminOrModerator(adminCheck.isAdminOrModerator);
+
+        // If admin/moderator, fetch pending access requests
+        if (adminCheck.isAdminOrModerator) {
+          setAccessRequestsLoading(true);
+          const requests = await getPendingAccessRequests(threadId);
+          setAccessRequests(requests);
+        }
+      } catch (error) {
+        console.error('Error checking admin status or fetching requests:', error);
+      } finally {
+        setAccessRequestsLoading(false);
+      }
+    };
+
+    checkAdminStatusAndFetchRequests();
+  }, [threadId]);
 
   // Set editor content when document loads
   useEffect(() => {
@@ -2240,7 +2357,7 @@ const CollaborativeEditor = () => {
               </Box>
             </Box>
 
-            {/* Right Sidebar - Shared Documents */}
+            {/* Right Sidebar - Shared Documents and Access Requests */}
             {!isFullscreen && (
               <Paper
                 elevation={1}
@@ -2268,10 +2385,10 @@ const CollaborativeEditor = () => {
                   {!isSidebarCollapsed && (
                     <>
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        Shared Documents
+                        Quick Access
                       </Typography>
                       <Chip
-                        label={`${sharedDocuments.length} documents`}
+                        label={`${sharedDocuments.length} docs`}
                         size="small"
                         variant="outlined"
                       />
@@ -2286,108 +2403,214 @@ const CollaborativeEditor = () => {
                   </IconButton>
                 </Box>
 
-                {/* Scrollable Content */}
+                {/* Scrollable Content - Split into two sections */}
                 {!isSidebarCollapsed && (
-                  <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-                    <Stack spacing={1}>
-                      {sharedDocuments.map((doc) => (
-                        <Card
-                          key={doc.id}
-                          variant={doc.isActive ? "elevation" : "outlined"}
-                          elevation={doc.isActive ? 3 : 0}
-                          sx={{
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease-in-out',
-                            '&:hover': {
-                              elevation: 2,
-                              transform: 'translateY(-1px)',
-                            },
-                            bgcolor: doc.isActive ? 'primary.50' : 'transparent',
-                            borderColor: doc.isActive ? 'primary.main' : 'divider',
-                          }}
-                          onClick={() => setActiveDocument(doc.title)}
-                        >
-                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                            <Box sx={{ display: 'flex', alignItems: 'start', gap: 1, mb: 1 }}>
-                              <Description fontSize="small" color="action" />
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600, flex: 1 }}>
-                                {doc.title}
-                              </Typography>
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: '0.75rem' }}>
-                              {doc.preview}
-                            </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <Typography variant="caption" color="text.secondary">
-                                {doc.lastEdited}
-                              </Typography>
-                              {doc.isActive && (
-                                <Chip
-                                  label="Active"
-                                  size="small"
-                                  color="primary"
-                                  sx={{ fontSize: '0.6rem', height: 20 }}
-                                />
-                              )}
-                            </Box>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </Stack>
-                    
-                    {/* Quick Help Section */}
-                    <Card variant="outlined" sx={{ mt: 3, bgcolor: 'grey.50' }}>
-                      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                          Keyboard Shortcuts
-                        </Typography>
-                        <Stack spacing={0.5}>
-                          {[
-                            { label: 'Bold', shortcut: 'Ctrl+B' },
-                            { label: 'Italic', shortcut: 'Ctrl+I' },
-                            { label: 'Underline', shortcut: 'Ctrl+U' },
-                            { label: 'Undo', shortcut: 'Ctrl+Z' },
-                            { label: 'Redo', shortcut: 'Ctrl+Y' },
-                          ].map((item) => (
-                            <Box key={item.label} sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <Typography variant="caption">{item.label}</Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {item.shortcut}
-                              </Typography>
-                            </Box>
-                          ))}
-                        </Stack>
-                      </CardContent>
-                    </Card>
-
-                    {/* Collaboration Info */}
-                    <Card variant="outlined" sx={{ mt: 2, bgcolor: 'success.50', borderColor: 'success.200' }}>
-                      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <Box
-                            sx={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              bgcolor: 'success.main',
-                              animation: 'pulse 2s infinite',
-                              '@keyframes pulse': {
-                                '0%': { opacity: 1 },
-                                '50%': { opacity: 0.5 },
-                                '100%': { opacity: 1 },
-                              },
-                            }}
-                          />
-                          <Typography variant="subtitle2" color="success.dark" sx={{ fontWeight: 600 }}>
-                            Live Collaboration
-                          </Typography>
+                  <>
+                    {/* Top Section: Shared Documents (max 60% height) */}
+                    <Box sx={{ 
+                      maxHeight: isAdminOrModerator ? '60%' : '100%',
+                      overflow: 'auto', 
+                      p: 2,
+                      borderBottom: isAdminOrModerator ? 1 : 0,
+                      borderColor: 'divider'
+                    }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, color: 'primary.main' }}>
+                        Shared Documents
+                      </Typography>
+                      
+                      {documentsLoading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                          <CircularProgress size={24} />
                         </Box>
-                        <Typography variant="caption" color="success.dark">
-                          {collaborators.filter(c => c.isActive).length + 1} people are working on this document. Changes are saved automatically.
+                      ) : sharedDocuments.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+                          No other documents in this thread
                         </Typography>
-                      </CardContent>
-                    </Card>
-                  </Box>
+                      ) : (
+                        <Stack spacing={1}>
+                          {sharedDocuments.map((doc) => {
+                            const hasAccess = doc.userPermission === 'write' || doc.userPermission === 'admin' || doc.userPermission === 'read';
+                            const canEdit = doc.userPermission === 'write' || doc.userPermission === 'admin';
+                            const canView = hasAccess || doc.isPublic || isAdminOrModerator;
+                            
+                            return (
+                              <Card
+                                key={doc.id}
+                                variant="outlined"
+                                sx={{
+                                  cursor: canView ? 'pointer' : 'default',
+                                  transition: 'all 0.2s ease-in-out',
+                                  '&:hover': canView ? {
+                                    elevation: 2,
+                                    transform: 'translateY(-1px)',
+                                  } : {},
+                                  opacity: canView ? 1 : 0.7,
+                                  borderColor: 'divider',
+                                }}
+                              >
+                                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'start', gap: 1, mb: 1 }}>
+                                    <Description fontSize="small" color="action" />
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, flex: 1 }}>
+                                      {doc.title}
+                                    </Typography>
+                                  </Box>
+                                  
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {new Date(doc.updatedAt).toLocaleDateString()}
+                                    </Typography>
+                                    {doc.userPermission && (
+                                      <Chip
+                                        label={doc.userPermission}
+                                        size="small"
+                                        color={doc.userPermission === 'admin' ? 'error' : doc.userPermission === 'write' ? 'success' : 'default'}
+                                        sx={{ fontSize: '0.6rem', height: 18 }}
+                                      />
+                                    )}
+                                  </Box>
+
+                                  {/* Action Button */}
+                                  {!isAdminOrModerator && !hasAccess && !doc.isPublic ? (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      fullWidth
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                          await requestDocumentAccess(doc.id, 'read', 'Requesting access to view this document');
+                                          showNotification('Access request sent', 'success');
+                                        } catch (error: any) {
+                                          showNotification(error?.response?.data?.message || 'Failed to request access', 'error');
+                                        }
+                                      }}
+                                      sx={{ mt: 1 }}
+                                    >
+                                      Request Access
+                                    </Button>
+                                  ) : canView ? (
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      fullWidth
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/workspace/${workspaceId}/threads/${threadId}/editor/${doc.id}`);
+                                      }}
+                                      sx={{ mt: 1 }}
+                                    >
+                                      {canEdit ? 'Edit' : 'View'}
+                                    </Button>
+                                  ) : null}
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </Stack>
+                      )}
+                    </Box>
+
+                    {/* Bottom Section: Access Requests (for admins/moderators only) */}
+                    {isAdminOrModerator && (
+                      <Box sx={{ 
+                        maxHeight: '40%',
+                        overflow: 'auto', 
+                        p: 2,
+                      }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, color: 'warning.main' }}>
+                          Access Requests
+                        </Typography>
+                        
+                        {accessRequestsLoading ? (
+                          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                            <CircularProgress size={24} />
+                          </Box>
+                        ) : accessRequests.length === 0 ? (
+                          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+                            No pending requests
+                          </Typography>
+                        ) : (
+                          <Stack spacing={1}>
+                            {accessRequests.map((request) => (
+                              <Card
+                                key={request.id}
+                                variant="outlined"
+                                sx={{
+                                  borderColor: 'warning.light',
+                                  bgcolor: 'warning.50',
+                                }}
+                              >
+                                <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'start', gap: 1, mb: 1 }}>
+                                    <Avatar 
+                                      sx={{ width: 24, height: 24, fontSize: '0.75rem' }}
+                                      src={request.requesterImage}
+                                    >
+                                      {request.requesterName?.charAt(0) || '?'}
+                                    </Avatar>
+                                    <Box sx={{ flex: 1 }}>
+                                      <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
+                                        {request.requesterName || request.requesterEmail}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                                        {request.documentTitle}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                  
+                                  {request.message && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontSize: '0.7rem' }}>
+                                      "{request.message}"
+                                    </Typography>
+                                  )}
+                                  
+                                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      color="success"
+                                      fullWidth
+                                      onClick={async () => {
+                                        try {
+                                          await approveAccessRequest(request.id);
+                                          setAccessRequests(prev => prev.filter(r => r.id !== request.id));
+                                          showNotification('Access request approved', 'success');
+                                        } catch (error) {
+                                          showNotification('Failed to approve request', 'error');
+                                        }
+                                      }}
+                                      sx={{ fontSize: '0.7rem', py: 0.5 }}
+                                    >
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      color="error"
+                                      fullWidth
+                                      onClick={async () => {
+                                        try {
+                                          await rejectAccessRequest(request.id, 'Access denied');
+                                          setAccessRequests(prev => prev.filter(r => r.id !== request.id));
+                                          showNotification('Access request rejected', 'info');
+                                        } catch (error) {
+                                          showNotification('Failed to reject request', 'error');
+                                        }
+                                      }}
+                                      sx={{ fontSize: '0.7rem', py: 0.5 }}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </Box>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </Stack>
+                        )}
+                      </Box>
+                    )}
+                  </>
                 )}
               </Paper>
             )}

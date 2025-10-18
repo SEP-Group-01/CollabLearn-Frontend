@@ -75,7 +75,7 @@ export const getForumMessages = async (workspaceId: string): Promise<MessageType
   
   try {
     const api = createAuthenticatedRequest();
-    const fullPath = `/workspaces/${workspaceId}/forum/messages`;
+    const fullPath = `/forum/workspaces/${workspaceId}/forum/messages`;
     const response = await api.get(fullPath);
     
     // Check if backend returned an error object instead of data
@@ -128,18 +128,33 @@ export const createForumMessage = async (
 
     console.log('🔧 Creating authenticated request...');
     const api = createAuthenticatedRequest();
-    const requestPath = `/workspaces/${workspaceId}/forum/messages`;
+    const requestPath = `/forum/workspaces/${workspaceId}/forum/messages`;
     console.log('📡 Request path:', requestPath);
     
-    // Prepare JSON payload (backend expects JSON, not FormData)
+    // Convert image to base64 if present
+    let imageBase64: string | undefined;
+    if (image) {
+      console.log('📸 Converting image to base64...');
+      imageBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(image);
+      });
+      console.log('✅ Image converted to base64');
+    }
+    
+    // Prepare JSON payload with image as base64
     console.log('📝 Preparing message payload...');
     const payload = {
       content,
-      authorId
+      authorId,
+      image: imageBase64 // Include base64 image if present
     };
     console.log('📎 Payload prepared:', {
       content: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
-      authorId
+      authorId,
+      hasImage: !!imageBase64
     });
 
     const response = await api.post(requestPath, payload);
@@ -229,7 +244,7 @@ export const pinMessage = async (workspaceId: string, messageId: number): Promis
     const api = createAuthenticatedRequest();
     const userId = getCurrentUserId(); // Get current user ID
     
-    const response = await api.put(`/workspaces/${workspaceId}/forum/messages/${messageId}/pin`, {
+    const response = await api.put(`/forum/messages/${messageId}/pin`, {
       userId, // Include userId as required by backend
     });
     
@@ -279,7 +294,8 @@ export const toggleMessageLike = async (
     const api = createAuthenticatedRequest();
     const userId = getCurrentUserId();
     
-    const response = await api.post(`/workspaces/${workspaceId}/forum/messages/${messageId}/like`, {
+    const response = await api.post(`/forum/messages/like`, {
+      messageId: typeof messageId === 'string' ? parseInt(messageId) : messageId,
       userId
     });
     

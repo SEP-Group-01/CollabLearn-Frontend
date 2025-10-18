@@ -190,3 +190,116 @@ export const getDocumentsByThread = async (threadId: string): Promise<DocumentLi
     throw error;
   }
 };
+
+// Document Access Request Types
+export interface DocumentAccessRequest {
+  id: string;
+  documentId: string;
+  userId: string;
+  requestedPermission: 'read' | 'write';
+  status: 'pending' | 'approved' | 'rejected';
+  message?: string;
+  requestedAt: string;
+  handledBy?: string;
+  handledAt?: string;
+  rejectionReason?: string;
+  // Joined data from view
+  documentTitle?: string;
+  requesterName?: string;
+  requesterEmail?: string;
+  requesterImage?: string;
+}
+
+// Request access to a document
+export const requestDocumentAccess = async (
+  documentId: string,
+  requestedPermission: 'read' | 'write',
+  message?: string,
+  token?: string
+): Promise<DocumentAccessRequest> => {
+  try {
+    const authToken = token || getAccessToken();
+    const response = await axios.post(
+      `${API_URL}/documents/${documentId}/access-request`,
+      { requestedPermission, message },
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error requesting document access:', error);
+    throw error;
+  }
+};
+
+// Get pending access requests for documents in a thread (admin/moderator only)
+export const getPendingAccessRequests = async (
+  threadId: string,
+  token?: string
+): Promise<DocumentAccessRequest[]> => {
+  try {
+    const authToken = token || getAccessToken();
+    const response = await axios.get(
+      `${API_URL}/documents/thread/${threadId}/access-requests`,
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching pending access requests:', error);
+    throw error;
+  }
+};
+
+// Approve document access request (admin/moderator only)
+export const approveAccessRequest = async (
+  requestId: string,
+  token?: string
+): Promise<void> => {
+  try {
+    const authToken = token || getAccessToken();
+    await axios.post(
+      `${API_URL}/documents/access-requests/${requestId}/approve`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      }
+    );
+  } catch (error) {
+    console.error('Error approving access request:', error);
+    throw error;
+  }
+};
+
+// Reject document access request (admin/moderator only)
+export const rejectAccessRequest = async (
+  requestId: string,
+  rejectionReason?: string,
+  token?: string
+): Promise<void> => {
+  try {
+    const authToken = token || getAccessToken();
+    await axios.post(
+      `${API_URL}/documents/access-requests/${requestId}/reject`,
+      { rejectionReason },
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+  } catch (error) {
+    console.error('Error rejecting access request:', error);
+    throw error;
+  }
+};

@@ -72,18 +72,9 @@ export default function ThreadPage() {
   const [createLoading, setCreateLoading] = useState(false)
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' })
 
-  // Helper functions to format data (defined before useEffect that uses them)
-  const getDisplayName = (userId?: string): string => {
-    // You might want to fetch user names from an API
-    // For now, return a placeholder
-    return userId ? `User ${userId.slice(0, 8)}` : "Unknown user"
-  }
-
-  const formatDate = (dateString?: string): string => {
-    if (!dateString) return "Unknown date"
-    return new Date(dateString).toLocaleDateString()
-  }
-
+  // Helper functions to format data - moved above useEffect so they are initialized
+  // before being referenced inside the effect (avoids TDZ/ReferenceError)
+  
   const formatFileSize = (bytes?: number): string => {
     if (!bytes) return "Unknown size"
     const kb = bytes / 1024
@@ -91,6 +82,17 @@ export default function ThreadPage() {
     if (mb >= 1) return `${mb.toFixed(1)} MB`
     if (kb >= 1) return `${kb.toFixed(1)} KB`
     return `${bytes} B`
+  }
+
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return "Unknown date"
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  const getDisplayName = (userId?: string): string => {
+    // You might want to fetch user names from an API
+    // For now, return a placeholder
+    return userId ? `User ${userId.slice(0, 8)}` : "Unknown user"
   }
 
   useEffect(() => {
@@ -217,6 +219,8 @@ export default function ThreadPage() {
 
     checkPermissions()
   }, [threadId])
+
+
 
   // Fetch editing documents for this thread
   useEffect(() => {
@@ -483,162 +487,6 @@ export default function ThreadPage() {
         </Box>
       </Box>
     
-
-      {/* Performance Analytics */}
-  {threadData && threadData.enrolled && (
-        <Card>
-          <CardHeader
-            title={
-              <Typography variant="h6" fontWeight="bold">
-                📊 Your Performance Analytics
-              </Typography>
-            }
-          />
-          <CardContent>
-            <Box
-              sx={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 3,
-              }}
-            >
-              {/* Performance Stats - Single Row */}
-              <Box
-                sx={{
-                  width: '100%',
-                  display: 'flex',
-                  flexDirection: 'row',
-                  gap: 2,
-                  justifyContent: 'space-between',
-                  alignItems: 'stretch',
-                  flexWrap: { xs: 'wrap', md: 'nowrap' },
-                }}
-              >
-                {/* Last Score */}
-                <Box
-                  sx={{
-                    minWidth: 140,
-                    minHeight: '100px',
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Box textAlign="center" p={2} bgcolor="primary.50" borderRadius={2}>
-                    <Typography variant="h4" fontWeight="bold" color="primary">
-                      {threadData.performance.lastScore || 0}%
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Last Score
-                    </Typography>
-                  </Box>
-                </Box>
-                {/* Average Score */}
-                <Box
-                  sx={{
-                    minWidth: 140,
-                    minHeight: '100px',
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                      <Typography variant="h4" fontWeight="bold" color="primary">
-                        {threadData.performance.averageScore}%
-                      </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Average Score
-                    </Typography>
-                  </Box>
-                </Box>
-                {/* Quizzes Completed */}
-                <Box
-                  sx={{
-                    minWidth: 140,
-                    minHeight: '100px',
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                      <Typography variant="h4" fontWeight="bold" color="primary">
-                        {threadData.performance.completedQuizzes}/{threadData.performance.totalQuizzes}
-                      </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Quizzes Completed
-                    </Typography>
-                  </Box>
-                </Box>
-                {/* Study Time */}
-                <Box
-                  sx={{
-                    minWidth: 140,
-                    minHeight: '100px',
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                      <Typography variant="h4" fontWeight="bold" color="primary">
-                        {threadData.performance.studyTime}h
-                      </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Study Time
-                    </Typography>
-                  </Box>
-                </Box>
-                {/* Resource Added */}
-                <Box
-                  sx={{
-                    minWidth: 140,
-                    minHeight: '100px',
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                    <Typography variant="h4" fontWeight="bold" color="primary">
-                      5
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Resource added
-                    </Typography>
-                  </Box>
-                </Box>
-                {/* Documents to Edit */}
-                <Box
-                  sx={{
-                    minWidth: 140,
-                    minHeight: '100px',
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Box textAlign="center" p={2} bgcolor="success.50" borderRadius={2}>
-                    <Typography variant="h4" fontWeight="bold" color="primary">
-                      5
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Documents to Edit
-                    </Typography>
-                  </Box>
-                </Box>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      )}
 
       <Box>
         <Typography 

@@ -2,8 +2,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
-import EditIcon from "@mui/icons-material/Edit";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { Box } from "@mui/material";
 import { Link } from "react-router-dom";
@@ -16,13 +15,9 @@ import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
 import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
-import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import { logout } from "../api/authApi";
-
-// Optional: Your logo asset
-import { assets } from "../assets/assets";
 
 interface SidebarMenuItemProps {
   title: string;
@@ -67,6 +62,7 @@ const SidebarMenuItem = ({
 const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) => {
   const [selected, setSelected] = useState<string>("Home");
   const navigate = useNavigate();
+  const { workspaceId } = useParams();
   const handleToggle = () => setCollapsed((prev) => !prev);
 
   const sidebarWidth = collapsed ? 80 : 250;
@@ -95,18 +91,21 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
               onClick={handleToggle}
               sx={{
                 display: "flex",
+                flexDirection: "column",
                 justifyContent: "center",
                 alignItems: "center",
                 padding: "12px",
                 marginBottom: "8px",
                 cursor: "pointer",
                 color: "white",
+                gap: 1,
                 "&:hover": {
                   backgroundColor: "rgba(255, 255, 255, 0.1)"
                 }
               }}
             >
-              <MenuOutlinedIcon sx={{ color: "white" }} />
+              <img src="/favicon.svg" alt="CollabLearn" width="32" height="32" />
+              <MenuOutlinedIcon sx={{ color: "white", fontSize: "1rem" }} />
             </Box>
           ) : (
             <MenuItem
@@ -126,7 +125,20 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
                   width: "100%"
                 }}
               >
-                <img src={assets.logo_dark} alt="logo" width="120" />
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <img src="/favicon.svg" alt="CollabLearn logo" width="32" height="32" />
+                  <Box
+                    component="span"
+                    sx={{
+                      fontSize: "1.2rem",
+                      fontWeight: "bold",
+                      color: "white",
+                      letterSpacing: "0.5px"
+                    }}
+                  >
+                    CollabLearn
+                  </Box>
+                </Box>
                 <ChevronLeftIcon sx={{ color: "white" }} />
               </Box>
             </MenuItem>
@@ -152,16 +164,16 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
             collapsed={collapsed}
           />
 
-          {/* Groups submenu */}
+          {/* Workspaces submenu */}
           <SubMenu
-            label={!collapsed ? "Groups" : ""}
+            label={!collapsed ? "Workspaces" : ""}
             icon={<GroupsOutlinedIcon sx={{ color: "white" }} />}
             style={{ color: "white" }}
             defaultOpen={collapsed}
           >
             <SidebarMenuItem
-              title="Registered Groups"
-              to="/group"
+              title="Registered Workspaces"
+              to="/Workspaces-list"
               icon={null}
               selected={selected}
               setSelected={setSelected}
@@ -178,32 +190,17 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
             collapsed={collapsed}
           />
 
-          <SidebarMenuItem
-            title="Edit Document"
-            to="/editor"
-            icon={<EditIcon sx={{ color: "white" }} />}
-            selected={selected}
-            setSelected={setSelected}
-            collapsed={collapsed}
-          />
+          {workspaceId && (
+            <SidebarMenuItem
+              title="Forum"
+              to={`/workspace/${workspaceId}/forum`}
+              icon={<ForumOutlinedIcon sx={{ color: "white" }} />}
+              selected={selected}
+              setSelected={setSelected}
+              collapsed={collapsed}
+            />
+          )}
 
-          <SidebarMenuItem
-            title="Forum"
-            to="/forum"
-            icon={<ForumOutlinedIcon sx={{ color: "white" }} />}
-            selected={selected}
-            setSelected={setSelected}
-            collapsed={collapsed}
-          />
-
-          <SidebarMenuItem
-            title="Analytics"
-            to="/analytics"
-            icon={<BarChartOutlinedIcon sx={{ color: "white" }} />}
-            selected={selected}
-            setSelected={setSelected}
-            collapsed={collapsed}
-          />
 
           {/* <SidebarMenuItem
             title="Sign Out"

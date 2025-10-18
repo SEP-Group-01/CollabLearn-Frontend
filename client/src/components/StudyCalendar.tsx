@@ -5,21 +5,12 @@ import {
   CardContent,
   Typography,
   Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Button,
   Stack,
-  Rating,
-  TextField,
   Tooltip,
   Grid,
 } from '@mui/material';
-import {
-  CheckCircle as CompletedIcon,
-} from '@mui/icons-material';
-import type { ScheduleSlot, ScheduledResource } from '../api/studyPlanApi';
+import type { ScheduleSlot } from '../api/studyPlanApi';
 
 interface StudyCalendarProps {
   schedule: ScheduleSlot[];
@@ -28,13 +19,7 @@ interface StudyCalendarProps {
 }
 
 const StudyCalendar: React.FC<StudyCalendarProps> = ({ schedule, onTaskUpdate, readonly = false }) => {
-  const [selectedTask, setSelectedTask] = useState<{
-    task: ScheduledResource;
-    slot: ScheduleSlot;
-  } | null>(null);
-  const [taskStatus, setTaskStatus] = useState<string>('pending');
-  const [taskRating, setTaskRating] = useState<number>(0);
-  const [taskNotes, setTaskNotes] = useState<string>('');
+  const [hoveredTaskKey, setHoveredTaskKey] = useState<string | null>(null); // Track hovered TASK, not slot
 
   // Group schedule by week
   const scheduleByWeek = schedule.reduce((acc, slot) => {
@@ -71,36 +56,6 @@ const StudyCalendar: React.FC<StudyCalendarProps> = ({ schedule, onTaskUpdate, r
     return (duration / 1440) * 100;
   };
 
-  const handleTaskClick = (task: ScheduledResource, slot: ScheduleSlot) => {
-    setSelectedTask({ task, slot });
-    setTaskStatus('pending');
-    setTaskRating(0);
-    setTaskNotes('');
-  };
-
-  const handleCloseDialog = () => {
-    setSelectedTask(null);
-    setTaskStatus('pending');
-    setTaskRating(0);
-    setTaskNotes('');
-  };
-
-  const handleMarkComplete = async () => {
-    if (!selectedTask || !onTaskUpdate || !selectedTask.task.task_id) return;
-
-    try {
-      await onTaskUpdate(selectedTask.task.task_id, {
-        status: taskStatus,
-        rating: taskRating || undefined,
-        notes: taskNotes || undefined,
-        completion_percentage: taskStatus === 'completed' ? 100 : undefined,
-      });
-      handleCloseDialog();
-    } catch (error) {
-      console.error('Failed to update task:', error);
-    }
-  };
-
   if (!schedule || schedule.length === 0) {
     return (
       <Box textAlign="center" py={4}>
@@ -123,7 +78,7 @@ const StudyCalendar: React.FC<StudyCalendarProps> = ({ schedule, onTaskUpdate, r
             Week {weekNumber}
           </Typography>
 
-          <Grid container spacing={2}>
+          <Grid container spacing={2} justifyContent="flex-start">
             {scheduleByWeek[weekNumber].map((slot, slotIndex) => {
               const totalMinutes = slot.assigned_resources.reduce(
                 (acc, r) => acc + r.allocated_minutes,
@@ -134,15 +89,16 @@ const StudyCalendar: React.FC<StudyCalendarProps> = ({ schedule, onTaskUpdate, r
                 <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={`${slot.day_of_week}-${slotIndex}`}>
                   <Card
                     sx={{
-                      height: '500px',
+                      height: '700px',
                       display: 'flex',
                       flexDirection: 'column',
-                      bgcolor: 'rgba(255, 255, 255, 0.7)',
-                      backdropFilter: 'blur(10px)',
+                      bgcolor: 'rgba(255, 255, 255, 0.95)',
+                      backdropFilter: 'blur(20px)',
                       borderRadius: 3,
                       border: '1px solid rgba(139, 92, 246, 0.2)',
                       boxShadow: '0 4px 16px rgba(139, 92, 246, 0.1)',
                       transition: 'all 0.3s ease',
+                      overflow: 'hidden',
                       '&:hover': {
                         transform: 'translateY(-4px)',
                         boxShadow: '0 12px 40px rgba(139, 92, 246, 0.2)',
@@ -168,7 +124,7 @@ const StudyCalendar: React.FC<StudyCalendarProps> = ({ schedule, onTaskUpdate, r
                           borderColor: 'divider',
                           borderRadius: 1,
                           bgcolor: 'background.default',
-                          minHeight: 300,
+                          minHeight: 600,
                         }}
                       >
                         {/* Time markers */}
@@ -226,84 +182,171 @@ const StudyCalendar: React.FC<StudyCalendarProps> = ({ schedule, onTaskUpdate, r
                                   .slice(0, resourceIndex)
                                   .reduce((acc, r) => acc + (r.allocated_minutes / 1440) * 100, 0)
                               : 0;
+                          
+                          const taskStatus = (resource as any).status || 'pending';
+                          const isCompleted = taskStatus === 'completed';
+                          const isSkipped = taskStatus === 'skipped';
+                          
+                          // Unique key for each task
+                          const taskKey = `${weekNumber}-${slot.day_of_week}-${slotIndex}-${resourceIndex}`;
+                          const isTaskHovered = hoveredTaskKey === taskKey;
 
                           return (
                             <Tooltip
                               key={resourceIndex}
                               title={
-                                <Box>
-                                  <Typography variant="caption" display="block">
-                                    <strong>{resource.title}</strong>
-                                  </Typography>
-                                  <Typography variant="caption" display="block">
-                                    Type: {resource.task_type}
-                                  </Typography>
-                                  <Typography variant="caption" display="block">
-                                    Duration: {resource.allocated_minutes} min
-                                  </Typography>
-                                  <Typography variant="caption" display="block">
-                                    Workspace: {resource.workspace_title || 'N/A'}
-                                  </Typography>
-                                  <Typography variant="caption" display="block">
-                                    Thread: {resource.thread_title || 'N/A'}
-                                  </Typography>
-                                </Box>
+                                !isTaskHovered ? (
+                                  <Box>
+                                    <Typography variant="caption" display="block">
+                                      <strong>{resource.title}</strong>
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                      Type: {resource.task_type}
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                      Duration: {resource.allocated_minutes} min
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                      Status: {taskStatus}
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                      Workspace: {resource.workspace_title || 'N/A'}
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                      Thread: {resource.thread_title || 'N/A'}
+                                    </Typography>
+                                  </Box>
+                                ) : null
                               }
                               arrow
                             >
                               <Box
-                                onClick={() => !readonly && handleTaskClick(resource, slot)}
+                                onMouseEnter={() => setHoveredTaskKey(taskKey)}
+                                onMouseLeave={() => setHoveredTaskKey(null)}
                                 sx={{
-                                  position: 'absolute',
-                                  top: `${topPosition + offsetTop}%`,
-                                  left: '8%',
-                                  right: '8%',
-                                  height: `${taskHeight}%`,
-                                  minHeight: '45px',
-                                  bgcolor:
-                                    resource.task_type === 'revision'
-                                      ? 'rgba(236, 72, 153, 0.15)'
-                                      : 'rgba(59, 130, 246, 0.15)',
+                                  position: isTaskHovered ? 'fixed' : 'absolute',
+                                  top: isTaskHovered ? '50%' : `${topPosition + offsetTop}%`,
+                                  left: isTaskHovered ? '50%' : '8%',
+                                  right: isTaskHovered ? 'auto' : '8%',
+                                  transform: isTaskHovered ? 'translate(-50%, -50%)' : 'none',
+                                  height: isTaskHovered ? 'auto' : `${taskHeight}%`,
+                                  minHeight: isTaskHovered ? '120px' : '45px',
+                                  maxHeight: isTaskHovered ? '80vh' : undefined,
+                                  width: isTaskHovered ? '240px' : 'auto',
+                                  bgcolor: isCompleted
+                                    ? 'rgba(59, 130, 246, 0.15)'
+                                    : isSkipped
+                                    ? 'rgba(156, 163, 175, 0.15)'
+                                    : resource.task_type === 'revision'
+                                    ? 'rgba(236, 72, 153, 0.15)'
+                                    : 'rgba(99, 102, 241, 0.15)',
                                   border: '2px solid',
-                                  borderColor: resource.task_type === 'revision' ? '#ec4899' : '#3b82f6',
+                                  borderColor: isCompleted
+                                    ? '#3b82f6'
+                                    : isSkipped
+                                    ? '#9ca3af'
+                                    : resource.task_type === 'revision'
+                                    ? '#ec4899'
+                                    : '#6366f1',
                                   backdropFilter: 'blur(10px)',
                                   borderRadius: 1,
-                                  p: 0.5,
+                                  p: isTaskHovered ? 1.5 : 0.5,
                                   display: 'flex',
                                   flexDirection: 'column',
-                                  overflow: 'hidden',
-                                  cursor: readonly ? 'default' : 'pointer',
+                                  overflow: isTaskHovered ? 'auto' : 'hidden',
+                                  cursor: 'default',
                                   transition: 'all 0.2s',
-                                  '&:hover': readonly
-                                    ? {}
-                                    : {
-                                        boxShadow: 3,
-                                        transform: 'scale(1.02)',
-                                        zIndex: 10,
-                                      },
+                                  zIndex: isTaskHovered ? 9999 : 1,
+                                  boxShadow: isTaskHovered ? '0 20px 60px rgba(139, 92, 246, 0.4)' : 'none',
+                                  '&:hover': {
+                                    boxShadow: isTaskHovered ? '0 20px 60px rgba(139, 92, 246, 0.4)' : 3,
+                                    transform: isTaskHovered ? 'translate(-50%, -50%)' : 'scale(1.02)',
+                                    zIndex: isTaskHovered ? 9999 : 10,
+                                  },
                                 }}
                               >
                                 <Typography
-                                  variant="caption"
+                                  variant={isTaskHovered ? "body2" : "caption"}
                                   fontWeight="bold"
                                   sx={{
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                    fontSize: '0.7rem',
+                                    whiteSpace: isTaskHovered ? 'normal' : 'nowrap',
+                                    fontSize: isTaskHovered ? '0.875rem' : '0.7rem',
                                   }}
                                 >
                                   {resource.title}
                                 </Typography>
-                                <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>
-                                  {resource.allocated_minutes}m
+                                {isTaskHovered && (
+                                  <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
+                                    {resource.workspace_title} • {resource.thread_title}
+                                  </Typography>
+                                )}
+                                <Typography variant="caption" sx={{ fontSize: isTaskHovered ? '0.75rem' : '0.65rem' }}>
+                                  {resource.allocated_minutes}m • {resource.task_type}
                                 </Typography>
                                 <Chip
-                                  label={resource.task_type}
+                                  label={taskStatus}
                                   size="small"
-                                  color={resource.task_type === 'revision' ? 'secondary' : 'primary'}
-                                  sx={{ height: 16, fontSize: '0.6rem', mt: 0.5 }}
+                                  sx={{ 
+                                    height: isTaskHovered ? 22 : 16, 
+                                    fontSize: isTaskHovered ? '0.7rem' : '0.6rem', 
+                                    mt: 0.5,
+                                    bgcolor: isCompleted
+                                      ? '#3b82f6'
+                                      : isSkipped
+                                      ? '#9ca3af'
+                                      : resource.task_type === 'revision'
+                                      ? '#ec4899'
+                                      : '#6366f1',
+                                    color: 'white',
+                                    fontWeight: 600,
+                                  }}
                                 />
+                                
+                                {/* Status buttons on hover */}
+                                {!readonly && isTaskHovered && resource.task_id && (
+                                  <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
+                                    <Button
+                                      size="small"
+                                      variant={taskStatus === 'completed' ? 'contained' : 'outlined'}
+                                      color="primary"
+                                      sx={{ fontSize: '0.65rem', py: 0.5, minWidth: 'auto' }}
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (onTaskUpdate && resource.task_id) {
+                                          try {
+                                            await onTaskUpdate(resource.task_id, { status: 'completed' });
+                                            (resource as any).status = 'completed';
+                                          } catch (err) {
+                                            console.error('Failed to update task:', err);
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      ✓ Done
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      variant={taskStatus === 'skipped' ? 'contained' : 'outlined'}
+                                      color="warning"
+                                      sx={{ fontSize: '0.65rem', py: 0.5, minWidth: 'auto' }}
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (onTaskUpdate && resource.task_id) {
+                                          try {
+                                            await onTaskUpdate(resource.task_id, { status: 'skipped' });
+                                            (resource as any).status = 'skipped';
+                                          } catch (err) {
+                                            console.error('Failed to update task:', err);
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      Skip
+                                    </Button>
+                                  </Stack>
+                                )}
                               </Box>
                             </Tooltip>
                           );
@@ -339,116 +382,6 @@ const StudyCalendar: React.FC<StudyCalendarProps> = ({ schedule, onTaskUpdate, r
           </Grid>
         </Box>
       ))}
-
-      {/* Task Details Dialog */}
-      {selectedTask && (
-        <Dialog open={!!selectedTask} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-          <DialogTitle>Task Details</DialogTitle>
-          <DialogContent>
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Resource
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {selectedTask.task.title}
-                </Typography>
-              </Box>
-
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Workspace / Thread
-                </Typography>
-                <Typography variant="body2">
-                  {selectedTask.task.workspace_title} / {selectedTask.task.thread_title}
-                </Typography>
-              </Box>
-
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Schedule
-                </Typography>
-                <Typography variant="body2">
-                  {selectedTask.slot.day_name}, {new Date(selectedTask.slot.scheduled_date).toLocaleDateString()}
-                </Typography>
-                <Typography variant="body2">
-                  {selectedTask.slot.start_time} - {selectedTask.slot.end_time}
-                </Typography>
-              </Box>
-
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Duration & Type
-                </Typography>
-                <Stack direction="row" spacing={1}>
-                  <Chip label={`${selectedTask.task.allocated_minutes} minutes`} size="small" />
-                  <Chip
-                    label={selectedTask.task.task_type}
-                    size="small"
-                    color={selectedTask.task.task_type === 'revision' ? 'secondary' : 'primary'}
-                  />
-                </Stack>
-              </Box>
-
-              {!readonly && (
-                <>
-                  <Box>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Mark as Completed
-                    </Typography>
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        variant={taskStatus === 'completed' ? 'contained' : 'outlined'}
-                        size="small"
-                        startIcon={<CompletedIcon />}
-                        onClick={() => setTaskStatus('completed')}
-                      >
-                        Completed
-                      </Button>
-                      <Button
-                        variant={taskStatus === 'skipped' ? 'contained' : 'outlined'}
-                        size="small"
-                        color="warning"
-                        onClick={() => setTaskStatus('skipped')}
-                      >
-                        Skipped
-                      </Button>
-                    </Stack>
-                  </Box>
-
-                  <Box>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Rate this session
-                    </Typography>
-                    <Rating
-                      value={taskRating}
-                      onChange={(_, value) => setTaskRating(value || 0)}
-                      size="large"
-                    />
-                  </Box>
-
-                  <TextField
-                    label="Notes (optional)"
-                    multiline
-                    rows={3}
-                    value={taskNotes}
-                    onChange={(e) => setTaskNotes(e.target.value)}
-                    fullWidth
-                  />
-                </>
-              )}
-            </Stack>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog}>Close</Button>
-            {!readonly && (
-              <Button onClick={handleMarkComplete} variant="contained" disabled={!taskStatus}>
-                Save Progress
-              </Button>
-            )}
-          </DialogActions>
-        </Dialog>
-      )}
     </Box>
   );
 };
