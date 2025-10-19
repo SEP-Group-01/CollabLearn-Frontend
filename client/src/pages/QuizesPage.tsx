@@ -177,6 +177,11 @@ const QuizesPage = ({ workspaceId: propWorkspaceId, threadId: propThreadId }: Qu
     return () => { mounted = false }
   }, [threadId])
 
+  // Scroll to top when component mounts or when returning from other pages
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <SidebarComponent collapsed={collapsed} setCollapsed={setCollapsed} />

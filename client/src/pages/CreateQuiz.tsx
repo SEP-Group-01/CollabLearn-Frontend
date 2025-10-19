@@ -381,7 +381,13 @@ const CreateQuiz: React.FC = () => {
 
             // Build payload expected by backend
             const payload = {
-                ...quizDetails,
+                title: quizDetails.title,
+                description: quizDetails.description,
+                timeAllocated: quizDetails.allocatedTime, // Map allocatedTime to timeAllocated
+                topics: quizDetails.topics,
+                selectedResources: quizDetails.selectedResources,
+                tags: quizDetails.tags,
+                resourceTags: quizDetails.resourceTags,
                 questions,
             }
 
