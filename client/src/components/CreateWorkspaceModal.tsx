@@ -49,7 +49,7 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
     description: '',
     tags: [],
     image: null,
-    joinPolicy: 'anyone',
+    joinPolicy: 'Anyone',
   });
 
   const [currentTag, setCurrentTag] = useState('');
@@ -170,7 +170,7 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
       description: '',
       tags: [],
       image: null,
-      joinPolicy: 'anyone',
+      joinPolicy: 'Anyone',
     });
     setCurrentTag('');
     setIsDragOver(false);
@@ -181,19 +181,19 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
 
   const joinPolicyOptions = [
     {
-      value: 'anyone',
+      value: 'Anyone',
       label: 'Anyone can join',
       description: 'Public workspace - anyone can join immediately',
       icon: <PeopleIcon sx={{ fontSize: 20 }} />,
     },
     {
-      value: 'requests',
+      value: 'Requests',
       label: 'Join by request',
       description: 'Users must request to join and be approved',
       icon: <MailIcon sx={{ fontSize: 20 }} />,
     },
     {
-      value: 'invites',
+      value: 'Invites',
       label: 'Invite only',
       description: 'Only invited users can join',
       icon: <LockIcon sx={{ fontSize: 20 }} />,
@@ -392,7 +392,7 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        joinPolicy: e.target.value as 'anyone' | 'requests' | 'invites',
+                        joinPolicy: e.target.value as 'Anyone' | 'Requests' | 'Invites',
                       }))
                     }
                     sx={{ gap: 1 }}

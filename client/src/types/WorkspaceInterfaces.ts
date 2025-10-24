@@ -34,7 +34,7 @@ export interface WorkspaceFormData {
   description: string;
   tags: string[];
   image: File | null;
-  joinPolicy: 'anyone' | 'requests' | 'invites';
+  joinPolicy: 'Anyone' | 'Requests' | 'Invites';
 }
 
 export interface Thread {
