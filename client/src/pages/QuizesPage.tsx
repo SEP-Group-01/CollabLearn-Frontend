@@ -21,7 +21,7 @@ import {
 import Footer from '../components/Footer'
 import SidebarComponent from '../components/SideBar'
 import LazyQuizCard from '../components/LazyQuizCard'
-import { getQuizzes } from '../api/quizApi'
+import { getQuizzes, deleteQuiz } from '../api/quizApi'
 import { isAuthenticated } from '../api/authApi'
 import type { Quiz } from '../types/QuizInterfaces'
 
@@ -94,6 +94,35 @@ const QuizesPage = ({ workspaceId: propWorkspaceId, threadId: propThreadId }: Qu
     } else {
       // Fallback to previous behavior if params not available
       navigate(`/quizzes/${quizId}/review`)
+    }
+  }
+
+  const handleDeleteQuiz = async (quizId: string, quizTitle: string) => {
+    if (!threadId || !workspaceId) {
+      setError('Missing thread or workspace context. Cannot delete quiz.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+      console.log('Deleting quiz:', quizId, quizTitle)
+      
+      await deleteQuiz(threadId, quizId, workspaceId)
+      
+      // Remove the deleted quiz from the list
+      setQuizzesList((prevQuizzes) => prevQuizzes.filter((q) => q.id !== quizId))
+      
+      console.log('Quiz deleted successfully:', quizId)
+    } catch (err: unknown) {
+      console.error('Failed to delete quiz:', err)
+      const message = err instanceof Error ? err.message : String(err)
+      setError(`Failed to delete quiz: ${message}`)
+      
+      // Scroll to top to show error message
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -282,6 +311,7 @@ const QuizesPage = ({ workspaceId: propWorkspaceId, threadId: propThreadId }: Qu
                 userRole={userRole}
                 onAttemptQuiz={handleAttemptQuiz}
                 onReviewAttempt={handleReviewAttempt}
+                onDeleteQuiz={handleDeleteQuiz}
                 formatTime={formatTime}
                 getPerformanceColor={getPerformanceColor}
               />

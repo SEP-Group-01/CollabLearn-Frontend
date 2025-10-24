@@ -87,7 +87,7 @@ const QuizReview: React.FC = () => {
         // Fetch quiz details
         const quizData = await getQuizById(quizId);
         console.log('[QuizReview] Quiz data:', quizData);
-        setQuiz(quizData);
+        setQuiz(quizData as any);
 
         // Fetch user's attempts for this quiz
         const attemptsData = await getMyAttemptsForQuiz(quizId);
@@ -208,104 +208,102 @@ const QuizReview: React.FC = () => {
             </Typography>
           </Box>
 
-          <Grid container spacing={4}>
-            {/* Attempts List */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Your Attempts ({attempts.length})
-                  </Typography>
-                  <Stack spacing={2}>
-                    {attempts.map((attempt, index) => {
-                      const percentage = getPercentage(attempt.marksObtained, attempt.totalMarks || quiz.quiz_questions.reduce((sum, q) => sum + q.marks, 0));
-                      const isSelected = selectedAttempt?.id === attempt.id;
-                      
-                      return (
-                        <Paper
-                          key={attempt.id}
-                          elevation={isSelected ? 3 : 1}
-                          sx={{
-                            p: 2,
-                            cursor: 'pointer',
-                            border: isSelected ? 2 : 1,
-                            borderColor: isSelected ? 'primary.main' : 'divider',
-                            '&:hover': { bgcolor: 'action.hover' }
-                          }}
-                          onClick={() => setSelectedAttempt(attempt)}
-                        >
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                            <Typography variant="subtitle2">
-                              Attempt #{attempt.attemptNumber}
-                            </Typography>
-                            <Chip
-                              label={`${percentage}%`}
-                              color={getPerformanceColor(percentage)}
-                              size="small"
-                            />
-                          </Box>
-                          <Typography variant="body2" color="text.secondary">
-                            Score: {attempt.marksObtained}/{attempt.totalMarks || quiz.quiz_questions.reduce((sum, q) => sum + q.marks, 0)}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Time: {formatTime(attempt.timeTaken)}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Date: {new Date(attempt.created_at).toLocaleDateString()}
-                          </Typography>
-                        </Paper>
-                      );
-                    })}
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Selected Attempt Review */}
-            <Grid size={{ xs: 12, md: 8 }}>
-              {selectedAttempt && (
-                <Card>
-                  <CardContent>
-                    {/* Attempt Summary */}
-                    <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Attempt #{selectedAttempt.attemptNumber} Review
+          {/* Attempts Selection - Horizontal Tabs */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                Your Attempts ({attempts.length})
+              </Typography>
+              <Stack direction="row" spacing={2} sx={{ overflowX: 'auto', pb: 1 }}>
+                {attempts.map((attempt) => {
+                  const percentage = getPercentage(attempt.marksObtained, attempt.totalMarks || quiz.quiz_questions.reduce((sum, q) => sum + q.marks, 0));
+                  const isSelected = selectedAttempt?.id === attempt.id;
+                  
+                  return (
+                    <Paper
+                      key={attempt.id}
+                      elevation={isSelected ? 3 : 1}
+                      sx={{
+                        p: 2,
+                        minWidth: 200,
+                        cursor: 'pointer',
+                        border: isSelected ? 2 : 1,
+                        borderColor: isSelected ? 'primary.main' : 'divider',
+                        bgcolor: isSelected ? 'primary.lighter' : 'background.paper',
+                        '&:hover': { bgcolor: isSelected ? 'primary.lighter' : 'action.hover' }
+                      }}
+                      onClick={() => setSelectedAttempt(attempt)}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                          Attempt #{attempt.attemptNumber}
+                        </Typography>
+                        <Chip
+                          label={`${percentage}%`}
+                          color={getPerformanceColor(percentage)}
+                          size="small"
+                        />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Score: {attempt.marksObtained}/{attempt.totalMarks || quiz.quiz_questions.reduce((sum, q) => sum + q.marks, 0)}
                       </Typography>
-                      <Grid container spacing={2}>
-                        <Grid size={{ xs: 6, sm: 3 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Score color="primary" />
-                            <Box>
-                              <Typography variant="body2" color="text.secondary">Score</Typography>
-                              <Typography variant="h6">
-                                {selectedAttempt.marksObtained}/{selectedAttempt.totalMarks || quiz.quiz_questions.reduce((sum, q) => sum + q.marks, 0)}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </Grid>
-                        <Grid size={{ xs: 6, sm: 3 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <AccessTime color="primary" />
-                            <Box>
-                              <Typography variant="body2" color="text.secondary">Time Taken</Typography>
-                              <Typography variant="h6">{formatTime(selectedAttempt.timeTaken)}</Typography>
-                            </Box>
-                          </Box>
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6 }}>
-                          <Box>
-                            <Typography variant="body2" color="text.secondary">Performance</Typography>
-                            <Chip
-                              label={`${getPercentage(selectedAttempt.marksObtained, selectedAttempt.totalMarks || quiz.quiz_questions.reduce((sum, q) => sum + q.marks, 0))}%`}
-                              color={getPerformanceColor(getPercentage(selectedAttempt.marksObtained, selectedAttempt.totalMarks || quiz.quiz_questions.reduce((sum, q) => sum + q.marks, 0)))}
-                              sx={{ fontSize: '1rem', height: 32 }}
-                            />
-                          </Box>
-                        </Grid>
-                      </Grid>
-                    </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Time: {formatTime(attempt.timeTaken)}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                        {new Date(attempt.created_at).toLocaleDateString()}
+                      </Typography>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            </CardContent>
+          </Card>
 
-                    <Divider sx={{ mb: 3 }} />
+          {/* Selected Attempt Review - Full Width */}
+          {selectedAttempt && (
+            <Card>
+              <CardContent>
+                {/* Attempt Summary */}
+                <Box sx={{ mb: 3, p: 2, bgcolor: 'primary.lighter', borderRadius: 1 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Attempt #{selectedAttempt.attemptNumber} Review
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Score color="primary" />
+                        <Box>
+                          <Typography variant="body2" color="text.secondary">Score</Typography>
+                          <Typography variant="h6">
+                            {selectedAttempt.marksObtained}/{selectedAttempt.totalMarks || quiz.quiz_questions.reduce((sum, q) => sum + q.marks, 0)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AccessTime color="primary" />
+                        <Box>
+                          <Typography variant="body2" color="text.secondary">Time Taken</Typography>
+                          <Typography variant="h6">{formatTime(selectedAttempt.timeTaken)}</Typography>
+                        </Box>
+                      </Box>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 4, md: 6 }}>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">Performance</Typography>
+                        <Chip
+                          label={`${getPercentage(selectedAttempt.marksObtained, selectedAttempt.totalMarks || quiz.quiz_questions.reduce((sum, q) => sum + q.marks, 0))}%`}
+                          color={getPerformanceColor(getPercentage(selectedAttempt.marksObtained, selectedAttempt.totalMarks || quiz.quiz_questions.reduce((sum, q) => sum + q.marks, 0)))}
+                          sx={{ fontSize: '1rem', height: 32 }}
+                        />
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Box>
+
+                <Divider sx={{ mb: 3 }} />
 
                     {/* Questions Review */}
                     <Typography variant="h6" gutterBottom>
@@ -334,12 +332,12 @@ const QuizReview: React.FC = () => {
                                   <Typography variant="subtitle1" gutterBottom>
                                     {question.question_text}
                                   </Typography>
-                                  {question.attachment_url && (
-                                    <Box sx={{ mb: 2 }}>
+                                  {(question.attachment_url || (question as any).image) && (
+                                    <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
                                       <img 
-                                        src={question.attachment_url} 
+                                        src={question.attachment_url || (question as any).image} 
                                         alt="Question image" 
-                                        style={{ maxWidth: '100%', height: 'auto', borderRadius: 8 }}
+                                        style={{ maxWidth: '100%', maxHeight: 400, height: 'auto', borderRadius: 8, objectFit: 'contain' }}
                                       />
                                     </Box>
                                   )}
@@ -352,6 +350,7 @@ const QuizReview: React.FC = () => {
                                     {question.quiz_options.map((option) => {
                                       const isUserSelected = userAnswers.includes(option.id);
                                       const isCorrectOption = option.is_correct;
+                                      const hasImage = option.image_url || (option as any).image;
                                       
                                       let backgroundColor = 'transparent';
                                       let borderColor = 'divider';
@@ -376,37 +375,42 @@ const QuizReview: React.FC = () => {
                                           key={option.id}
                                           variant="outlined"
                                           sx={{
-                                            p: 1.5,
+                                            p: hasImage ? 2 : 1.5,
                                             bgcolor: backgroundColor,
                                             borderColor: borderColor,
                                             color: textColor,
                                             display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1
+                                            flexDirection: 'column',
+                                            gap: hasImage ? 2 : 0,
+                                            minHeight: hasImage ? 450 : 'auto'
                                           }}
                                         >
-                                          <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: 24 }}>
-                                            {option.sequence_letter}.
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ flexGrow: 1 }}>
-                                            {option.text}
-                                          </Typography>
-                                          {option.image_url && (
-                                            <img 
-                                              src={option.image_url} 
-                                              alt="Option image" 
-                                              style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }}
-                                            />
-                                          )}
-                                          {isUserSelected && (
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                              (Your Answer)
+                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: 24 }}>
+                                              {option.sequence_letter}.
                                             </Typography>
-                                          )}
-                                          {isCorrectOption && (
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                              ✓ Correct
+                                            <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                                              {option.text}
                                             </Typography>
+                                            {isUserSelected && (
+                                              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                                (Your Answer)
+                                              </Typography>
+                                            )}
+                                            {isCorrectOption && (
+                                              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                                ✓ Correct
+                                              </Typography>
+                                            )}
+                                          </Box>
+                                          {hasImage && (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexGrow: 1, width: '100%' }}>
+                                              <img 
+                                                src={option.image_url || (option as any).image} 
+                                                alt="Option image" 
+                                                style={{ width: '100%', height: 'auto', maxHeight: 400, objectFit: 'contain', borderRadius: 4 }}
+                                              />
+                                            </Box>
                                           )}
                                         </Paper>
                                       );
@@ -422,8 +426,6 @@ const QuizReview: React.FC = () => {
                   </CardContent>
                 </Card>
               )}
-            </Grid>
-          </Grid>
         </Container>
       </Box>
     </Box>

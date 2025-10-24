@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useInView } from 'react-intersection-observer'
  import {
   Box,
@@ -15,6 +16,13 @@ import { useInView } from 'react-intersection-observer'
   ListItemText,
   ListItemIcon,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  TextField,
+  IconButton,
 } from '@mui/material'
 import {
   Quiz as QuizIcon,
@@ -29,7 +37,8 @@ import {
   Assignment as AssignmentIcon,
   Refresh as RefreshIcon,
   PlayCircle as PlayCircleIcon,
-  TrendingUp as TrendingUpIcon
+  TrendingUp as TrendingUpIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material'
 
 import QuizSkeleton from '../components/QuizSkelton'
@@ -41,7 +50,8 @@ const LazyQuizCard = ({
   totalQuizzes, 
   userRole: _userRole, 
   onAttemptQuiz, 
-  onReviewAttempt, 
+  onReviewAttempt,
+  onDeleteQuiz,
   formatTime, 
   getPerformanceColor 
 }: LazyQuizCardProps) => {
@@ -50,6 +60,42 @@ const LazyQuizCard = ({
     threshold: 0.1,
     rootMargin: '100px 0px' // Start loading 100px before the element comes into view
   })
+
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const userRole = _userRole?.toLowerCase() || ''
+  const canDelete = userRole === 'admin' || userRole === 'moderator'
+
+  const handleDeleteClick = () => {
+    setOpenDeleteDialog(true)
+    setDeleteConfirmText('')
+  }
+
+  const handleDeleteCancel = () => {
+    setOpenDeleteDialog(false)
+    setDeleteConfirmText('')
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (deleteConfirmText !== quiz.title) {
+      return // Don't proceed if the title doesn't match
+    }
+
+    setIsDeleting(true)
+    try {
+      if (onDeleteQuiz) {
+        await onDeleteQuiz(quiz.id, quiz.title)
+      }
+      setOpenDeleteDialog(false)
+    } catch (error) {
+      console.error('Error deleting quiz:', error)
+      // Error handling is done in the parent component
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   // Enhanced quiz status logic using studentAttempts data
   const getQuizStatus = () => {
@@ -131,21 +177,33 @@ const LazyQuizCard = ({
           <Box sx={{ flex: 1 }}>
             <Card sx={{ height: '100%' }}>
               <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                  <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48, mr: 2 }}>
-                    <QuizIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-                      {quiz.title}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                      <PersonIcon fontSize="small" color="action" sx={{ mr: 0.5 }} />
-                      <Typography variant="body2" color="text.secondary">
-                        Created by {quiz.creator || 'Unknown'}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                    <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48, mr: 2 }}>
+                      <QuizIcon />
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
+                        {quiz.title}
                       </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                        <PersonIcon fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                        <Typography variant="body2" color="text.secondary">
+                          Created by {quiz.creator || 'Unknown'}
+                        </Typography>
+                      </Box>
                     </Box>
                   </Box>
+                  {canDelete && onDeleteQuiz && (
+                    <IconButton
+                      onClick={handleDeleteClick}
+                      color="error"
+                      sx={{ ml: 2 }}
+                      title="Delete Quiz"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  )}
                 </Box>
 
                 <Typography variant="body1" sx={{ mb: 3, lineHeight: 1.6 }}>
@@ -507,6 +565,50 @@ const LazyQuizCard = ({
           />
         </Box>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={openDeleteDialog} onClose={handleDeleteCancel} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Quiz</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Are you sure you want to delete this quiz? This action cannot be undone.
+            All questions, answers, and images associated with this quiz will be permanently deleted.
+          </DialogContentText>
+          <DialogContentText sx={{ mb: 2, fontWeight: 600 }}>
+            To confirm, please type the quiz title: <strong>{quiz.title}</strong>
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Quiz Title"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder="Type the quiz title to confirm"
+            error={deleteConfirmText.length > 0 && deleteConfirmText !== quiz.title}
+            helperText={
+              deleteConfirmText.length > 0 && deleteConfirmText !== quiz.title
+                ? "Title doesn't match"
+                : ""
+            }
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={isDeleting}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            color="error"
+            variant="contained"
+            disabled={deleteConfirmText !== quiz.title || isDeleting}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete Quiz'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

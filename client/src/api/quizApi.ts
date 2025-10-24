@@ -209,7 +209,7 @@ export const getQuizById = async (quizId: string): Promise<Quiz> => {
 /**
  * Create a new quiz in a thread
  * POST /threads/:threadId/quizzes/create
- * quizData should be a plain object (JSON) containing title, description, timeAllocated, totalMarks, tags, resourceTags, etc.
+ * quizData should be FormData containing quizData (JSON string) and image files
  */
 export const createQuiz = async (threadId: string, quizData: Partial<Quiz> | FormData) => {
   const token = getAccessToken()
@@ -217,22 +217,34 @@ export const createQuiz = async (threadId: string, quizData: Partial<Quiz> | For
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
   }
+  // Don't set Content-Type for FormData - let browser set it with boundary
   if (!isFormData) headers['Content-Type'] = 'application/json'
 
   try {
-    // Use the correct API Gateway endpoint that actually works
-    const response = await axios.post(`${API_URL}/quizzes/thread/${threadId}`, quizData, {
+    // Use the correct endpoint that handles FormData with images
+    const endpoint = isFormData 
+      ? `${API_URL}/threads/${threadId}/quizzes/create`
+      : `${API_URL}/quizzes/thread/${threadId}`
+    
+    console.log('[createQuiz] Posting to:', endpoint)
+    console.log('[createQuiz] Is FormData:', isFormData)
+    
+    const response = await axios.post(endpoint, quizData, {
       headers,
     })
     return response.data
   } catch (error: any) {
     console.error('[createQuiz] Backend error:', error)
+    console.error('[createQuiz] Error response:', error.response?.data)
     
     // Provide more specific error messages
     if (error.response?.status === 500) {
-      throw new Error('Server error: Please check if your backend database is connected and running properly.')
+      const message = error.response?.data?.message || 'Server error'
+      throw new Error(`Server error: ${message}`)
     } else if (error.response?.status === 401) {
       throw new Error('Authentication error: Please log in again.')
+    } else if (error.response?.status === 403) {
+      throw new Error('Permission denied: Only admins and moderators can create quizzes.')
     } else if (error.response?.status === 404) {
       throw new Error('API endpoint not found: Please check if your backend server has the quiz creation endpoint.')
     } else {
@@ -258,12 +270,13 @@ export const updateQuiz = async (quizId: string, quizData: Partial<Quiz>) => {
 
 /**
  * Delete a quiz
- * DELETE /quizzes/:quizId
+ * DELETE /threads/:threadId/quizzes/:quizId
  */
-export const deleteQuiz = async (quizId: string) => {
+export const deleteQuiz = async (threadId: string, quizId: string, workspaceId: string) => {
   const token = getAccessToken()
-  const response = await axios.delete(`${API_URL}/quizzes/${quizId}`, {
+  const response = await axios.delete(`${API_URL}/threads/${threadId}/quizzes/${quizId}`, {
     headers: { Authorization: `Bearer ${token}` },
+    data: { workspaceId }, // Send workspaceId in the request body
   })
   return response.data
 }

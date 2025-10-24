@@ -27,6 +27,7 @@ export interface LazyQuizCardProps {
   userRole: string
   onAttemptQuiz: (quizId: string) => void
   onReviewAttempt: (quizId: string, attemptNumber: number) => void
+  onDeleteQuiz?: (quizId: string, quizTitle: string) => void
   formatTime: (minutes: number) => string
   getPerformanceColor: (marks: number, total: number) => 'success' | 'warning' | 'error'
 }
@@ -53,12 +54,15 @@ export interface QuizDetails {
     description: string;
     allocatedTime: number;
     selectedResources: string[];
+    topics?: string;
+    tags?: string[];
+    resourceTags?: string[];
 }
 
 export interface DragDropImageUploadProps {
     onImageUpload: (file: File) => void;
-    currentImage: File | null;
-    currentImageUrl?: string | null; // Add support for existing image URLs
+    currentImage: File | string | null; // Support File objects, URL strings, or null
+    currentImageUrl?: string | null; // Deprecated - use currentImage instead
     label: string;
     fullWidth?: boolean;
     height?: string;

@@ -375,24 +375,79 @@ const CreateQuiz: React.FC = () => {
             // Determine threadId: prefer navigation state, then route params
             const stateThreadId = (location.state as any)?.threadId
             const threadId = stateThreadId || params.threadId
+            const workspaceId = (location.state as any)?.workspaceId || params.workspaceId
+            
             if (!threadId) {
                 throw new Error('Thread ID is missing. Cannot create quiz without thread context.')
             }
 
-            // Build payload expected by backend
-            const payload = {
+            // Build quiz data
+            const quizData = {
                 title: quizDetails.title,
                 description: quizDetails.description,
-                timeAllocated: quizDetails.allocatedTime, // Map allocatedTime to timeAllocated
+                timeAllocated: quizDetails.allocatedTime,
                 topics: quizDetails.topics,
                 selectedResources: quizDetails.selectedResources,
                 tags: quizDetails.tags,
                 resourceTags: quizDetails.resourceTags,
-                questions,
+                questions: questions.map(q => ({
+                    questionId: q.id, // Frontend-generated temporary ID for mapping
+                    questionText: q.questionText,
+                    marks: q.marks,
+                    image: q.image instanceof File ? null : q.image, // Don't include File objects in JSON
+                    options: q.options.map(opt => ({
+                        optionId: opt.id, // Frontend-generated temporary ID for mapping
+                        text: opt.text,
+                        isCorrect: opt.isCorrect,
+                        sequenceLetter: opt.sequenceLetter,
+                        image: opt.image instanceof File ? null : opt.image, // Don't include File objects in JSON
+                    }))
+                }))
+            };
+
+            // Create FormData to send images along with quiz data
+            const formData = new FormData();
+            
+            // Add metadata about image mappings to quiz data
+            const imageMapping = {
+                questions: {} as Record<string, number>, // maps questionId to index in questionImages array
+                options: {} as Record<string, number>,   // maps optionId to index in optionImages array
+            };
+            
+            let questionImageIndex = 0;
+            let optionImageIndex = 0;
+            
+            // Add question images
+            questions.forEach((question) => {
+                if (question.image instanceof File) {
+                    imageMapping.questions[question.id] = questionImageIndex;
+                    formData.append('questionImages', question.image);
+                    questionImageIndex++;
+                }
+
+                // Add option images
+                question.options.forEach((option) => {
+                    if (option.image instanceof File) {
+                        imageMapping.options[option.id] = optionImageIndex;
+                        formData.append('optionImages', option.image);
+                        optionImageIndex++;
+                    }
+                });
+            });
+            
+            // Include image mapping in quiz data
+            const quizDataWithMapping = {
+                ...quizData,
+                imageMapping,
+            };
+            
+            formData.append('quizData', JSON.stringify(quizDataWithMapping));
+            if (workspaceId) {
+                formData.append('workspaceId', workspaceId);
             }
 
-            // Call the API to create the quiz with correct parameter order
-            const response = await createQuiz(threadId, payload as any);
+            // Call the API to create the quiz with FormData
+            const response = await createQuiz(threadId, formData);
             
             console.log('Quiz creation response:', response);
             
@@ -730,7 +785,7 @@ const CreateQuiz: React.FC = () => {
                                         {question.image && (
                                             <Box sx={{ mb: 2 }}>
                                                 <img 
-                                                    src={URL.createObjectURL(question.image)} 
+                                                    src={question.image instanceof File ? URL.createObjectURL(question.image) : question.image} 
                                                     alt="Question" 
                                                     style={{ maxWidth: '300px', maxHeight: '200px', borderRadius: '8px' }}
                                                 />
@@ -771,7 +826,7 @@ const CreateQuiz: React.FC = () => {
                                                     </Typography>
                                                     {option.image && (
                                                         <img 
-                                                            src={URL.createObjectURL(option.image)} 
+                                                            src={option.image instanceof File ? URL.createObjectURL(option.image) : option.image} 
                                                             alt={`Option ${option.sequenceLetter}`}
                                                             style={{ 
                                                                 width: '40px', 

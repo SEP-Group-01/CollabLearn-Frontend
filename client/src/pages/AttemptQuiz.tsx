@@ -24,7 +24,9 @@ import {
 } from '@mui/icons-material';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import SidebarComponent from '../components/SideBar';
-import { getQuizById, startQuizAttempt, getActiveAttempt, submitQuizAttempt } from '../api/quizApi';
+import { getQuizById, startQuizAttempt, getActiveAttempt } from '../api/quizApi';
+import { getAccessToken, getUserData } from '../api/authApi';
+import quizSocketService from '../services/quizSocketService';
 import type { Quiz, Question } from '../types/QuizInterfaces';
 
 const AttemptQuiz: React.FC = () => {
@@ -35,7 +37,7 @@ const AttemptQuiz: React.FC = () => {
 	const [collapsed, setCollapsed] = useState(false);
 	const [current, setCurrent] = useState(0);
 	const [answers, setAnswers] = useState<{ [qid: string]: string[] }>({});
-	const [timeLeft, setTimeLeft] = useState(-1); // Use -1 to indicate not initialized
+	const [timeLeft, setTimeLeft] = useState(-1); // Server-authoritative timer
 	const [showFinish, setShowFinish] = useState(false);
 	const [showWarn, setShowWarn] = useState(false);
 	const [finished, setFinished] = useState(false);
@@ -45,14 +47,16 @@ const AttemptQuiz: React.FC = () => {
 	const [questions, setQuestions] = useState<Question[]>([]);
 	const [submitting, setSubmitting] = useState(false);
 	const [attemptId, setAttemptId] = useState<string | null>(null);
+	const [userId, setUserId] = useState<string | null>(null);
+	const [wsConnected, setWsConnected] = useState(false);
 	const timerRef = useRef<NodeJS.Timeout | null>(null);
 	
 	// Get quiz ID from URL params or location state
 	const quizId = urlQuizId || location.state?.quizId;
 
-	// Fetch quiz data on component mount
+	// Initialize WebSocket connection and fetch quiz data
 	useEffect(() => {
-		const fetchQuizData = async () => {
+		const initializeQuiz = async () => {
 			if (!quizId) {
 				setError('No quiz ID provided');
 				setLoading(false);
@@ -62,36 +66,45 @@ const AttemptQuiz: React.FC = () => {
 			try {
 				setLoading(true);
 				
-				// Fetch quiz details first
+				// Get user data first
+				const user = await getUserData();
+				const currentUserId = user?.id;
+				if (!currentUserId) {
+					throw new Error('Unable to get user ID');
+				}
+				setUserId(currentUserId);
+				console.log('[AttemptQuiz] User ID:', currentUserId);
+				
+				// Connect to WebSocket
+				const token = getAccessToken();
+				if (!token) {
+					throw new Error('No authentication token available');
+				}
+				
+				await quizSocketService.connect(token);
+				console.log('[AttemptQuiz] WebSocket connected');
+				setWsConnected(true);
+				
+				// Fetch quiz details
 				console.log('[AttemptQuiz] Fetching quiz data for quizId:', quizId);
 				const quizData = await getQuizById(quizId);
 				console.log('[AttemptQuiz] Fetched quiz data:', quizData);
 				
 				setQuiz(quizData);
 				
-				// Transform questions to match the expected format
-				console.log('[AttemptQuiz] Raw quiz data:', quizData);
-				console.log('[AttemptQuiz] Questions array:', quizData.questions);
-				console.log('[AttemptQuiz] Quiz questions array:', (quizData as any).quiz_questions);
-				
+				// Transform questions (is_correct should now be excluded from backend)
 				const questionsArray = (quizData as any).quiz_questions || quizData.questions || [];
-				console.log('[AttemptQuiz] Using questions array:', questionsArray);
+				console.log('[AttemptQuiz] Questions array:', questionsArray);
 				
 				const transformedQuestions: Question[] = questionsArray.map((q: any, index: number) => {
-					console.log(`[AttemptQuiz] Processing question ${index}:`, q);
-					
-					const options = (q.quiz_options || q.answer_option || q.options || []).map((opt: any, optIndex: number) => {
-						console.log(`[AttemptQuiz] Processing option ${optIndex}:`, opt);
-						return {
-							id: opt.id || `opt${optIndex}`,
-							sequenceLetter: opt.sequence_letter || opt.sequenceLetter || String.fromCharCode(65 + optIndex), // A, B, C, D
-							text: opt.text || opt.answer || opt.option_text || '',
-							image: opt.image || opt.image_url || null,
-							isCorrect: opt.is_correct !== undefined ? opt.is_correct : (opt.isCorrect || false)
-						};
-					});
-					
-					console.log(`[AttemptQuiz] Transformed options for question ${index}:`, options);
+					const options = (q.quiz_options || q.answer_option || q.options || []).map((opt: any, optIndex: number) => ({
+						id: opt.id || `opt${optIndex}`,
+						sequenceLetter: opt.sequence_letter || opt.sequenceLetter || String.fromCharCode(65 + optIndex),
+						text: opt.text || opt.answer || opt.option_text || '',
+						image: opt.image || opt.image_url || null,
+						// is_correct should NOT be here anymore
+						isCorrect: false // Default to false for security
+					}));
 					
 					return {
 						id: q.id || `q${index}`,
@@ -106,113 +119,85 @@ const AttemptQuiz: React.FC = () => {
 				console.log('[AttemptQuiz] Final transformed questions:', transformedQuestions);
 				setQuestions(transformedQuestions);
 				
-				// Set timer - convert minutes to seconds  
-				const timeInSeconds = (quizData.allocated_time || quizData.timeAllocated || 30) * 60;
-				console.log('[AttemptQuiz] Setting timer to:', timeInSeconds, 'seconds');
-				setTimeLeft(timeInSeconds);
-				
-		// Check for active attempt first, then start new one if needed
-		try {
-			console.log('[AttemptQuiz] Checking for active attempt...');
-			
-			try {
-				// First try to get an active attempt
-				const activeAttempt = await getActiveAttempt(quizId);
-				console.log('[AttemptQuiz] Found active attempt:', activeAttempt);
-				
-				setAttemptId(activeAttempt.attemptId);
-				
-				// Use the remaining time from the active attempt
-				if (activeAttempt.timeRemaining !== undefined) {
-					console.log('[AttemptQuiz] Resuming with remaining time:', activeAttempt.timeRemaining, 'seconds');
-					setTimeLeft(activeAttempt.timeRemaining);
+				// Check for active attempt or start new one
+				let currentAttemptId: string;
+				try {
+					const activeAttempt = await getActiveAttempt(quizId);
+					console.log('[AttemptQuiz] Found active attempt:', activeAttempt);
+					console.log('[AttemptQuiz] Saved answers from backend:', activeAttempt.savedAnswers);
+					console.log('[AttemptQuiz] Number of saved answers:', Object.keys(activeAttempt.savedAnswers || {}).length);
+					currentAttemptId = activeAttempt.attemptId;
+					setAttemptId(currentAttemptId);
+					
+					// Load saved answers if resuming
+					if (activeAttempt.savedAnswers && Object.keys(activeAttempt.savedAnswers).length > 0) {
+						console.log('[AttemptQuiz] Restoring saved answers:', activeAttempt.savedAnswers);
+						setAnswers(activeAttempt.savedAnswers);
+					} else {
+						console.log('[AttemptQuiz] No saved answers to restore');
+					}
+				} catch (noActiveError) {
+					console.log('[AttemptQuiz] No active attempt found, starting new attempt...');
+					const startResult = await startQuizAttempt(quizId);
+					console.log('[AttemptQuiz] Successfully started new quiz attempt:', startResult);
+					currentAttemptId = startResult.attemptId;
+					setAttemptId(currentAttemptId);
 				}
 				
-			} catch (noActiveError) {
-				console.log('[AttemptQuiz] No active attempt found, starting new attempt...');
+				// Join quiz attempt via WebSocket (this starts the server timer)
+				console.log('[AttemptQuiz] Joining quiz attempt via WebSocket:', currentAttemptId);
+				await quizSocketService.joinQuizAttempt(currentAttemptId, quizId, currentUserId);
 				
-				// No active attempt, start a new one
-				const startResult = await startQuizAttempt(quizId);
-				console.log('[AttemptQuiz] Successfully started new quiz attempt:', startResult);
-				setAttemptId(startResult.attemptId);
+				// Setup WebSocket listeners
+				quizSocketService.onTimeUpdate((data) => {
+					console.log('[AttemptQuiz] Server time update:', data);
+					// Backend sends {attemptId, timeRemaining} object
+					const timeRemaining = typeof data === 'number' ? data : data.timeRemaining;
+					setTimeLeft(timeRemaining);
+				});
 				
-				// Use the time from the backend if available
-				if (startResult.timeRemaining !== undefined) {
-					console.log('[AttemptQuiz] Using backend timer:', startResult.timeRemaining, 'seconds');
-					setTimeLeft(startResult.timeRemaining);
-				}
-			}
-			
-		} catch (attemptError) {
-			console.error('[AttemptQuiz] Error with quiz attempt:', attemptError);
-			setError('Failed to start or resume quiz attempt. Please try again.');
-		}			} catch (err) {
-				console.error('[AttemptQuiz] Error fetching quiz:', err);
+				quizSocketService.onTimeWarning((data) => {
+					console.log('[AttemptQuiz] Time warning:', data);
+					// data contains {attemptId, message, timeRemaining}
+					// Optional: Show warning notification with data.message
+				});
+				
+				quizSocketService.onQuizAutoSubmitted((data) => {
+					console.log('[AttemptQuiz] Quiz auto-submitted by server:', data);
+					setFinished(true);
+					setSubmitting(false);
+					// Navigate back to previous page (quizzes list)
+					setTimeout(() => {
+						navigate(-1);
+					}, 2000); // Show "Quiz Submitted" message for 2 seconds
+				});
+				
+				quizSocketService.onAnswerSubmitted((data) => {
+					console.log('[AttemptQuiz] Answer saved on server:', data);
+				});
+				
+			} catch (err) {
+				console.error('[AttemptQuiz] Error initializing quiz:', err);
 				setError('Failed to load quiz. Please try again.');
 			} finally {
 				setLoading(false);
 			}
 		};
 
-		fetchQuizData();
+		initializeQuiz();
+		
+		// Cleanup on unmount
+		return () => {
+			if (quizSocketService.isConnected()) {
+				quizSocketService.leaveQuizAttempt();
+			}
+			quizSocketService.disconnect();
+		};
 	}, [quizId]);
 
-	// Timer effect - only start timer once timeLeft is properly initialized
-	useEffect(() => {
-		if (timeLeft > 0 && !finished && !submitting) {
-			console.log('[AttemptQuiz] Starting timer with', timeLeft, 'seconds');
-			timerRef.current = setInterval(() => {
-				setTimeLeft((prevTime) => {
-					const newTime = prevTime > 0 ? prevTime - 1 : 0;
-					
-					// Auto-submit when time reaches 0
-					if (newTime === 0 && !finished && !submitting) {
-						console.log('[AttemptQuiz] Time expired, auto-submitting quiz');
-						setTimeout(() => confirmFinish(), 100); // Small delay to avoid state conflicts
-					}
-					
-					return newTime;
-				});
-			}, 1000);
-		} else if (timeLeft === 0 && timeLeft !== -1) {
-			// Clear timer when time is up
-			if (timerRef.current) {
-				clearInterval(timerRef.current);
-				timerRef.current = null;
-			}
-		}
-		
-		return () => {
-			if (timerRef.current) {
-				clearInterval(timerRef.current);
-			}
-		};
-	}, [timeLeft, finished, submitting]);
-
-	// Periodic server sync to check if attempt has expired on server side
-	useEffect(() => {
-		if (!attemptId || attemptId.startsWith('dummy-') || finished || submitting) return;
-
-		const syncInterval = setInterval(async () => {
-			try {
-				const activeAttempt = await getActiveAttempt(quizId!);
-				
-				// Update client time with server time if there's a significant difference
-				const serverTime = activeAttempt.timeRemaining;
-				if (Math.abs(serverTime - timeLeft) > 5) { // 5 second tolerance
-					console.log('[AttemptQuiz] Syncing time with server:', serverTime);
-					setTimeLeft(serverTime);
-				}
-				
-			} catch (error) {
-				// If server says no active attempt, the quiz has expired
-				console.log('[AttemptQuiz] Server indicates quiz has expired');
-				setTimeLeft(0);
-			}
-		}, 30000); // Check every 30 seconds
-
-		return () => clearInterval(syncInterval);
-	}, [attemptId, quizId, timeLeft, finished, submitting]);
+	// Note: Timer is now managed by the WebSocket server
+	// The server sends 'time-update' events every second
+	// No need for client-side setInterval anymore
 
 	const handleOptionToggle = (qid: string, oid: string) => {
 		setAnswers((prev) => {
@@ -223,6 +208,26 @@ const AttemptQuiz: React.FC = () => {
 			} else {
 				nextAns = [...prevAns, oid];
 			}
+			
+			// Submit answer in real-time to server
+			const question = questions.find(q => q.id === qid);
+			if (question && nextAns.length > 0) {
+				// Convert option IDs to sequence letters for backend
+				const selectedSequenceLetters = nextAns
+					.map(optId => {
+						const option = question.options.find(o => o.id === optId);
+						return option?.sequenceLetter.toLowerCase();
+					})
+					.filter(Boolean) as string[];
+				
+				console.log('[AttemptQuiz] Submitting answer in real-time:', {
+					questionId: qid,
+					selectedOptions: selectedSequenceLetters
+				});
+				
+				quizSocketService.submitAnswer(qid, selectedSequenceLetters);
+			}
+			
 			return { ...prev, [qid]: nextAns };
 		});
 	};
@@ -251,9 +256,8 @@ const AttemptQuiz: React.FC = () => {
 	};
 
 	const confirmFinish = async () => {
-		// Prevent submission if quiz is not loaded yet
-		if (questions.length === 0) {
-			console.log('[AttemptQuiz] No questions loaded, aborting submission');
+		if (questions.length === 0 || !attemptId || !userId) {
+			console.log('[AttemptQuiz] Cannot submit: missing required data');
 			return;
 		}
 
@@ -262,68 +266,21 @@ const AttemptQuiz: React.FC = () => {
 		setShowWarn(false);
 		
 		try {
-			console.log('[AttemptQuiz] Starting quiz submission to backend...');
-			console.log('[AttemptQuiz] Current answers:', answers);
-			console.log('[AttemptQuiz] Questions:', questions);
+			console.log('[AttemptQuiz] Submitting quiz via WebSocket...');
 			
-			// Use the existing attemptId (should already be set from component initialization)
-			let realAttemptId = attemptId;
+			// Submit via WebSocket - answers already saved in real-time
+			await quizSocketService.submitQuiz();
 			
-			if (!realAttemptId || realAttemptId.startsWith('dummy-')) {
-				setError('No valid quiz attempt found. Please refresh and try again.');
-				setSubmitting(false);
-				return;
-			}
-			
-			// Step 2: Prepare answers in the expected format for backend
-			const formattedAnswers = questions
-				.filter(question => answers[question.id] && answers[question.id].length > 0)
-				.map((question) => ({
-					questionId: question.id,
-					selectedOptionIds: answers[question.id]
-				}));
-
-			console.log('[AttemptQuiz] Formatted answers for backend:', formattedAnswers);
-			
-			// Step 3: Submit the attempt to backend
-			if (realAttemptId && !realAttemptId.startsWith('dummy-')) {
-				console.log('[AttemptQuiz] Step 3: Submitting to backend with attemptId:', realAttemptId);
-				
-				const attemptData = {
-					attemptId: realAttemptId,
-					answers: formattedAnswers
-				};
-				
-				const result = await submitQuizAttempt(quizId!, attemptData);
-				console.log('[AttemptQuiz] Backend submission result:', result);
-			} else {
-				console.log('[AttemptQuiz] No valid attemptId, submission will be local only');
-			}
-			
-			// Calculate score for display
-			let totalCorrect = 0;
-			let totalQuestions = questions.length;
-			
-			questions.forEach(question => {
-				const userAnswers = answers[question.id] || [];
-				const correctOptions = question.options.filter(opt => opt.isCorrect);
-				const correctIds = correctOptions.map(opt => opt.id);
-				
-				// Check if user selected exactly the correct options
-				const isCorrect = userAnswers.length === correctIds.length && 
-					userAnswers.every(id => correctIds.includes(id)) &&
-					correctIds.every(id => userAnswers.includes(id));
-				
-				if (isCorrect) totalCorrect++;
-			});
-			
-			console.log(`[AttemptQuiz] Final Score: ${totalCorrect}/${totalQuestions}`);
-			
+			console.log('[AttemptQuiz] Quiz submitted successfully');
 			setFinished(true);
-			timerRef.current && clearInterval(timerRef.current);
+			
+			// Navigate back to previous page after showing success message
+			setTimeout(() => {
+				navigate(-1);
+			}, 2000);
 			
 		} catch (error) {
-			console.error('[AttemptQuiz] Error submitting quiz attempt:', error);
+			console.error('[AttemptQuiz] Error submitting quiz:', error);
 			setError('Failed to submit quiz. Please try again.');
 			setSubmitting(false);
 		}
@@ -439,20 +396,24 @@ const AttemptQuiz: React.FC = () => {
 													cursor: 'pointer',
 													'&:hover': { boxShadow: 3 },
 													display: 'flex',
-													alignItems: 'center',
-													minHeight: 64
+													flexDirection: 'column',
+													minHeight: opt.image ? 450 : 64
 												}}
 												onClick={() => handleOptionToggle(q.id, opt.id)}
 											>
-												<CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-													<Checkbox checked={selected.includes(opt.id)} color="primary" />
-													<Typography sx={{ flexGrow: 1 }}>{opt.sequenceLetter}. {opt.text}</Typography>
+												<CardContent sx={{ display: 'flex', flexDirection: 'column', width: '100%', p: opt.image ? 2 : 1.5, flexGrow: 1 }}>
+													<Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: opt.image ? 2 : 0 }}>
+														<Checkbox checked={selected.includes(opt.id)} color="primary" />
+														<Typography sx={{ flexGrow: 1 }}>{opt.sequenceLetter}. {opt.text}</Typography>
+													</Box>
 													{opt.image && (
-														<img 
-															src={typeof opt.image === 'string' ? opt.image : URL.createObjectURL(opt.image)} 
-															alt={opt.sequenceLetter} 
-															style={{ width: 80, height: 80, borderRadius: 8, objectFit: 'contain' }} 
-														/>
+														<Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexGrow: 1, width: '100%' }}>
+															<img 
+																src={typeof opt.image === 'string' ? opt.image : URL.createObjectURL(opt.image)} 
+																alt={opt.sequenceLetter} 
+																style={{ width: '100%', height: 'auto', maxHeight: 400, borderRadius: 8, objectFit: 'contain' }} 
+															/>
+														</Box>
 													)}
 												</CardContent>
 											</Card>
