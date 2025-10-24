@@ -23,6 +23,7 @@ import VerifyEmailPage from './pages/VerifyEmailPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import DocumentQuery from './pages/DocumentQuery'
 import WorkspaceSearchResults from './pages/WorkspaceSearchResults'
+import MyWorkspaces from './pages/MyWorkspaces'
 import StudyPlanGenerationPage from './pages/StudyPlanGenerationPage'
 import GroupManagePage from './pages/GroupManagePage';
 import DocumentDetailsPage from './pages/DocumentDetailsPage';
@@ -44,6 +45,7 @@ const App = () => {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           {/* <Route path="/dashboard" element={<DashboardPage />} /> */}
           <Route path="/editor" element={<CollaborativeEditor />} />
+          <Route path="/my-workspaces" element={<MyWorkspaces />} />
           <Route path="/workspaces-list" element={<WorkspaceSearchResults />} />
           <Route path="/workspaces-list/:search" element={<WorkspaceSearchResults />} />
           <Route path="/workspace/:workspaceId" element={<Workspace />} />

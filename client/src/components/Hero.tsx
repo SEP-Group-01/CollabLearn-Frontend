@@ -6,14 +6,7 @@ import SearchBar from "./SearchBar";
 import CreateWorkspaceModal from "./CreateWorkspaceModal";
 import { assets } from "../assets/assets";
 import { isAuthenticated } from "../api/authApi";
-
-interface WorkspaceFormData {
-  title: string;
-  description: string;
-  tags: string[];
-  image: File | null;
-  joinPolicy: 'anyone' | 'requests' | 'invites';
-}
+import type { WorkspaceFormData } from "../types/WorkspaceInterfaces";
 
 const Hero = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -211,6 +204,36 @@ const Hero = () => {
             flexWrap: "wrap" 
           }}
         >
+          {isLoggedIn && (
+            <motion.div variants={buttonVariants}>
+              <Button
+                variant="outlined"
+                onClick={() => navigate("/my-workspaces")}
+                sx={{
+                  borderColor: "primary.main",
+                  color: "primary.main",
+                  bgcolor: "transparent",
+                  px: 4,
+                  py: 1.5,
+                  borderRadius: "999px",
+                  fontSize: "1.125rem",
+                  fontWeight: 500,
+                  textTransform: "none",
+                  borderWidth: 2,
+                  "&:hover": { 
+                    borderColor: "primary.dark",
+                    bgcolor: "rgba(59, 130, 246, 0.05)",
+                    borderWidth: 2,
+                  },
+                }}
+                component={motion.button}
+                whileHover="hover"
+                whileTap="tap"
+              >
+                My Workspaces
+              </Button>
+            </motion.div>
+          )}
           <motion.div variants={buttonVariants}>
             <Button
               variant="contained"

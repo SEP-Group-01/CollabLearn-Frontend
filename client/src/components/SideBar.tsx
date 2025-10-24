@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
+import { Sidebar, Menu, MenuItem } from "react-pro-sidebar";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { Box } from "@mui/material";
@@ -13,11 +13,12 @@ import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
 import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
-import { logout } from "../api/authApi";
+import { logout, isAuthenticated, getAccessToken } from "../api/authApi";
 
 interface SidebarMenuItemProps {
   title: string;
@@ -164,22 +165,27 @@ const SidebarComponent = ({ collapsed, setCollapsed }: SidebarComponentProps) =>
             collapsed={collapsed}
           />
 
-          {/* Workspaces submenu */}
-          <SubMenu
-            label={!collapsed ? "Workspaces" : ""}
-            icon={<GroupsOutlinedIcon sx={{ color: "white" }} />}
-            style={{ color: "white" }}
-            defaultOpen={collapsed}
-          >
+          {/* My Workspaces - Only show if authenticated */}
+          {isAuthenticated() && getAccessToken() && (
             <SidebarMenuItem
-              title="Registered Workspaces"
-              to="/Workspaces-list"
-              icon={null}
+              title="My Workspaces"
+              to="/my-workspaces"
+              icon={<GroupsOutlinedIcon sx={{ color: "white" }} />}
               selected={selected}
               setSelected={setSelected}
               collapsed={collapsed}
             />
-          </SubMenu>
+          )}
+
+          {/* Browse Workspaces */}
+          <SidebarMenuItem
+            title="Browse Workspaces"
+            to="/Workspaces-list"
+            icon={<SearchOutlinedIcon sx={{ color: "white" }} />}
+            selected={selected}
+            setSelected={setSelected}
+            collapsed={collapsed}
+          />
 
           <SidebarMenuItem
             title="Generate Study Plan"
