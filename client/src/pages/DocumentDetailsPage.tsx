@@ -48,6 +48,7 @@ import {
   Save,
   Cancel,
   Checklist as ChecklistIcon,
+  FullscreenExit
 } from "@mui/icons-material";
 import ResourceProgressTracker from '../components/ResourceProgressTracker';
 import { useResourceActions } from '../hooks/useResourceActions';
@@ -509,49 +510,6 @@ export default function DocumentDetailsPage() {
               </Typography>
             </Box>
           </Box>
-          
-          <Box display="flex" alignItems="center" gap={1}>
-            <Tooltip title="Search in document">
-              <IconButton 
-                sx={{ color: 'white' }} 
-                onClick={handleSearchInDocument}
-              >
-                <Search />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title={isBookmarked ? "Remove bookmark" : "Bookmark"}>
-              <IconButton 
-                sx={{ color: 'white' }} 
-                onClick={handleToggleBookmark}
-              >
-                {isBookmarked ? <Bookmark /> : <BookmarkBorder />}
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Download">
-              <IconButton 
-                sx={{ color: 'white' }} 
-                onClick={handleDownload}
-              >
-                <Download />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Share">
-              <IconButton 
-                sx={{ color: 'white' }} 
-                onClick={handleShare}
-              >
-                <Share />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="More options">
-              <IconButton 
-                sx={{ color: 'white' }} 
-                onClick={handleMenuOpen}
-              >
-                <MoreVert />
-              </IconButton>
-            </Tooltip>
-          </Box>
         </Box>
       </Paper>
       )}
@@ -612,31 +570,15 @@ export default function DocumentDetailsPage() {
               </>
             )}
             
-            <Tooltip title="Zoom out">
-              <IconButton size="small" onClick={handleZoomOut} disabled={zoom <= 50}>
-                <ZoomOut />
-              </IconButton>
-            </Tooltip>
-            <Typography variant="body2" sx={{ minWidth: 60, textAlign: 'center', fontWeight: 'bold' }}>
-              {zoom}%
-            </Typography>
-            <Tooltip title="Zoom in">
-              <IconButton size="small" onClick={handleZoomIn} disabled={zoom >= 200}>
-                <ZoomIn />
-              </IconButton>
-            </Tooltip>
-            
-            <Divider orientation="vertical" flexItem sx={{ mx: 1, bgcolor: 'rgba(255,255,255,0.3)' }} />
-            
             <Tooltip title="Print">
               <IconButton size="small" onClick={() => window.print()}>
                 <Print />
               </IconButton>
             </Tooltip>
             
-            <Tooltip title={isMaximized ? "Exit fullscreen" : "Enter fullscreen"}>
+            <Tooltip title={isMaximized ? "Minimize" : "Enter fullscreen"}>
               <IconButton size="small" onClick={handleToggleMaximize}>
-                <OpenInFull />
+                {isMaximized ? <FullscreenExit /> : <OpenInFull />}
               </IconButton>
             </Tooltip>
 
@@ -645,16 +587,6 @@ export default function DocumentDetailsPage() {
                 <Download />
               </IconButton>
             </Tooltip>
-
-            {/* Search Results Display */}
-            {searchQuery && (
-              <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <FindInPage />
-                <Typography variant="body2">
-                  "{searchQuery}" - {searchResults} results found
-                </Typography>
-              </Box>
-            )}
           </Paper>
 
           {/* Document Viewer */}
@@ -771,84 +703,57 @@ export default function DocumentDetailsPage() {
           </Card>
 
           {/* Comments Section */}
-          <Card elevation={3} sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                <ChatBubbleOutline sx={{ mr: 1 }} />
+          <Card elevation={2} sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', bgcolor: '#f8fafc', borderRadius: 2, boxShadow: '0 2px 8px rgba(102,126,234,0.08)', minHeight: 220 }}>
+            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 2 }}>
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom sx={{ color: '#6366f1', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ChatBubbleOutline sx={{ mr: 1, fontSize: 20 }} />
                 Discussion ({reviews.length})
               </Typography>
-              
-              <Stack spacing={2} sx={{ flexGrow: 1, mb: 2, maxHeight: 400, overflow: 'auto' }}>
+              <Divider sx={{ mb: 1 }} />
+              <Stack spacing={1.5} sx={{ flexGrow: 1, mb: 1, maxHeight: 220, overflow: 'auto' }}>
                 {reviewsLoading && (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                    <CircularProgress size={24} />
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+                    <CircularProgress size={18} />
                   </Box>
                 )}
                 {reviews.length === 0 && !reviewsLoading && (
-                  <Box 
-                    sx={{ 
-                      textAlign: 'center', 
-                      py: 4,
-                      color: 'text.secondary',
-                      border: '2px dashed #ddd',
-                      borderRadius: 2
-                    }}
-                  >
-                    <ChatBubbleOutline sx={{ fontSize: 48, mb: 1, opacity: 0.5 }} />
+                  <Box sx={{ textAlign: 'center', py: 2, color: 'text.secondary', border: '1px dashed #ddd', borderRadius: 2 }}>
+                    <ChatBubbleOutline sx={{ fontSize: 28, mb: 1, opacity: 0.5 }} />
                     <Typography variant="body2">
-                      No comments yet. Start the discussion!
+                      No comments yet.
                     </Typography>
                   </Box>
                 )}
                 {reviews.map((review) => (
-                  <Paper key={review.id} elevation={1} sx={{ p: 2, bgcolor: "#f8fafc", borderLeft: '4px solid #3b82f6' }}>
-                    <Box display="flex" alignItems="start" gap={1} mb={1}>
-                      <Avatar sx={{ width: 24, height: 24 }}>
+                  <Paper key={review.id} elevation={1} sx={{ p: 1.5, bgcolor: review.user_id === currentUserId ? '#e0e7ff' : '#f8fafc', borderLeft: review.user_id === currentUserId ? '3px solid #6366f1' : '3px solid #3b82f6', boxShadow: review.user_id === currentUserId ? '0 1px 4px rgba(102,102,234,0.10)' : 'none', mb: 0.5 }}>
+                    <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                      <Avatar sx={{ width: 24, height: 24, bgcolor: '#6366f1', color: 'white', fontWeight: 'bold', fontSize: 14 }}>
                         {(review.username || 'U').charAt(0).toUpperCase()}
                       </Avatar>
                       <Box flexGrow={1}>
                         <Typography variant="caption" color="text.secondary">
                           {review.username || 'Anonymous'} • {new Date(review.created_at).toLocaleDateString()}
                           {review.user_id === currentUserId && (
-                            <Chip 
-                              label="Your Review" 
-                              size="small" 
-                              color="primary" 
-                              sx={{ ml: 1, height: 16, fontSize: '0.7rem' }}
-                            />
+                            <Chip label="Your Review" size="small" color="primary" sx={{ ml: 1, height: 16, fontSize: '0.75rem', fontWeight: 'bold' }} />
                           )}
                         </Typography>
                         {review.rating > 0 && (
-                          <Box display="flex" alignItems="center" gap={0.5} mt={0.5}>
-                            <Rating value={review.rating} size="small" readOnly />
-                            <Typography variant="caption" color="text.secondary">
-                              ({review.rating}/5)
-                            </Typography>
+                          <Box display="flex" alignItems="center" gap={0.5} mt={0.25}>
+                            <Rating value={review.rating} size="small" readOnly sx={{ fontSize: 16 }} />
+                            <Typography variant="caption" color="text.secondary">({review.rating}/5)</Typography>
                           </Box>
                         )}
                       </Box>
-                      <Box display="flex" gap={0.5}>
-                        {review.user_id === currentUserId && (
-                          <Tooltip title="Edit your review">
-                            <IconButton 
-                              size="small"
-                              onClick={() => {
-                                console.log('🖱️ Edit button clicked in review list');
-                                handleEditReview();
-                              }}
-                              color="primary"
-                            >
-                              <Edit fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        <IconButton size="small">
-                          <Reply fontSize="small" />
-                        </IconButton>
-                      </Box>
+                      {review.user_id === currentUserId && (
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={handleEditReview} color="primary">
+                            <Edit fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Box>
                     {review.comment && (
-                      <Typography variant="body2">{review.comment}</Typography>
+                      <Typography variant="body2" sx={{ mt: 0.5, color: '#374151', fontSize: '0.95rem' }}>{review.comment}</Typography>
                     )}
                   </Paper>
                 ))}
@@ -856,71 +761,49 @@ export default function DocumentDetailsPage() {
               
               {/* One Review Message Alert */}
               {showOneReviewMessage && (
-                <Alert 
-                  severity="info" 
-                  sx={{ mb: 2 }}
-                  action={
-                    <Box display="flex" gap={1}>
-                      <Button 
-                        size="small" 
-                        startIcon={<Edit />}
-                        onClick={() => {
-                          console.log('🖱️ Edit My Review button clicked in alert');
-                          handleEditReview();
-                        }}
-                        variant="outlined"
-                      >
-                        Edit My Review
-                      </Button>
-                      <Button 
-                        size="small" 
-                        onClick={() => setShowOneReviewMessage(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </Box>
-                  }
-                >
+                <Alert severity="info" sx={{ mb: 1, py: 0.5, fontSize: '0.95rem' }} action={
+                  <Box display="flex" gap={1}>
+                    <Button size="small" startIcon={<Edit />} onClick={handleEditReview} variant="outlined">Edit</Button>
+                    <Button size="small" onClick={() => setShowOneReviewMessage(false)}>Cancel</Button>
+                  </Box>
+                }>
                   You already have a review for this document. You can only have one review per document, but you can edit your existing review.
                 </Alert>
               )}
               
               {/* Edit Mode UI */}
               {isEditingReview && userReview && (
-                <Box sx={{ mb: 2, p: 2, border: '2px solid #2196F3', borderRadius: 2, bgcolor: '#f3f9ff' }}>
-                  <Typography variant="subtitle2" color="primary" sx={{ mb: 1, fontWeight: 'bold' }}>
+                <Box sx={{ mb: 1, p: 1.5, border: '1px solid #2196F3', borderRadius: 2, bgcolor: '#f3f9ff' }}>
+                  <Typography variant="subtitle2" color="primary" sx={{ mb: 0.5, fontWeight: 'bold', fontSize: '0.95rem' }}>
                     Editing Your Review
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-                    Current rating: {userReview.rating}/5 stars
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                    Current rating: {userReview.rating}/5
                   </Typography>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={3}
-                    value={commentInput}
-                    onChange={(e) => setCommentInput(e.target.value)}
-                    placeholder="Edit your review comment..."
-                    sx={{ mb: 2 }}
-                  />
-                  <Box display="flex" gap={1} justifyContent="flex-end">
-                    <Button 
-                      size="small" 
-                      startIcon={<Save />}
+                  <Box display="flex" gap={1}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={2}
+                      value={commentInput}
+                      onChange={(e) => setCommentInput(e.target.value)}
+                      placeholder="Edit your review..."
+                      sx={{ mb: 0 }}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && commentInput.trim()) {
+                          handleSaveEditedReview();
+                        }
+                      }}
+                    />
+                    <IconButton
+                      size="medium"
+                      color="primary"
                       onClick={handleSaveEditedReview}
-                      variant="contained"
                       disabled={!commentInput.trim()}
+                      sx={{ alignSelf: 'flex-end', ml: 1 }}
                     >
-                      Save Changes
-                    </Button>
-                    <Button 
-                      size="small" 
-                      startIcon={<Cancel />}
-                      onClick={handleCancelEdit}
-                      variant="outlined"
-                    >
-                      Cancel
-                    </Button>
+                      <Send fontSize="small" />
+                    </IconButton>
                   </Box>
                 </Box>
               )}
@@ -930,7 +813,7 @@ export default function DocumentDetailsPage() {
                 <Box display="flex" gap={1}>
                   <TextField
                     size="small"
-                    placeholder={userHasReview ? "You already have a review. Click to edit it." : "Add your comment to the discussion..."}
+                    placeholder={userHasReview ? "You already have a review. Click to edit it." : "Add your comment..."}
                     value={commentInput}
                     onChange={(e) => setCommentInput(e.target.value)}
                     sx={{ flex: 1 }}
@@ -939,23 +822,12 @@ export default function DocumentDetailsPage() {
                       endAdornment: (
                         <InputAdornment position="end">
                           {userHasReview ? (
-                            <IconButton 
-                              size="small" 
-                              onClick={() => {
-                                console.log('🖱️ Edit button clicked in input field');
-                                handleEditReview();
-                              }}
-                              title="Edit your existing review"
-                            >
-                              <Edit />
+                            <IconButton size="small" onClick={handleEditReview} title="Edit your review">
+                              <Edit fontSize="small" />
                             </IconButton>
                           ) : (
-                            <IconButton 
-                              size="small" 
-                              onClick={handleAddComment}
-                              disabled={!commentInput.trim()}
-                            >
-                              <Send />
+                            <IconButton size="small" onClick={handleAddComment} disabled={!commentInput.trim()}>
+                              <Send fontSize="small" />
                             </IconButton>
                           )}
                         </InputAdornment>
@@ -1055,21 +927,6 @@ export default function DocumentDetailsPage() {
           <ListItemText>{isBookmarked ? 'Remove Bookmark' : 'Bookmark'}</ListItemText>
         </MenuItem>
       </Menu>
-
-      {/* Floating Search Button */}
-      <Fab
-        color="primary"
-        aria-label="search"
-        sx={{ 
-          position: "fixed", 
-          bottom: 16, 
-          right: 16,
-          background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-        }}
-        onClick={handleSearchInDocument}
-      >
-        <Search />
-      </Fab>
     </Box>
   );
 }
