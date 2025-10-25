@@ -460,38 +460,6 @@ export default function VideoDetailsPage() {
             </Box>
           </Box>
           <Box display="flex" alignItems="center" gap={1}>
-            <Tooltip title="Search in video">
-              <IconButton 
-                sx={{ color: 'white' }} 
-                onClick={handleSearchInVideo}
-              >
-                <Search />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title={isBookmarked ? "Remove bookmark" : "Bookmark"}>
-              <IconButton 
-                sx={{ color: 'white' }} 
-                onClick={handleToggleBookmark}
-              >
-                {isBookmarked ? <Bookmark /> : <BookmarkBorder />}
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Share">
-              <IconButton 
-                sx={{ color: 'white' }} 
-                onClick={handleShare}
-              >
-                <Share />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="More options">
-              <IconButton 
-                sx={{ color: 'white' }} 
-                onClick={handleMenuOpen}
-              >
-                <MoreVert />
-              </IconButton>
-            </Tooltip>
             {!isLocalVideo(video.url) && (
               <Button
                 variant="contained"
@@ -585,27 +553,9 @@ export default function VideoDetailsPage() {
               </>
             )}
             
-            <Tooltip title="Zoom out">
-              <IconButton size="small" onClick={handleZoomOut} disabled={zoom <= 50}>
-                <ZoomOut />
-              </IconButton>
-            </Tooltip>
-            <Typography variant="body2" sx={{ minWidth: 60, textAlign: 'center', fontWeight: 'bold' }}>
-              {zoom}%
-            </Typography>
-            <Tooltip title="Zoom in">
-              <IconButton size="small" onClick={handleZoomIn} disabled={zoom >= 200}>
-                <ZoomIn />
-              </IconButton>
-            </Tooltip>
+           
             
             <Divider orientation="vertical" flexItem sx={{ mx: 1, bgcolor: 'rgba(255,255,255,0.3)' }} />
-            
-            <Tooltip title="Print">
-              <IconButton size="small" onClick={() => window.print()}>
-                <Print />
-              </IconButton>
-            </Tooltip>
             
             {isLocalVideo(video.url) && (
               <Tooltip title="Fullscreen">
