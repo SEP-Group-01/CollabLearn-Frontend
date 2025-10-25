@@ -229,7 +229,10 @@ export default function ThreadPage() {
 
       try {
         setEditingDocsLoading(true)
+        console.log('🔍 Fetching documents for thread:', threadId)
         const documents = await getDocumentsByThread(threadId)
+        console.log('📄 Documents received from API:', documents)
+        console.log('📊 Number of documents:', documents.length)
         
         // Transform documents to match the Document interface expected by the UI
         const transformedDocs: EditingDocument[] = documents.map(doc => ({
@@ -250,9 +253,10 @@ export default function ThreadPage() {
           userPermission: doc.userPermission || 'read'
         }))
         
+        console.log('✅ Transformed documents:', transformedDocs)
         setEditingDocuments(transformedDocs)
       } catch (error) {
-        console.error('Error fetching editing documents:', error)
+        console.error('❌ Error fetching editing documents:', error)
       } finally {
         setEditingDocsLoading(false)
       }
@@ -787,10 +791,18 @@ export default function ThreadPage() {
     title={
       <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
         <Box display="flex" alignItems="center" gap={1}>
-          <EditIcon color={threadData && threadData.currentlyEditing.length > 0 ? "primary" : "disabled"} />
+          <EditIcon color="primary" />
           <Typography variant="h6" fontWeight="bold" color="text.primary">
-            {threadData && threadData.currentlyEditing.length > 0 ? "Currently Being Edited" : "No Documents Being Edited"}
+            Collaborative Documents
           </Typography>
+          {threadData && threadData.currentlyEditing.length > 0 && (
+            <Chip 
+              label={`${threadData.currentlyEditing.length} Document${threadData.currentlyEditing.length === 1 ? '' : 's'}`}
+              size="small"
+              color="primary"
+              sx={{ height: 20, fontSize: '0.7rem' }}
+            />
+          )}
         </Box>
         
         {/* Create Document Button - Only for admins/moderators */}
@@ -901,14 +913,24 @@ export default function ThreadPage() {
         ))}
       </Stack>
     ) : (
-      <Typography 
-        variant="body2" 
-        color="text.secondary" 
-        textAlign="center" 
-        sx={{ p: 3 }}
-      >
-        No documents are currently being edited. Start collaborating by opening a document!
-      </Typography>
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <EditIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+        <Typography 
+          variant="body1" 
+          color="text.secondary" 
+          sx={{ mb: 1 }}
+        >
+          No collaborative documents yet
+        </Typography>
+        <Typography 
+          variant="body2" 
+          color="text.secondary"
+        >
+          {isAdmin 
+            ? 'Create a new document to start collaborating with your team.' 
+            : 'Check back later for collaborative documents created by your moderators.'}
+        </Typography>
+      </Box>
     )}
   </CardContent>
 </Card>
